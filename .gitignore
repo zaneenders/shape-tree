@@ -1,0 +1,18 @@
+# macOS
+.DS_Store
+
+# SwiftPM build artifacts
+/.build
+*.xcodeproj
+*.xcworkspace
+
+# SwiftPM coverage artifacts
+*.profdata
+*.profraw
+coverage.lcov
+
+# SwiftPM derived
+DerivedData/
+
+# Package.resolved noise (optional — keep if you want reproducible builds)
+# Package.resolved
