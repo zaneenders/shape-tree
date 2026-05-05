@@ -7,12 +7,12 @@ let package = Package(
   platforms: [
     .macOS(.v26)
   ],
-  products: [
-    .executable(name: "shape-tree", targets: ["ShapeTree"])
-  ],
   dependencies: [
     .package(url: "https://github.com/zaneenders/scribe.git", revision: "0718ddb"),
     .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0"),
+    .package(url: "https://github.com/apple/swift-openapi-generator.git", from: "1.0.0"),
+    .package(url: "https://github.com/apple/swift-openapi-runtime.git", from: "1.0.0"),
+    .package(url: "https://github.com/swift-server/swift-openapi-async-http-client.git", from: "1.0.0"),
   ],
   targets: [
     .executableTarget(
@@ -26,12 +26,27 @@ let package = Package(
         .swiftLanguageMode(.v6)
       ]
     ),
+    .target(
+      name: "ShapeTreeClient",
+      dependencies: [
+        .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
+        .product(name: "OpenAPIAsyncHTTPClient", package: "swift-openapi-async-http-client"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6)
+      ],
+      plugins: [
+        .plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")
+      ]
+    ),
     .testTarget(
       name: "ShapeTreeTests",
       dependencies: [
         "ShapeTree",
+        "ShapeTreeClient",
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "HummingbirdTesting", package: "hummingbird"),
+        .product(name: "OpenAPIAsyncHTTPClient", package: "swift-openapi-async-http-client"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6)
