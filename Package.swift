@@ -39,6 +39,15 @@ let package = Package(
         .plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")
       ]
     ),
+    .executableTarget(
+      name: "ShapeTreeClientCLI",
+      dependencies: [
+        "ShapeTreeClient",
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6)
+      ]
+    ),
     .testTarget(
       name: "ShapeTreeTests",
       dependencies: [

@@ -3,7 +3,7 @@
 /// The `Client` struct (transport-agnostic) and request/response types are
 /// auto-generated at build time from the bundled `openapi.yaml`.
 ///
-/// ## Quick start (local server on :8080)
+/// ## Quick start (local server on :42069)
 /// ```swift
 /// import OpenAPIAsyncHTTPClient
 /// import ShapeTreeClient
