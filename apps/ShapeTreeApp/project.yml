@@ -1,0 +1,89 @@
+name: ShapeTreeClient
+options:
+  bundleIdPrefix: org.shapetree
+
+settings:
+  DEVELOPMENT_TEAM: N2X4A6MY5F
+
+packages:
+  ShapeTreeClient:
+    path: ../shape-tree
+
+targets:
+  ShapeTreeClient-iOS:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - ShapeTreeShared
+      - ShapeTree-iOS-Only
+    resources:
+      - ShapeTree-iOS-Only/Assets.xcassets
+    settings:
+      PRODUCT_NAME: ShapeTree
+      PRODUCT_BUNDLE_IDENTIFIER: org.shapetree.shapetree-client
+      DEVELOPMENT_TEAM: N2X4A6MY5F
+      IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+      CODE_SIGN_STYLE: Automatic
+      ENABLE_PREVIEWS: YES
+      SWIFT_VERSION: "6.0"
+      SWIFT_STRICT_CONCURRENCY: complete
+      SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+      TARGETED_DEVICE_FAMILY: "1,2"
+      INFOPLIST_KEY_CFBundleDisplayName: ShapeTree
+      INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.developer-tools"
+      GENERATE_INFOPLIST_FILE: YES
+      GENERATE_ASSET_SYMBOLS: YES
+      INFOPLIST_KEY_UILaunchScreen_Generation: YES
+      INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+      INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+      INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+    dependencies:
+      - package: ShapeTreeClient
+        product: ShapeTreeClient
+
+  ShapeTreeClient-Mac:
+    type: application
+    platform: macOS
+    deploymentTarget: "26.0"
+    sources:
+      - ShapeTreeShared
+      - ShapeTree-Mac-Only
+    resources:
+      - ShapeTree-Mac-Only/Assets.xcassets
+    settings:
+      PRODUCT_NAME: ShapeTree
+      PRODUCT_BUNDLE_IDENTIFIER: org.shapetree.shapetree-client
+      DEVELOPMENT_TEAM: N2X4A6MY5F
+      MACOSX_DEPLOYMENT_TARGET: "26.0"
+      CODE_SIGN_STYLE: Automatic
+      ENABLE_PREVIEWS: YES
+      SWIFT_VERSION: "6.0"
+      SWIFT_STRICT_CONCURRENCY: complete
+      SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+      INFOPLIST_KEY_CFBundleDisplayName: ShapeTree
+      INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.developer-tools"
+      GENERATE_INFOPLIST_FILE: YES
+      INFOPLIST_KEY_NSAppTransportSecurity: 
+        NSAllowsLocalNetworking: YES
+    entitlements:
+      path: ShapeTree-Mac-Only/ShapeTree.entitlements
+      properties:
+        com.apple.security.network.client: true
+    dependencies:
+      - package: ShapeTreeClient
+        product: ShapeTreeClient
+
+schemes:
+  ShapeTreeClient-iOS:
+    build:
+      targets:
+        ShapeTreeClient-iOS: all
+    run:
+      config: Debug
+  ShapeTreeClient-Mac:
+    build:
+      targets:
+        ShapeTreeClient-Mac: all
+    run:
+      config: Debug

@@ -14,12 +14,6 @@ paths:
     post:
       operationId: createSession
       summary: Create a new agent session.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateSessionRequest"
       responses:
         "200":
           description: Session created.
@@ -27,12 +21,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CreateSessionResponse"
-        "400":
-          description: Invalid request (e.g. bad serverURL).
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HTTPErrorResponse"
 
   /sessions/{id}/completions:
     post:
@@ -73,37 +61,6 @@ paths:
 
 components:
   schemas:
-
-    CreateSessionRequest:
-      type: object
-      required:
-        - model
-        - serverURL
-        - systemPrompt
-      properties:
-        model:
-          type: string
-          description: Model identifier (e.g. "gemma4:e2b").
-        serverURL:
-          type: string
-          format: uri
-          description: OpenAI-compatible server URL (http or https).
-        systemPrompt:
-          type: string
-          description: System prompt for the agent.
-        bearerToken:
-          type: string
-          nullable: true
-          description: Optional bearer token for authentication.
-        contextWindow:
-          type: integer
-          nullable: true
-          description: Context window size in tokens (default 131072).
-        contextWindowThreshold:
-          type: number
-          format: double
-          nullable: true
-          description: Threshold fraction for context window management (default 0.85).
 
     CreateSessionResponse:
       type: object

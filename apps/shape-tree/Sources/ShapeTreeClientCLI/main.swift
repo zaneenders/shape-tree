@@ -8,14 +8,9 @@ import ShapeTreeClient
   static func main() async throws {
     let args = CommandLine.arguments
     let serverURL = parseServerURL(args) ?? "http://127.0.0.1:42069"
-    let ollamaURL = parseOllamaURL(args) ?? "http://127.0.0.1:11434"
-    let model     = parseModel(args)     ?? "gemma4:e2b"
-    let system    = parseSystem(args)
 
     print("ShapeTree Client CLI")
     print("  server:  \(serverURL)")
-    print("  ollama:  \(ollamaURL)")
-    print("  model:   \(model)")
     print()
 
     guard let server = URL(string: serverURL) else {
@@ -31,22 +26,11 @@ import ShapeTreeClient
 
     // Create session
     print("Creating session...")
-    let sessionResponse = try await client.createSession(
-      body: .json(.init(
-        model: model,
-        serverURL: ollamaURL,
-        systemPrompt: system ?? "You are a helpful coding assistant.",
-        bearerToken: parseBearerToken(args)
-      ))
-    )
+    let sessionResponse = try await client.createSession()
     let session: Components.Schemas.CreateSessionResponse
     switch sessionResponse {
     case .ok(let ok):
       session = try ok.body.json
-    case .badRequest(let err):
-      let body = try err.body.json
-      print("Error: \(body.error.message)")
-      return
     case .undocumented(let code, _):
       print("Error: server returned \(code)")
       return
@@ -95,25 +79,9 @@ import ShapeTreeClient
     valueForFlag("--server", args) ?? valueForFlag("-s", args)
   }
 
-  static func parseOllamaURL(_ args: [String]) -> String? {
-    valueForFlag("--ollama", args) ?? valueForFlag("-o", args)
-  }
-
-  static func parseModel(_ args: [String]) -> String? {
-    valueForFlag("--model", args) ?? valueForFlag("-m", args)
-  }
-
-  static func parseSystem(_ args: [String]) -> String? {
-    valueForFlag("--system", args)
-  }
-
-  static func parseBearerToken(_ args: [String]) -> String? {
-    valueForFlag("--token", args)
-  }
-
   static func valueForFlag(_ flag: String, _ args: [String]) -> String? {
     guard let idx = args.firstIndex(of: flag),
-          idx + 1 < args.count
+      idx + 1 < args.count
     else { return nil }
     return args[idx + 1]
   }

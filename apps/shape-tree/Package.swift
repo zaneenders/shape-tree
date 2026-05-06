@@ -5,7 +5,11 @@ import PackageDescription
 let package = Package(
   name: "shape-tree",
   platforms: [
-    .macOS(.v26)
+    .macOS(.v26),
+    .iOS(.v26),
+  ],
+  products: [
+    .library(name: "ShapeTreeClient", targets: ["ShapeTreeClient"])
   ],
   dependencies: [
     .package(url: "https://github.com/zaneenders/scribe.git", revision: "0718ddb"),
@@ -42,7 +46,7 @@ let package = Package(
     .executableTarget(
       name: "ShapeTreeClientCLI",
       dependencies: [
-        "ShapeTreeClient",
+        "ShapeTreeClient"
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6)
