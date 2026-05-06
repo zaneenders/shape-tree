@@ -31,8 +31,6 @@ struct ClientTests {
       let response = try await api.createSession(
         body: .json(
           .init(
-            model: "gemma4:e2b",
-            serverURL: "http://localhost:11434",
             systemPrompt: "You are a helpful coding assistant."
           )))
 
@@ -42,38 +40,6 @@ struct ClientTests {
       // id should be a valid UUID string
       #expect(UUID(uuidString: json.id) != nil)
       #expect(json.createdAt.timeIntervalSince1970 > 0)
-    }
-  }
-
-  // MARK: - POST /sessions (invalid URL)
-
-  @Test func createSessionWithInvalidURL() async throws {
-    let store = SessionStore()
-    let log = Logger(label: "test.client-invalid-url")
-    let router = buildRoutes(store: store, log: log)
-    let app = Application(router: router)
-
-    try await app.test(.live) { client in
-      let port = try #require(client.port)
-
-      let transport = AsyncHTTPClientTransport()
-      let api = Client(
-        serverURL: URL(string: "http://localhost:\(port)")!,
-        transport: transport
-      )
-
-      let response = try await api.createSession(
-        body: .json(
-          .init(
-            model: "gemma4:e2b",
-            serverURL: "ftp://example.com",
-            systemPrompt: "Hello."
-          )))
-
-      // Should be a 400 with the error response format.
-      let badRequest = try response.badRequest
-      let errorJson = try badRequest.body.json
-      #expect(!errorJson.error.message.isEmpty)
     }
   }
 

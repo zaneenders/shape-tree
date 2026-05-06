@@ -106,7 +106,7 @@ public final class ShapeTreeViewModel {
     let newClient = Client(serverURL: server, transport: transport)
 
     let response = try await newClient.createSession(
-      .init(body: .json(.init(model: "gemma4:e2b")))
+      .init(body: .json(.init()))
     )
 
     switch response {
