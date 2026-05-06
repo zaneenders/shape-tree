@@ -6,16 +6,9 @@ import ShapeTreeClient
 
 @main struct ShapeTreeClientCLI {
   static func main() async throws {
-    let args = CommandLine.arguments
-    let serverURL = parseServerURL(args) ?? "http://127.0.0.1:42069"
-    let model = parseModel(args) ?? "gemma4:e2b"
-    let ollamaURL = parseOllamaURL(args) ?? "http://127.0.0.1:11434"
-
-    print("ShapeTree Client CLI")
-    print("  server:  \(serverURL)")
-    print("  model:   \(model)")
-    print("  ollama:  \(ollamaURL)")
-    print()
+    let serverURL = "http://127.0.0.1:42069"
+    let model = "gemma4:e2b"
+    let ollamaURL = "http://127.0.0.1:11434"
 
     guard let server = URL(string: serverURL) else {
       print("Error: invalid server URL: \(serverURL)")
@@ -46,8 +39,7 @@ import ShapeTreeClient
       return
     }
 
-    let sessionId = session.id
-    print("Session: \(sessionId)")
+    print("Session: \(session.id)")
     print("Type a message and press Enter.  /quit to exit.\n")
 
     // Interactive REPL
@@ -62,7 +54,7 @@ import ShapeTreeClient
       }
 
       let completionResponse = try await client.runCompletion(
-        path: .init(id: sessionId),
+        path: .init(id: session.id),
         body: .json(.init(message: line))
       )
 
@@ -84,26 +76,5 @@ import ShapeTreeClient
       }
       print()
     }
-  }
-
-  // MARK: - Argument parsing
-
-  static func parseServerURL(_ args: [String]) -> String? {
-    valueForFlag("--server", args) ?? valueForFlag("-s", args)
-  }
-
-  static func parseModel(_ args: [String]) -> String? {
-    valueForFlag("--model", args) ?? valueForFlag("-m", args)
-  }
-
-  static func parseOllamaURL(_ args: [String]) -> String? {
-    valueForFlag("--ollama", args) ?? valueForFlag("-o", args)
-  }
-
-  static func valueForFlag(_ flag: String, _ args: [String]) -> String? {
-    guard let idx = args.firstIndex(of: flag),
-      idx + 1 < args.count
-    else { return nil }
-    return args[idx + 1]
   }
 }

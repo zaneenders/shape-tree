@@ -8,6 +8,7 @@ let log = Logger(label: "shape-tree.server")
 // MARK: - Config key bindings
 
 enum Key {
+  static let serverPort: ConfigKey = "server.port"
   static let ollamaURL: ConfigKey = "ollama.url"
   static let ollamaToken: ConfigKey = "ollama.token"
   static let agentModel: ConfigKey = "agent.model"
@@ -23,6 +24,7 @@ let configPath = "shape-tree-config.json"
 let fileProvider = try await FileProvider<JSONSnapshot>(filePath: .init(configPath))
 let reader = ConfigReader(providers: [fileProvider])
 
+let port = try await reader.fetchRequiredInt(forKey: Key.serverPort)
 let ollamaURL = try await reader.fetchRequiredString(forKey: Key.ollamaURL)
 let ollamaToken = try await reader.fetchRequiredString(forKey: Key.ollamaToken)
 let agentModel = try await reader.fetchRequiredString(forKey: Key.agentModel)
@@ -46,7 +48,6 @@ let router = buildRoutes(
   contextWindowThreshold: contextWindowThreshold
 )
 let host = "0.0.0.0"
-let port = 42069
 
 let app = Application(
   router: router,
