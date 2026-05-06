@@ -1,6 +1,6 @@
 # ShapeTree Client App
 
-Basic iOS and macOS chat UI for [ShapeTree](../..).
+Basic iOS and macOS chat UI for [ShapeTree](../shape-tree/).
 
 ## Prerequisites
 
@@ -19,9 +19,9 @@ Then pick the **ShapeTreeClient-Mac** or **ShapeTreeClient-iOS** scheme and run.
 
 ## What it is
 
-A minimal single-screen chat app that talks to a local [ShapeTree server](../../Sources/ShapeTree/)
+A minimal single-screen chat app that talks to a local [ShapeTree server](../shape-tree/Sources/ShapeTree/)
 (default `http://127.0.0.1:42069`) through the OpenAPI-generated
-[ShapeTreeClient](../../Sources/ShapeTreeClient/).
+[ShapeTreeClient](../shape-tree/Sources/ShapeTreeClient/).
 
 - **macOS**: Native window with chat history and text input.
 - **iOS**: Identical UI, runs on iPhone and iPad.

@@ -7,7 +7,7 @@ settings:
 
 packages:
   ShapeTreeClient:
-    path: ../..
+    path: ../shape-tree
 
 targets:
   ShapeTreeClient-iOS:

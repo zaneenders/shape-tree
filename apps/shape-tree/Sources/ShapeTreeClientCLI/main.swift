@@ -81,7 +81,7 @@ import ShapeTreeClient
 
   static func valueForFlag(_ flag: String, _ args: [String]) -> String? {
     guard let idx = args.firstIndex(of: flag),
-          idx + 1 < args.count
+      idx + 1 < args.count
     else { return nil }
     return args[idx + 1]
   }

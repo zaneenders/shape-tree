@@ -1,27 +1,11 @@
 # shape-tree
 
-Hummingbird server wrapping ScribeAgent.
+## Structure
 
-## Testing
-
-You can use the following commands to view current test coverage.
-
-**macOS**
-```bash
-swift test --enable-code-coverage
-PROFDATA=$(find .build -name '*.profdata' -print -quit)
-BIN=$(find .build -name 'shape-treePackageTests' -type f -not -path '*.dSYM*' -print -quit)
-xcrun llvm-cov report "$BIN" --instr-profile="$PROFDATA" \
-  --ignore-filename-regex='\.build/' \
-  --ignore-filename-regex='/scribe/Sources/'
+```
+apps/
+├── shape-tree/       ← Swift package (server + client library)
+└── ShapeTreeApp/     ← iOS & macOS chat app
 ```
 
-**Linux**
-```bash
-swift test --enable-code-coverage
-PROFDATA=$(find .build -name '*.profdata' -print -quit)
-BIN=$(find .build -name 'shape-treePackageTests' -type f -print -quit)
-llvm-cov report "$BIN" --instr-profile="$PROFDATA" \
-  --ignore-filename-regex='\.build/' \
-  --ignore-filename-regex='/scribe/Sources/'
-```
+See [apps/shape-tree](./apps/shape-tree/) for the server package and [apps/ShapeTreeApp](./apps/ShapeTreeApp/) for the client app.

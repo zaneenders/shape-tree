@@ -31,7 +31,8 @@ timeline.xctimeline
 playground.xcworkspace
 
 # SwiftPM build artifacts
-/.build
+*.build
+*.swiftpm
 Packages/
 *.xcodeproj
 *.xcworkspace
@@ -41,17 +42,4 @@ Packages/
 *.profraw
 coverage.lcov
 
-# CocoaPods
-Pods/
-
-# Carthage
-Carthage/Build/
-
-# fastlane
-fastlane/report.xml
-fastlane/Preview.html
-fastlane/screenshots/**/*.png
-fastlane/test_output
-
-# Package.resolved noise (optional — keep if you want reproducible builds)
-# Package.resolved
+Package.resolved
