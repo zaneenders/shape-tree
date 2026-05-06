@@ -14,6 +14,7 @@ let package = Package(
   dependencies: [
     .package(url: "https://github.com/zaneenders/scribe.git", revision: "0718ddb"),
     .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0"),
+    .package(url: "https://github.com/hummingbird-project/swift-openapi-hummingbird.git", revision: "c464db1"),
     .package(url: "https://github.com/apple/swift-openapi-generator.git", from: "1.0.0"),
     .package(url: "https://github.com/apple/swift-openapi-runtime.git", from: "1.0.0"),
     .package(url: "https://github.com/swift-server/swift-openapi-async-http-client.git", from: "1.0.0"),
@@ -22,9 +23,11 @@ let package = Package(
     .executableTarget(
       name: "ShapeTree",
       dependencies: [
+        "ShapeTreeClient",
         .product(name: "ScribeCore", package: "scribe"),
         .product(name: "ScribeLLM", package: "scribe"),
         .product(name: "Hummingbird", package: "hummingbird"),
+        .product(name: "OpenAPIHummingbird", package: "swift-openapi-hummingbird"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6)

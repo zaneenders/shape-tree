@@ -14,6 +14,12 @@ paths:
     post:
       operationId: createSession
       summary: Create a new agent session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequest"
       responses:
         "200":
           description: Session created.
@@ -21,6 +27,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CreateSessionResponse"
+        "400":
+          description: Invalid request body.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
 
   /sessions/{id}/completions:
     post:
@@ -58,9 +70,41 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HTTPErrorResponse"
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
 
 components:
   schemas:
+
+    CreateSessionRequest:
+      type: object
+      required:
+        - model
+      properties:
+        model:
+          type: string
+          description: The model name to use (e.g. "gemma4:e2b").
+        serverURL:
+          type: string
+          format: uri
+          description: URL of the Ollama-compatible server. Defaults to the server-configured value.
+        systemPrompt:
+          type: string
+          description: Optional system prompt for the agent.
+        bearerToken:
+          type: string
+          description: Optional bearer token for the LLM server.
+        contextWindow:
+          type: integer
+          description: Maximum context window size.
+        contextWindowThreshold:
+          type: number
+          format: double
+          description: Fraction (0–1) of context window at which to compact.
 
     CreateSessionResponse:
       type: object

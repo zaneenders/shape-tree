@@ -3,6 +3,7 @@ import Hummingbird
 import HummingbirdTesting
 import Logging
 import NIOCore
+import ShapeTreeClient
 import Testing
 
 @testable import ShapeTree
@@ -36,10 +37,10 @@ struct RouterTests {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let json = try decoder.decode(
-          CreateSessionResponse.self,
+          Components.Schemas.CreateSessionResponse.self,
           from: Data(buffer: response.body)
         )
-        #expect(json.id != UUID(uuidString: "00000000-0000-0000-0000-000000000000")!)
+        #expect(UUID(uuidString: json.id) != nil)
         #expect(json.createdAt.timeIntervalSince1970 > 0)
       }
     }
@@ -69,7 +70,7 @@ struct RouterTests {
     }
   }
 
-  // MARK: - POST /sessions/:id/completions
+  // MARK: - POST /sessions/{id}/completions
 
   @Test func completionWithMalformedSessionId() async throws {
     let store = SessionStore()

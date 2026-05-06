@@ -70,7 +70,7 @@ struct ClientTests {
             systemPrompt: "Hello."
           )))
 
-      // Should be a 400 with Hummingbird's default error format
+      // Should be a 400 with the error response format.
       let badRequest = try response.badRequest
       let errorJson = try badRequest.body.json
       #expect(!errorJson.error.message.isEmpty)

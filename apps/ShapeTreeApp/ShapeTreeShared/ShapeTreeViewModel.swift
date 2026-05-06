@@ -105,7 +105,9 @@ public final class ShapeTreeViewModel {
 
     let newClient = Client(serverURL: server, transport: transport)
 
-    let response = try await newClient.createSession()
+    let response = try await newClient.createSession(
+      .init(body: .json(.init(model: "gemma4:e2b")))
+    )
 
     switch response {
     case .ok(let ok):
@@ -113,6 +115,9 @@ public final class ShapeTreeViewModel {
       sessionId = session.id
       client = newClient
       return newClient
+    case .badRequest(let err):
+      let body = try err.body.json
+      throw AppError.server(body.error.message)
     case .undocumented(let code, _):
       throw AppError.server("Server returned status \(code)")
     }
@@ -139,6 +144,9 @@ public final class ShapeTreeViewModel {
     case .notFound:
       resetSession()
       throw AppError.server("Session expired. Please try again.")
+    case .internalServerError(let err):
+      let body = try err.body.json
+      throw AppError.server(body.error.message)
     case .undocumented(let code, _):
       throw AppError.server("Server returned status \(code)")
     }

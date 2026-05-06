@@ -3,6 +3,7 @@ import Hummingbird
 import HummingbirdTesting
 import Logging
 import NIOCore
+import ShapeTreeClient
 import Testing
 
 @testable import ShapeTree
@@ -24,7 +25,7 @@ import Testing
           "systemPrompt": "Reply concisely."
       }
       """#
-    let sessionId: UUID = try await client.execute(
+    let sessionId: String = try await client.execute(
       uri: "/sessions",
       method: .post,
       body: ByteBuffer(string: createBody)
@@ -33,7 +34,7 @@ import Testing
       let decoder = JSONDecoder()
       decoder.dateDecodingStrategy = .iso8601
       let json = try decoder.decode(
-        CreateSessionResponse.self,
+        Components.Schemas.CreateSessionResponse.self,
         from: Data(buffer: response.body)
       )
       return json.id
@@ -42,7 +43,7 @@ import Testing
     // 2. Run a completion.
     let completionBody = #"{"message": "Say hello in exactly one word."}"#
     try await client.execute(
-      uri: "/sessions/\(sessionId.uuidString)/completions",
+      uri: "/sessions/\(sessionId)/completions",
       method: .post,
       body: ByteBuffer(string: completionBody)
     ) { response in
@@ -50,7 +51,7 @@ import Testing
 
       let decoder = JSONDecoder()
       let json = try decoder.decode(
-        CompletionResponse.self,
+        Components.Schemas.CompletionResponse.self,
         from: Data(buffer: response.body)
       )
       #expect(!json.assistant.isEmpty)

@@ -8,9 +8,13 @@ import ShapeTreeClient
   static func main() async throws {
     let args = CommandLine.arguments
     let serverURL = parseServerURL(args) ?? "http://127.0.0.1:42069"
+    let model = parseModel(args) ?? "gemma4:e2b"
+    let ollamaURL = parseOllamaURL(args) ?? "http://127.0.0.1:11434"
 
     print("ShapeTree Client CLI")
     print("  server:  \(serverURL)")
+    print("  model:   \(model)")
+    print("  ollama:  \(ollamaURL)")
     print()
 
     guard let server = URL(string: serverURL) else {
@@ -26,11 +30,17 @@ import ShapeTreeClient
 
     // Create session
     print("Creating session...")
-    let sessionResponse = try await client.createSession()
+    let sessionResponse = try await client.createSession(
+      .init(body: .json(.init(model: model, serverURL: ollamaURL)))
+    )
     let session: Components.Schemas.CreateSessionResponse
     switch sessionResponse {
     case .ok(let ok):
       session = try ok.body.json
+    case .badRequest(let err):
+      let body = try err.body.json
+      print("Error: \(body.error.message)")
+      return
     case .undocumented(let code, _):
       print("Error: server returned \(code)")
       return
@@ -66,6 +76,9 @@ import ShapeTreeClient
       case .notFound(let err):
         let body = try err.body.json
         print("Error: \(body.error.message)")
+      case .internalServerError(let err):
+        let body = try err.body.json
+        print("Error: \(body.error.message)")
       case .undocumented(let code, _):
         print("Error: server returned \(code)")
       }
@@ -77,6 +90,14 @@ import ShapeTreeClient
 
   static func parseServerURL(_ args: [String]) -> String? {
     valueForFlag("--server", args) ?? valueForFlag("-s", args)
+  }
+
+  static func parseModel(_ args: [String]) -> String? {
+    valueForFlag("--model", args) ?? valueForFlag("-m", args)
+  }
+
+  static func parseOllamaURL(_ args: [String]) -> String? {
+    valueForFlag("--ollama", args) ?? valueForFlag("-o", args)
   }
 
   static func valueForFlag(_ flag: String, _ args: [String]) -> String? {
