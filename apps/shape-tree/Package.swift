@@ -18,6 +18,7 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-openapi-generator.git", from: "1.0.0"),
     .package(url: "https://github.com/apple/swift-openapi-runtime.git", from: "1.0.0"),
     .package(url: "https://github.com/swift-server/swift-openapi-async-http-client.git", from: "1.0.0"),
+    .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0"),
   ],
   targets: [
     .executableTarget(
@@ -28,6 +29,7 @@ let package = Package(
         .product(name: "ScribeLLM", package: "scribe"),
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "OpenAPIHummingbird", package: "swift-openapi-hummingbird"),
+        .product(name: "Configuration", package: "swift-configuration"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6)

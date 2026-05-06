@@ -1,27 +1,38 @@
+import Configuration
 import Foundation
 import Hummingbird
 import Logging
 
 let log = Logger(label: "shape-tree.server")
 
-// MARK: - LLM configuration (server owns this)
+// MARK: - Config key bindings
 
-let ollamaURL =
-  ProcessInfo.processInfo.environment["OLLAMA_URL"]
-  ?? "http://127.0.0.1:11434"
-let agentModel =
-  ProcessInfo.processInfo.environment["SHAPETREE_MODEL"]
-  ?? "gemma4:e2b"
-let systemPrompt =
-  ProcessInfo.processInfo.environment["SHAPETREE_SYSTEM_PROMPT"]
-  ?? "You are a helpful coding assistant."
-let bearerToken = ProcessInfo.processInfo.environment["OLLAMA_TOKEN"]
-let contextWindow =
-  ProcessInfo.processInfo.environment["SHAPETREE_CONTEXT_WINDOW"]
-  .flatMap(Int.init) ?? 131_072
-let contextWindowThreshold =
-  ProcessInfo.processInfo.environment["SHAPETREE_CONTEXT_THRESHOLD"]
-  .flatMap(Double.init) ?? 0.85
+enum Key {
+  static let ollamaURL: ConfigKey = "ollama.url"
+  static let ollamaToken: ConfigKey = "ollama.token"
+  static let agentModel: ConfigKey = "agent.model"
+  static let systemPrompt: ConfigKey = "agent.systemPrompt"
+  static let contextWindow: ConfigKey = "agent.contextWindow"
+  static let contextWindowThreshold: ConfigKey = "agent.contextWindowThreshold"
+}
+
+// MARK: - Load configuration
+
+let configPath = "shape-tree-config.json"
+
+let fileProvider = try await FileProvider<JSONSnapshot>(filePath: .init(configPath))
+let reader = ConfigReader(providers: [fileProvider])
+
+let ollamaURL = try await reader.fetchRequiredString(forKey: Key.ollamaURL)
+let ollamaToken = try await reader.fetchRequiredString(forKey: Key.ollamaToken)
+let agentModel = try await reader.fetchRequiredString(forKey: Key.agentModel)
+let systemPrompt = try await reader.fetchRequiredString(forKey: Key.systemPrompt)
+let contextWindow = try await reader.fetchRequiredInt(forKey: Key.contextWindow)
+let contextWindowThreshold = try await reader.fetchRequiredDouble(forKey: Key.contextWindowThreshold)
+
+// MARK: - Start server
+
+let bearerToken: String? = ollamaToken.isEmpty ? nil : ollamaToken
 
 let store = SessionStore()
 let router = buildRoutes(
