@@ -1,0 +1,14 @@
+# Local-only Xcode signing (not committed). Created automatically by ./generate.sh
+# on first run if missing. Replace XXXXXXXXXX with your 10-character Apple Team ID
+# (Membership details on developer.apple.com, or Xcode → target → Signing & Capabilities).
+
+settings:
+  DEVELOPMENT_TEAM: XXXXXXXXXX
+
+targets:
+  ShapeTreeClient-iOS:
+    settings:
+      DEVELOPMENT_TEAM: XXXXXXXXXX
+  ShapeTreeClient-Mac:
+    settings:
+      DEVELOPMENT_TEAM: XXXXXXXXXX

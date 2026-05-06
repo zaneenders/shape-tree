@@ -1,0 +1,132 @@
+openapi: "3.0.3"
+info:
+  title: ShapeTree
+  description: Hummingbird server wrapping ScribeAgent.
+  version: 0.1.0
+
+servers:
+  - url: http://localhost:42069
+    description: Local development server.
+
+paths:
+
+  /sessions:
+    post:
+      operationId: createSession
+      summary: Create a new agent session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSessionRequest"
+      responses:
+        "200":
+          description: Session created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateSessionResponse"
+        "400":
+          description: Invalid request body.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+
+  /sessions/{id}/completions:
+    post:
+      operationId: runCompletion
+      summary: Run one completion turn for a session.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompletionRequest"
+      responses:
+        "200":
+          description: Completion result.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompletionResponse"
+        "400":
+          description: Invalid or missing session id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "404":
+          description: Session not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+
+components:
+  schemas:
+
+    CreateSessionRequest:
+      type: object
+      properties:
+        systemPrompt:
+          type: string
+          description: Optional system prompt override for the agent.
+
+    CreateSessionResponse:
+      type: object
+      required:
+        - id
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+
+    CompletionRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: The user message to send to the agent.
+
+    CompletionResponse:
+      type: object
+      required:
+        - assistant
+      properties:
+        assistant:
+          type: string
+          description: The assistant's reply text.
+
+    HTTPErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - message
+          properties:
+            message:
+              type: string
