@@ -82,16 +82,7 @@ components:
 
     CreateSessionRequest:
       type: object
-      required:
-        - model
       properties:
-        model:
-          type: string
-          description: The model name to use (e.g. "gemma4:e2b").
-        serverURL:
-          type: string
-          format: uri
-          description: URL of the Ollama-compatible server. Defaults to the server-configured value.
         systemPrompt:
           type: string
           description: Optional system prompt for the agent.

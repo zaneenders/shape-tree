@@ -2,16 +2,47 @@ import Foundation
 import OpenAPIAsyncHTTPClient
 import ShapeTreeClient
 
+// MARK: - Argument parsing
+
+struct Args {
+  let serverURL: String
+
+  static func parse() -> Args {
+    let defaultServer = "http://127.0.0.1:42069"
+    var server = defaultServer
+
+    var args = CommandLine.arguments.dropFirst()
+    while let arg = args.popFirst() {
+      switch arg {
+      case "--server", "-s":
+        if let val = args.popFirst() { server = val }
+      case "--help", "-h":
+        print("""
+              Usage: shape-tree-cli [options]
+
+              Options:
+                -s, --server <url>   ShapeTree server URL (default: \(defaultServer))
+                -h, --help           Show this help
+
+              """)
+        Foundation.exit(0)
+      default:
+        print("Unknown option: \(arg). Use --help for usage.")
+        Foundation.exit(1)
+      }
+    }
+    return Args(serverURL: server)
+  }
+}
+
 // MARK: - Main entry point
 
 @main struct ShapeTreeClientCLI {
   static func main() async throws {
-    let serverURL = "http://127.0.0.1:42069"
-    let model = "gemma4:e2b"
-    let ollamaURL = "http://127.0.0.1:11434"
+    let args = Args.parse()
 
-    guard let server = URL(string: serverURL) else {
-      print("Error: invalid server URL: \(serverURL)")
+    guard let server = URL(string: args.serverURL) else {
+      print("Error: invalid server URL: \(args.serverURL)")
       return
     }
 
@@ -21,10 +52,10 @@ import ShapeTreeClient
       transport: transport
     )
 
-    // Create session
+    // Create session (server uses its own configured model/LLM backend)
     print("Creating session...")
     let sessionResponse = try await client.createSession(
-      .init(body: .json(.init(model: model, serverURL: ollamaURL)))
+      .init(body: .json(.init()))
     )
     let session: Components.Schemas.CreateSessionResponse
     switch sessionResponse {

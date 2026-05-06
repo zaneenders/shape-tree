@@ -33,28 +33,16 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
       return .badRequest(.init(body: .json(error)))
     }
 
-    let model = body.model
-    let ollamaURL = body.serverURL ?? defaultOllamaURL
-
-    guard let server = URL(string: ollamaURL),
-      server.scheme == "http" || server.scheme == "https"
-    else {
-      let error = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "serverURL must be a valid http or https URL.")
-      )
-      return .badRequest(.init(body: .json(error)))
-    }
-
     let prompt = body.systemPrompt ?? systemPrompt
     let token = body.bearerToken ?? bearerToken
     let window = body.contextWindow ?? contextWindow
     let threshold = body.contextWindowThreshold ?? contextWindowThreshold
 
     let config = AgentConfig(
-      agentModel: model,
+      agentModel: agentModel,
       contextWindow: window,
       contextWindowThreshold: threshold,
-      serverURL: ollamaURL,
+      serverURL: defaultOllamaURL,
       bearerToken: token
     )
 
@@ -77,7 +65,7 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
       """
       event=session.create \
       id=\(id) \
-      model=\(model)
+      model=\(agentModel)
       """)
 
     let session = await store.get(id)
