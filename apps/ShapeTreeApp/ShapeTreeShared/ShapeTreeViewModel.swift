@@ -6,7 +6,7 @@ import SwiftUI
 /// View model for the ShapeTree chat UI.
 ///
 /// Uses the OpenAPI-generated ``Client`` to talk to a local ShapeTree server
-/// (default: `http://192.168.1.111:42069`).
+/// (default: `http://127.0.0.1:42069`).
 @Observable
 @MainActor
 public final class ShapeTreeViewModel {
@@ -33,7 +33,7 @@ public final class ShapeTreeViewModel {
   // MARK: - Init
 
   public init(
-    serverURL: String = "http://192.168.1.111:42069"
+    serverURL: String = "http://127.0.0.1:42069"
   ) {
     self.serverURL = serverURL
     self.transport = AsyncHTTPClientTransport()
@@ -50,24 +50,32 @@ public final class ShapeTreeViewModel {
     isLoading = true
     errorMessage = nil
 
-    let placeholderIndex = messages.count
-    messages.append(ChatMessage(content: "", isUser: false))
+    let placeholderID = UUID()
+    messages.append(ChatMessage(id: placeholderID, content: "", isUser: false))
 
     Task {
       do {
         let reply = try await runCompletion(userMessage: trimmed)
-        guard placeholderIndex < messages.count else { return }
-        messages[placeholderIndex] = ChatMessage(content: reply, isUser: false)
-        isLoading = false
+        replacePlaceholder(id: placeholderID, with: reply, isLoading: false)
       } catch {
-        guard placeholderIndex < messages.count else { return }
-        if messages[placeholderIndex].content.isEmpty {
-          messages.remove(at: placeholderIndex)
-        }
+        removePlaceholder(id: placeholderID, isLoading: false)
         errorMessage = error.localizedDescription
-        isLoading = false
       }
     }
+  }
+
+  private func replacePlaceholder(id: UUID, with content: String, isLoading: Bool) {
+    guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
+    messages[index] = ChatMessage(content: content, isUser: false)
+    self.isLoading = isLoading
+  }
+
+  private func removePlaceholder(id: UUID, isLoading: Bool) {
+    guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
+    if messages[index].content.isEmpty {
+      messages.remove(at: index)
+    }
+    self.isLoading = isLoading
   }
 
   /// Clear the conversation and start a fresh session.

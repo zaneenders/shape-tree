@@ -9,7 +9,7 @@ let log = Logger(label: "shape-tree.server")
 let ollamaURL = ProcessInfo.processInfo.environment["OLLAMA_URL"]
   ?? "http://127.0.0.1:11434"
 let agentModel = ProcessInfo.processInfo.environment["SHAPETREE_MODEL"]
-  ?? "gemma4:26b"
+  ?? "gemma4:e2b"
 let systemPrompt = ProcessInfo.processInfo.environment["SHAPETREE_SYSTEM_PROMPT"]
   ?? "You are a helpful coding assistant."
 let bearerToken = ProcessInfo.processInfo.environment["OLLAMA_TOKEN"]
