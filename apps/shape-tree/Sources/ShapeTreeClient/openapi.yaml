@@ -85,17 +85,7 @@ components:
       properties:
         systemPrompt:
           type: string
-          description: Optional system prompt for the agent.
-        bearerToken:
-          type: string
-          description: Optional bearer token for the LLM server.
-        contextWindow:
-          type: integer
-          description: Maximum context window size.
-        contextWindowThreshold:
-          type: number
-          format: double
-          description: Fraction (0–1) of context window at which to compact.
+          description: Optional system prompt override for the agent.
 
     CreateSessionResponse:
       type: object

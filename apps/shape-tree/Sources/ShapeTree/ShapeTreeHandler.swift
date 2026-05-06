@@ -34,16 +34,13 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
     }
 
     let prompt = body.systemPrompt ?? systemPrompt
-    let token = body.bearerToken ?? bearerToken
-    let window = body.contextWindow ?? contextWindow
-    let threshold = body.contextWindowThreshold ?? contextWindowThreshold
 
     let config = AgentConfig(
       agentModel: agentModel,
-      contextWindow: window,
-      contextWindowThreshold: threshold,
+      contextWindow: contextWindow,
+      contextWindowThreshold: contextWindowThreshold,
       serverURL: defaultOllamaURL,
-      bearerToken: token
+      bearerToken: bearerToken
     )
 
     let tools: [any ScribeTool] = [
