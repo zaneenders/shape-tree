@@ -13,7 +13,7 @@ targets:
   ShapeTreeClient-iOS:
     type: application
     platform: iOS
-    deploymentTarget: "18.0"
+    deploymentTarget: "26.0"
     sources:
       - ShapeTreeShared
       - ShapeTree-iOS-Only
@@ -23,7 +23,7 @@ targets:
       PRODUCT_NAME: ShapeTree
       PRODUCT_BUNDLE_IDENTIFIER: org.shapetree.shapetree-client
       DEVELOPMENT_TEAM: N2X4A6MY5F
-      IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+      IPHONEOS_DEPLOYMENT_TARGET: "26.0"
       CODE_SIGN_STYLE: Automatic
       ENABLE_PREVIEWS: YES
       SWIFT_VERSION: "6.0"
@@ -45,7 +45,7 @@ targets:
   ShapeTreeClient-Mac:
     type: application
     platform: macOS
-    deploymentTarget: "15.0"
+    deploymentTarget: "26.0"
     sources:
       - ShapeTreeShared
       - ShapeTree-Mac-Only
@@ -55,7 +55,7 @@ targets:
       PRODUCT_NAME: ShapeTree
       PRODUCT_BUNDLE_IDENTIFIER: org.shapetree.shapetree-client
       DEVELOPMENT_TEAM: N2X4A6MY5F
-      MACOSX_DEPLOYMENT_TARGET: "15.0"
+      MACOSX_DEPLOYMENT_TARGET: "26.0"
       CODE_SIGN_STYLE: Automatic
       ENABLE_PREVIEWS: YES
       SWIFT_VERSION: "6.0"
@@ -69,7 +69,6 @@ targets:
     entitlements:
       path: ShapeTree-Mac-Only/ShapeTree.entitlements
       properties:
-        com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
     dependencies:
       - package: ShapeTreeClient

@@ -73,7 +73,7 @@ struct ShapeTreeChatView: View {
             .frame(width: 6, height: 6)
             .foregroundStyle(.green)
         }
-        Text("\(viewModel.model) — \(viewModel.serverURL)")
+        Text("\(viewModel.serverURL)")
           .font(.caption)
           .foregroundStyle(.secondary)
           .lineLimit(1)
@@ -103,7 +103,7 @@ struct ShapeTreeChatView: View {
       Text("ShapeTree")
         .font(.title2)
         .fontWeight(.semibold)
-      Text("Send a message to start chatting with \(viewModel.model).")
+      Text("Send a message to start chatting.")
         .font(.subheadline)
         .foregroundStyle(.secondary)
         .multilineTextAlignment(.center)

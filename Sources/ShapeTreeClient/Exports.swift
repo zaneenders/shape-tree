@@ -13,11 +13,7 @@
 ///     serverURL: try Servers.Server1.url(),
 ///     transport: transport
 /// )
-/// let response = try await client.createSession(body: .json(.init(
-///     model: "gemma4:e2b",
-///     serverURL: "http://localhost:11434",
-///     systemPrompt: "You are a helpful coding assistant."
-/// )))
+/// let response = try await client.createSession()
 /// let sessionId = try response.ok.body.json.id
 ///
 /// let completion = try await client.runCompletion(

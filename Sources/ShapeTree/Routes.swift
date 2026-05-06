@@ -5,15 +5,6 @@ import ScribeCore
 
 // MARK: - Request / Response types
 
-struct CreateSessionRequest: Decodable, Sendable {
-  let model: String
-  let serverURL: String
-  let systemPrompt: String
-  let bearerToken: String?
-  let contextWindow: Int?
-  let contextWindowThreshold: Double?
-}
-
 struct CreateSessionResponse: ResponseCodable, Sendable {
   let id: UUID
   let createdAt: Date
@@ -27,35 +18,28 @@ struct CompletionResponse: ResponseCodable, Sendable {
   let assistant: String
 }
 
-struct ErrorResponse: ResponseCodable, Sendable {
-  let ok: Bool
-  let error: String
-}
-
 // MARK: - Route setup
 
-func buildRoutes(store: SessionStore, log: Logger) -> Router<BasicRequestContext> {
+func buildRoutes(
+  store: SessionStore,
+  log: Logger,
+  defaultOllamaURL: String,
+  agentModel: String,
+  systemPrompt: String,
+  bearerToken: String?,
+  contextWindow: Int,
+  contextWindowThreshold: Double
+) -> Router<BasicRequestContext> {
   let router = Router(context: BasicRequestContext.self)
 
   // MARK: POST /sessions — create a new agent session
-  router.post("/sessions") { request, context -> CreateSessionResponse in
-    let body = try await request.decode(as: CreateSessionRequest.self, context: context)
-
-    guard let serverURL = URL(string: body.serverURL),
-      let scheme = serverURL.scheme,
-      scheme == "http" || scheme == "https"
-    else {
-      throw HTTPError(
-        .badRequest, message: "Invalid serverURL (must be http or https): \(body.serverURL)"
-      )
-    }
-
+  router.post("/sessions") { _, _ -> CreateSessionResponse in
     let config = AgentConfig(
-      agentModel: body.model,
-      contextWindow: body.contextWindow ?? 131_072,
-      contextWindowThreshold: body.contextWindowThreshold ?? 0.85,
-      serverURL: body.serverURL,
-      bearerToken: body.bearerToken
+      agentModel: agentModel,
+      contextWindow: contextWindow,
+      contextWindowThreshold: contextWindowThreshold,
+      serverURL: defaultOllamaURL,
+      bearerToken: bearerToken
     )
 
     let tools: [any ScribeTool] = [
@@ -67,21 +51,19 @@ func buildRoutes(store: SessionStore, log: Logger) -> Router<BasicRequestContext
 
     let agent = ScribeAgent(
       configuration: config,
-      systemPrompt: body.systemPrompt,
+      systemPrompt: systemPrompt,
       tools: tools
     )
 
-    let id = await store.create(agent: agent, systemPrompt: body.systemPrompt)
+    let id = await store.create(agent: agent, systemPrompt: systemPrompt)
 
     log.info(
       """
       event=session.create \
       id=\(id) \
-      model=\(body.model) \
-      server=\(body.serverURL)
+      model=\(agentModel)
       """)
 
-    // Resolve createdAt from the store entry
     let session = await store.get(id)
     return CreateSessionResponse(id: id, createdAt: session?.createdAt ?? Date())
   }

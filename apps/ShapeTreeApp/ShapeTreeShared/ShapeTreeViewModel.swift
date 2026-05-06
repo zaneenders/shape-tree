@@ -6,7 +6,7 @@ import SwiftUI
 /// View model for the ShapeTree chat UI.
 ///
 /// Uses the OpenAPI-generated ``Client`` to talk to a local ShapeTree server
-/// (default: `http://localhost:42069`).
+/// (default: `http://192.168.1.111:42069`).
 @Observable
 @MainActor
 public final class ShapeTreeViewModel {
@@ -23,15 +23,6 @@ public final class ShapeTreeViewModel {
   public var serverURL: String {
     didSet { resetSession() }
   }
-  public var ollamaURL: String {
-    didSet { resetSession() }
-  }
-  public var model: String {
-    didSet { resetSession() }
-  }
-  public var systemPrompt: String {
-    didSet { resetSession() }
-  }
 
   // MARK: - Private
 
@@ -42,15 +33,9 @@ public final class ShapeTreeViewModel {
   // MARK: - Init
 
   public init(
-    serverURL: String = "http://127.0.0.1:42069",
-    ollamaURL: String = "http://127.0.0.1:11434",
-    model: String = "gemma4:e2b",
-    systemPrompt: String = "You are a helpful coding assistant."
+    serverURL: String = "http://192.168.1.111:42069"
   ) {
     self.serverURL = serverURL
-    self.ollamaURL = ollamaURL
-    self.model = model
-    self.systemPrompt = systemPrompt
     self.transport = AsyncHTTPClientTransport()
   }
 
@@ -112,13 +97,7 @@ public final class ShapeTreeViewModel {
 
     let newClient = Client(serverURL: server, transport: transport)
 
-    let response = try await newClient.createSession(
-      body: .json(.init(
-        model: model,
-        serverURL: ollamaURL,
-        systemPrompt: systemPrompt
-      ))
-    )
+    let response = try await newClient.createSession()
 
     switch response {
     case .ok(let ok):
@@ -126,9 +105,6 @@ public final class ShapeTreeViewModel {
       sessionId = session.id
       client = newClient
       return newClient
-    case .badRequest(let err):
-      let body = try err.body.json
-      throw AppError.server(body.error.message)
     case .undocumented(let code, _):
       throw AppError.server("Server returned status \(code)")
     }
@@ -153,7 +129,6 @@ public final class ShapeTreeViewModel {
       let body = try err.body.json
       throw AppError.server(body.error.message)
     case .notFound:
-      // Session expired — reset and let the next message re-create it.
       resetSession()
       throw AppError.server("Session expired. Please try again.")
     case .undocumented(let code, _):

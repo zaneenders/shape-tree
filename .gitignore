@@ -1,8 +1,38 @@
 # macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Xcode - generated project files (xcodegen regenerates from project.yml)
+*.xcodeproj
+*.xcworkspace
+xcuserdata/
+xcshareddata/IDEFindNavigatorScopes.plist
+UserInterfaceState.xcuserstate
+IDEWorkspaceChecks.plist
+*.xcuserstate
+
+# Xcode - build artifacts
+DerivedData/
+Build/
+*.xcarchive
+
+# Xcode - playground
+timeline.xctimeline
+playground.xcworkspace
 
 # SwiftPM build artifacts
 /.build
+Packages/
 *.xcodeproj
 *.xcworkspace
 
@@ -11,8 +41,17 @@
 *.profraw
 coverage.lcov
 
-# SwiftPM derived
-DerivedData/
+# CocoaPods
+Pods/
+
+# Carthage
+Carthage/Build/
+
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
 
 # Package.resolved noise (optional — keep if you want reproducible builds)
 # Package.resolved

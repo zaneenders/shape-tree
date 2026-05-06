@@ -11,11 +11,7 @@ Basic iOS and macOS chat UI for [ShapeTree](../..).
 
 ```bash
 cd apps/ShapeTreeApp
-
-# Generate the Xcode project
 xcodegen generate
-
-# Open
 open ShapeTreeClient.xcodeproj
 ```
 
