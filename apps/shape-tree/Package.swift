@@ -19,6 +19,7 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-openapi-runtime.git", from: "1.0.0"),
     .package(url: "https://github.com/swift-server/swift-openapi-async-http-client.git", from: "1.0.0"),
     .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0"),
+    .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.6.0"),
   ],
   targets: [
     .executableTarget(
@@ -51,7 +52,8 @@ let package = Package(
     .executableTarget(
       name: "ShapeTreeClientCLI",
       dependencies: [
-        "ShapeTreeClient"
+        "ShapeTreeClient",
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6)

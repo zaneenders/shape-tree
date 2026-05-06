@@ -1,54 +1,28 @@
+import ArgumentParser
 import Foundation
 import OpenAPIAsyncHTTPClient
 import ShapeTreeClient
 
-// MARK: - Argument parsing
+@main struct ShapeTreeClientCLI: AsyncParsableCommand {
+  static let configuration = CommandConfiguration(
+    abstract: "A CLI client for the ShapeTree server."
+  )
 
-struct Args {
-  let serverURL: String
+  @Option(
+    name: [ .long],
+    help: "ShapeTree server URL."
+  )
+  var server: String = "http://127.0.0.1:42069"
 
-  static func parse() -> Args {
-    let defaultServer = "http://127.0.0.1:42069"
-    var server = defaultServer
 
-    var args = CommandLine.arguments.dropFirst()
-    while let arg = args.popFirst() {
-      switch arg {
-      case "--server", "-s":
-        if let val = args.popFirst() { server = val }
-      case "--help", "-h":
-        print("""
-              Usage: shape-tree-cli [options]
-
-              Options:
-                -s, --server <url>   ShapeTree server URL (default: \(defaultServer))
-                -h, --help           Show this help
-
-              """)
-        Foundation.exit(0)
-      default:
-        print("Unknown option: \(arg). Use --help for usage.")
-        Foundation.exit(1)
-      }
-    }
-    return Args(serverURL: server)
-  }
-}
-
-// MARK: - Main entry point
-
-@main struct ShapeTreeClientCLI {
-  static func main() async throws {
-    let args = Args.parse()
-
-    guard let server = URL(string: args.serverURL) else {
-      print("Error: invalid server URL: \(args.serverURL)")
-      return
+  mutating func run() async throws {
+    guard let serverURL = URL(string: server) else {
+      throw ValidationError("Invalid server URL: \(server)")
     }
 
     let transport = AsyncHTTPClientTransport()
     let client = Client(
-      serverURL: server,
+      serverURL: serverURL,
       transport: transport
     )
 
@@ -57,17 +31,16 @@ struct Args {
     let sessionResponse = try await client.createSession(
       .init(body: .json(.init()))
     )
+
     let session: Components.Schemas.CreateSessionResponse
     switch sessionResponse {
     case .ok(let ok):
       session = try ok.body.json
     case .badRequest(let err):
       let body = try err.body.json
-      print("Error: \(body.error.message)")
-      return
+      throw ValidationError("Error: \(body.error.message)")
     case .undocumented(let code, _):
-      print("Error: server returned \(code)")
-      return
+      throw ValidationError("Error: server returned \(code)")
     }
 
     print("Session: \(session.id)")
