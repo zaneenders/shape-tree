@@ -125,7 +125,7 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
   func appendJournalEntry(
     _ input: Operations.appendJournalEntry.Input
   ) async throws -> Operations.appendJournalEntry.Output {
-    guard case let .json(body) = input.body else {
+    guard case .json(let body) = input.body else {
       let payload = Components.Schemas.HTTPErrorResponse(
         error: .init(message: "Request body must be JSON.")
       )
@@ -166,7 +166,7 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
   func registerDeviceToken(
     _ input: Operations.registerDeviceToken.Input
   ) async throws -> Operations.registerDeviceToken.Output {
-    guard case let .json(body) = input.body else {
+    guard case .json(let body) = input.body else {
       let payload = Components.Schemas.HTTPErrorResponse(
         error: .init(message: "Request body must be JSON.")
       )
@@ -194,7 +194,7 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
   func createSession(
     _ input: Operations.createSession.Input
   ) async throws -> Operations.createSession.Output {
-    guard case let .json(body) = input.body else {
+    guard case .json(let body) = input.body else {
       let error = Components.Schemas.HTTPErrorResponse(
         error: .init(message: "Request body must be JSON.")
       )
@@ -254,7 +254,7 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
       return .badRequest(.init(body: .json(error)))
     }
 
-    guard case let .json(body) = input.body else {
+    guard case .json(let body) = input.body else {
       let error = Components.Schemas.HTTPErrorResponse(
         error: .init(message: "Request body must be JSON.")
       )
@@ -280,16 +280,15 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
     )
 
     let turnLog = Logger(label: "scribe.agent.turn.\(sessionId)")
-    _ = try await session.agent.runTurn(
-      messages: &session.messages,
-      log: turnLog,
-      onEvent: { _ in }
-    )
+    let ts = session.agent.streamTurn(messages: session.messages, log: turnLog)
+    Task { for await _ in ts.events {} }
+    let result = try await ts.result.value
+    session.messages = result.messages
 
     // Persist updated messages.
     await store.setMessages(sessionId, messages: session.messages)
 
-    guard let assistantText = ChatHistory.lastAssistantText(from: session.messages) else {
+    guard let assistantText = ChatHistory.lastAssistantText(from: result.messages) else {
       let error = Components.Schemas.HTTPErrorResponse(
         error: .init(message: "No assistant response.")
       )
