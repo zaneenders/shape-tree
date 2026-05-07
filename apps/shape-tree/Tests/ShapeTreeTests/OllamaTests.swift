@@ -13,7 +13,15 @@ import Testing
 @Test func liveCompletion() async throws {
   let store = SessionStore()
   let log = Logger(label: "test.live-completion")
-  let router = buildRoutes(store: store, log: log)
+  let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+  let journalQuery = JournalQueryService(layout: layout, log: log)
+  let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+  let router = buildRoutes(
+    store: store,
+    journalService: journal,
+    journalQuery: journalQuery,
+    jwtKeys: jwtKeys,
+    log: log)
   let app = Application(router: router)
 
   try await app.test(.router) { client in
@@ -28,6 +36,7 @@ import Testing
     let sessionId: String = try await client.execute(
       uri: "/sessions",
       method: .post,
+      headers: try await JWTTestSupport.bearerHeaders(),
       body: ByteBuffer(string: createBody)
     ) { response in
       #expect(response.status == .ok)
@@ -45,6 +54,7 @@ import Testing
     try await client.execute(
       uri: "/sessions/\(sessionId)/completions",
       method: .post,
+      headers: try await JWTTestSupport.bearerHeaders(),
       body: ByteBuffer(string: completionBody)
     ) { response in
       #expect(response.status == .ok)

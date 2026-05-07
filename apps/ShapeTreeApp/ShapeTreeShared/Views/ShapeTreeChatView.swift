@@ -1,15 +1,152 @@
+import ShapeTreeClient
 import SwiftUI
 
 /// Main chat view for the ShapeTree client app.
 struct ShapeTreeChatView: View {
   @Bindable var viewModel: ShapeTreeViewModel
+  @State private var showConnectionSettings = false
+  @State private var connectionDraftURL = ""
+  @State private var connectionDraftToken = ""
+  @State private var connectionTokenFormatWarning: String?
 
   var body: some View {
     VStack(spacing: 0) {
-      // Header
+      if let pushErr = viewModel.pushNotificationError {
+        Text(pushErr)
+          .font(.caption)
+          .foregroundStyle(.orange)
+          .multilineTextAlignment(.center)
+          .padding(.horizontal, 12)
+          .padding(.vertical, 8)
+          .frame(maxWidth: .infinity)
+          .background(Color.orange.opacity(0.12))
+      }
+
+      if let apiErr = viewModel.journalError, !apiErr.isEmpty {
+        Text(apiErr)
+          .font(.caption)
+          .foregroundStyle(.orange)
+          .multilineTextAlignment(.center)
+          .padding(.horizontal, 12)
+          .padding(.vertical, 8)
+          .frame(maxWidth: .infinity)
+          .background(Color.orange.opacity(0.12))
+      }
+
+      if let chatErr = viewModel.errorMessage, !chatErr.isEmpty {
+        Text(chatErr)
+          .font(.caption)
+          .foregroundStyle(.orange)
+          .multilineTextAlignment(.center)
+          .padding(.horizontal, 12)
+          .padding(.vertical, 8)
+          .frame(maxWidth: .infinity)
+          .background(Color.orange.opacity(0.12))
+      }
+
+      TabView {
+        assistantRoot.tabItem {
+          Label("Chat", systemImage: "bubble.left.and.bubble.right.fill")
+        }
+
+        ShapeTreeJournalView(viewModel: viewModel).tabItem {
+          Label("Journal", systemImage: "book.closed")
+        }
+      }
+    }
+    .task {
+      await viewModel.refreshJournalSubjects()
+    }
+    .onChange(of: showConnectionSettings) { _, isPresented in
+      guard isPresented else { return }
+      connectionDraftURL = viewModel.serverURL
+      connectionDraftToken = viewModel.apiBearerToken ?? ""
+      connectionTokenFormatWarning = nil
+    }
+    .sheet(isPresented: $showConnectionSettings) {
+      connectionSettingsSheet
+    }
+    #if os(macOS)
+    .frame(minWidth: 540, minHeight: 460)
+    #endif
+  }
+
+  private var connectionSettingsSheet: some View {
+    NavigationStack {
+      Form {
+        Section {
+          TextField("Server URL", text: $connectionDraftURL)
+            .textContentType(.URL)
+            #if os(iOS)
+              .textInputAutocapitalization(.never)
+              .keyboardType(.URL)
+            #endif
+        } header: {
+          Text("ShapeTree server")
+        } footer: {
+          Text(
+            "Use http://127.0.0.1:PORT on this Mac or Simulator. On a physical iPhone, use your Mac's LAN IP (same Wi-Fi), not 127.0.0.1."
+          )
+        }
+
+        Section {
+          SecureField("Bearer JWT", text: $connectionDraftToken)
+          #if os(iOS)
+            .textContentType(.password)
+          #endif
+          if let hint = connectionTokenFormatWarning {
+            Text(hint)
+              .font(.footnote)
+              .foregroundStyle(.red)
+          }
+        } header: {
+          Text("API access token")
+        } footer: {
+          Text(
+            "Paste a signed JWT (HS256), usually starting with eyJ and with two dots in the string—not jwt.secret, not JSON from shape-tree-config.json. Those stay on the server only; mint a short-lived token with the same secret. Optional \"Bearer \" prefix is OK."
+          )
+        }
+      }
+      .navigationTitle("Connection")
+      #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+      #endif
+      .toolbar {
+        ToolbarItem(placement: .confirmationAction) {
+          Button("Done") {
+            connectionTokenFormatWarning = nil
+            let url = connectionDraftURL.trimmingCharacters(in: .whitespacesAndNewlines)
+            let tok = connectionDraftToken.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if !tok.isEmpty, let issue = ShapeTreeAPIClientMiddleware.bearerTokenFormatIssue(tok) {
+              connectionTokenFormatWarning = issue
+              return
+            }
+
+            if !url.isEmpty, url != viewModel.serverURL {
+              viewModel.serverURL = url
+            }
+            let normalized: String? = tok.isEmpty ? nil : ShapeTreeAPIClientMiddleware.normalizedBearerJWT(tok)
+            if normalized != viewModel.apiBearerToken {
+              viewModel.apiBearerToken = normalized
+            }
+            showConnectionSettings = false
+            Task {
+              await viewModel.refreshJournalSubjects()
+            }
+          }
+        }
+      }
+    }
+    #if os(macOS)
+      .frame(minWidth: 400, minHeight: 280)
+    #endif
+  }
+
+  private var assistantRoot: some View {
+    VStack(spacing: 0) {
       headerView
 
-      // Messages
       ScrollViewReader { proxy in
         ScrollView {
           LazyVStack(spacing: 0) {
@@ -49,16 +186,12 @@ struct ShapeTreeChatView: View {
 
       Divider()
 
-      // Input
       ShapeTreeChatInputView(
         text: $viewModel.inputText,
         onSend: { viewModel.sendMessage() },
         isLoading: viewModel.isLoading
       )
     }
-    #if os(macOS)
-    .frame(minWidth: 500, minHeight: 400)
-    #endif
   }
 
   // MARK: - Header
@@ -79,6 +212,15 @@ struct ShapeTreeChatView: View {
           .lineLimit(1)
       }
       Spacer()
+      Button {
+        showConnectionSettings = true
+      } label: {
+        Image(systemName: "network")
+          .font(.system(size: 16))
+      }
+      .buttonStyle(.plain)
+      .help("Server URL and API token")
+
       Button {
         viewModel.reset()
       } label: {

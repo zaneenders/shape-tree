@@ -8,7 +8,163 @@ servers:
   - url: http://localhost:42069
     description: Local development server.
 
+security:
+  - bearerAuth: []
+
 paths:
+
+  /journal/subjects:
+    get:
+      operationId: listJournalSubjects
+      summary: List configured journal subjects.
+      responses:
+        "200":
+          description: Subject catalogue.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalSubjectsResponse"
+        "500":
+          description: Server failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+
+  /journal/entries:
+    get:
+      operationId: listJournalEntrySummaries
+      summary: List journal entry metadata for each day in the date span that has a Markdown file.
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9]{2}-[0-9]{2}-[0-9]{2}$'
+          description: Inclusive range start (`yy-MM-dd`).
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9]{2}-[0-9]{2}-[0-9]{2}$'
+          description: Inclusive range end (`yy-MM-dd`).
+      responses:
+        "200":
+          description: Summaries for days that have an entry file on disk.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntriesSummariesResponse"
+        "400":
+          description: Invalid or malformed query parameters.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "500":
+          description: Server failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+    post:
+      operationId: appendJournalEntry
+      summary: Append a markdown journal block (git-managed).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppendJournalEntryRequest"
+      responses:
+        "201":
+          description: Entry persisted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppendJournalEntryResponse"
+        "400":
+          description: Invalid request body.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "500":
+          description: Server failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+
+  /journal/entries/{journal_day}:
+    get:
+      operationId: getJournalEntryDetail
+      summary: Load Markdown journal content for a single calendar day.
+      parameters:
+        - name: journal_day
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9]{2}-[0-9]{2}-[0-9]{2}$'
+          description: Calendar day key `yy-MM-dd`.
+      responses:
+        "200":
+          description: Entry body found on disk.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntryDetailResponse"
+        "404":
+          description: No Markdown file for this day.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "400":
+          description: Invalid path parameter.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "500":
+          description: Server failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+
+  /devices/register-token:
+    post:
+      operationId: registerDeviceToken
+      summary: Persist an APNs device token alongside optional device metadata.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceTokenRegistrationRequest"
+      responses:
+        "200":
+          description: Stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceTokenRegistrationResponse"
+        "400":
+          description: Invalid token payload.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "500":
+          description: Server failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
 
   /sessions:
     post:
@@ -78,7 +234,136 @@ paths:
                 $ref: "#/components/schemas/HTTPErrorResponse"
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
+
+    JournalSubject:
+      type: object
+      required:
+        - id
+        - label
+      properties:
+        id:
+          type: string
+          description: Stable subject identifier used when creating entries.
+        label:
+          type: string
+          description: Heading label shown in Markdown blocks.
+
+    JournalSubjectsResponse:
+      type: object
+      required:
+        - subjects
+      properties:
+        subjects:
+          type: array
+          items:
+            $ref: "#/components/schemas/JournalSubject"
+
+    JournalEntrySummary:
+      type: object
+      required:
+        - date
+        - journal_relative_path
+        - word_count
+        - line_count
+      properties:
+        date:
+          type: string
+          description: Calendar day key (`yy-MM-dd`).
+        journal_relative_path:
+          type: string
+          description: Repo-relative Markdown path (`yy/MM/yy-MM-dd.md`).
+        word_count:
+          type: integer
+          minimum: 0
+        line_count:
+          type: integer
+          minimum: 0
+
+    JournalEntriesSummariesResponse:
+      type: object
+      required:
+        - entries
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/JournalEntrySummary"
+
+    JournalEntryDetailResponse:
+      type: object
+      required:
+        - date
+        - journal_relative_path
+        - content
+        - word_count
+        - line_count
+      properties:
+        date:
+          type: string
+        journal_relative_path:
+          type: string
+        content:
+          type: string
+        word_count:
+          type: integer
+          minimum: 0
+        line_count:
+          type: integer
+          minimum: 0
+
+    AppendJournalEntryRequest:
+      type: object
+      required:
+        - subject_ids
+        - body
+      properties:
+        subject_ids:
+          type: array
+          items:
+            type: string
+          description: Subject ids to render as `# label1, label2`.
+        body:
+          type: string
+          description: Markdown body underneath the ISO-8601 timestamp line.
+        created_at:
+          type: string
+          format: date-time
+          description: Anchor date for filepath + timestamp; UTC recommended.
+
+    AppendJournalEntryResponse:
+      type: object
+      required:
+        - journal_relative_path
+      properties:
+        journal_relative_path:
+          type: string
+          description: Repo-relative Markdown path (`yy/MM/yy-MM-dd.md`) under `.shape-tree/Journal`.
+
+    DeviceTokenRegistrationRequest:
+      type: object
+      required:
+        - device_token
+      properties:
+        device_token:
+          type: string
+          description: APNs device token string.
+        device_id:
+          type: string
+          description: Optional stable client id for the on-disk JSON filename.
+
+    DeviceTokenRegistrationResponse:
+      type: object
+      required:
+        - stored
+      properties:
+        stored:
+          type: boolean
 
     CreateSessionRequest:
       type: object

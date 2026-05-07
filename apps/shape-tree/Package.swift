@@ -20,17 +20,34 @@ let package = Package(
     .package(url: "https://github.com/swift-server/swift-openapi-async-http-client.git", from: "1.0.0"),
     .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0"),
     .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.6.0"),
+    .package(url: "https://github.com/swiftlang/swift-subprocess.git", from: "0.4.0"),
+    .package(url: "https://github.com/apple/swift-system.git", from: "1.4.0"),
+    .package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"),
+    .package(url: "https://github.com/vapor/jwt-kit.git", from: "5.0.0"),
   ],
   targets: [
+    .target(
+      name: "Sit",
+      dependencies: [
+        .product(name: "Subprocess", package: "swift-subprocess"),
+        .product(name: "SystemPackage", package: "swift-system"),
+        .product(name: "Logging", package: "swift-log"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6)
+      ]
+    ),
     .executableTarget(
       name: "ShapeTree",
       dependencies: [
         "ShapeTreeClient",
+        "Sit",
         .product(name: "ScribeCore", package: "scribe"),
         .product(name: "ScribeLLM", package: "scribe"),
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "OpenAPIHummingbird", package: "swift-openapi-hummingbird"),
         .product(name: "Configuration", package: "swift-configuration"),
+        .product(name: "JWTKit", package: "jwt-kit"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6)
@@ -54,6 +71,18 @@ let package = Package(
       dependencies: [
         "ShapeTreeClient",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        .product(name: "JWTKit", package: "jwt-kit"),
+        .product(name: "Configuration", package: "swift-configuration"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6)
+      ]
+    ),
+    .testTarget(
+      name: "SitTests",
+      dependencies: [
+        "Sit",
+        .product(name: "Logging", package: "swift-log"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6)
@@ -67,6 +96,7 @@ let package = Package(
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "HummingbirdTesting", package: "hummingbird"),
         .product(name: "OpenAPIAsyncHTTPClient", package: "swift-openapi-async-http-client"),
+        .product(name: "JWTKit", package: "jwt-kit"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6)

@@ -1,5 +1,9 @@
-# ShapeTree 
+# ShapeTree
 *shape-tree-config.json
+
+# Mutable Scribe-compatible store (`data.path` pointing at checkout root keeps this subtree local only)
+/.shape-tree/
+apps/shape-tree/.shape-tree/
 apps/ShapeTreeApp/project.local.yml
 
 # macOS
