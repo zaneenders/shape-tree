@@ -1,5 +1,5 @@
 {
-  "originHash" : "f45c34f83d0ff64a24f30b98f79cbf0d343067a355ff7693a69b3a98845847be",
+  "originHash" : "e54c5545b15cffcbbe5488c66778003ac52815352f2ac1733cb6df98c10dd90a",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -42,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/zaneenders/scribe.git",
       "state" : {
-        "branch" : "0718ddb",
-        "revision" : "0718ddbb7561a2d8e96be29c696240ff5cfba401"
+        "branch" : "88e7ba5",
+        "revision" : "88e7ba50c2aec87bb2335d9932d93b4ffc2e5617"
       }
     },
     {
@@ -114,8 +114,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swiftlang/swift-cmark.git",
       "state" : {
-        "revision" : "5d9bdaa4228b381639fff09403e39a04926e2dbe",
-        "version" : "0.7.1"
+        "revision" : "924936d0427cb25a61169739a7660230bffa6ea6",
+        "version" : "0.8.0"
       }
     },
     {
@@ -186,8 +186,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-markdown.git",
       "state" : {
-        "revision" : "7d9a5ce307528578dfa777d505496bd5f544ad94",
-        "version" : "0.7.3"
+        "revision" : "3c6f9523da3a1ec2fd829673e472d95b8097a3b8",
+        "version" : "0.8.0"
       }
     },
     {
@@ -287,6 +287,24 @@
       "state" : {
         "revision" : "f039fa6d6338aab5164f3d1be16281524c9a8f89",
         "version" : "1.11.0"
+      }
+    },
+    {
+      "identity" : "swift-profile-recorder",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-profile-recorder.git",
+      "state" : {
+        "revision" : "dc22b17d43b56d499baf808ec47425b950bd948b",
+        "version" : "0.3.16"
+      }
+    },
+    {
+      "identity" : "swift-protobuf",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-protobuf.git",
+      "state" : {
+        "revision" : "81558271e243f8f47dfe8e9fdd55f3c2b5413f68",
+        "version" : "1.37.0"
       }
     },
     {

@@ -167,7 +167,7 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
   func appendJournalEntry(
     _ input: Operations.appendJournalEntry.Input
   ) async throws -> Operations.appendJournalEntry.Output {
-    guard case let .json(body) = input.body else {
+    guard case .json(let body) = input.body else {
       let payload = Components.Schemas.HTTPErrorResponse(
         error: .init(message: "Request body must be JSON.")
       )
@@ -209,7 +209,7 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
   func registerDeviceToken(
     _ input: Operations.registerDeviceToken.Input
   ) async throws -> Operations.registerDeviceToken.Output {
-    guard case let .json(body) = input.body else {
+    guard case .json(let body) = input.body else {
       let payload = Components.Schemas.HTTPErrorResponse(
         error: .init(message: "Request body must be JSON.")
       )
@@ -237,7 +237,7 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
   func createSession(
     _ input: Operations.createSession.Input
   ) async throws -> Operations.createSession.Output {
-    guard case let .json(body) = input.body else {
+    guard case .json(let body) = input.body else {
       let error = Components.Schemas.HTTPErrorResponse(
         error: .init(message: "Request body must be JSON.")
       )
@@ -246,14 +246,6 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
 
     let prompt = body.systemPrompt ?? systemPrompt
 
-    let config = AgentConfig(
-      agentModel: agentModel,
-      contextWindow: contextWindow,
-      contextWindowThreshold: contextWindowThreshold,
-      serverURL: defaultOllamaURL,
-      bearerToken: bearerToken
-    )
-
     let tools: [any ScribeTool] = [
       ShellTool(),
       ReadFileTool(),
@@ -261,10 +253,18 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
       EditFileTool(),
     ]
 
-    let agent = ScribeAgent(
-      configuration: config,
-      systemPrompt: prompt,
+    let config = ScribeConfig(
+      agentModel: agentModel,
+      contextWindow: contextWindow,
+      contextWindowThreshold: contextWindowThreshold,
+      serverURL: defaultOllamaURL,
+      apiKey: bearerToken,
       tools: tools
+    )
+
+    let agent = try ScribeAgent(
+      configuration: config,
+      systemPrompt: prompt
     )
 
     let id = await store.create(agent: agent, systemPrompt: prompt)
@@ -297,7 +297,7 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
       return .badRequest(.init(body: .json(error)))
     }
 
-    guard case let .json(body) = input.body else {
+    guard case .json(let body) = input.body else {
       let error = Components.Schemas.HTTPErrorResponse(
         error: .init(message: "Request body must be JSON.")
       )
@@ -311,28 +311,16 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
       return .notFound(.init(body: .json(error)))
     }
 
-    // Append the user message.
-    session.messages.append(
-      .init(
-        role: .user,
-        content: body.message,
-        name: nil,
-        toolCalls: nil,
-        toolCallId: nil
-      )
-    )
-
     let turnLog = Logger(label: "scribe.agent.turn.\(sessionId)")
-    _ = try await session.agent.runTurn(
-      messages: &session.messages,
-      log: turnLog,
-      onEvent: { _ in }
-    )
+    let ts = await session.agent.prompt(body.message, log: turnLog)
+    Task { for await _ in ts.events {} }
+    let result = try await ts.result.value
+    session.messages = result.messages
 
     // Persist updated messages.
     await store.setMessages(sessionId, messages: session.messages)
 
-    guard let assistantText = ChatHistory.lastAssistantText(from: session.messages) else {
+    guard let assistantText = result.messages.last(where: { $0.role == .assistant })?.content, !assistantText.isEmpty else {
       let error = Components.Schemas.HTTPErrorResponse(
         error: .init(message: "No assistant response.")
       )

@@ -12,7 +12,7 @@ let package = Package(
     .library(name: "ShapeTreeClient", targets: ["ShapeTreeClient"])
   ],
   dependencies: [
-    .package(url: "https://github.com/zaneenders/scribe.git", revision: "0718ddb"),
+    .package(url: "https://github.com/zaneenders/scribe.git", revision: "88e7ba5"),
     .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0"),
     .package(url: "https://github.com/hummingbird-project/swift-openapi-hummingbird.git", revision: "c464db1"),
     .package(url: "https://github.com/apple/swift-openapi-generator.git", from: "1.0.0"),
