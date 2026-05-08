@@ -8,6 +8,9 @@ import SwiftUI
 @MainActor
 public final class ShapeTreeViewModel {
 
+  fileprivate nonisolated static let journalUnauthorizedJWTMessage =
+    "Unauthorized (401). Paste a minted JWT (three segments like eyJ… . … . …)—not jwt.secret or JSON from shape-tree-config.json. Mint with `swift run ShapeTreeClientCLI --mint-token` from apps/shape-tree. Same token as Chat (Connection)."
+
   // MARK: - Chat UI
 
   public var messages: [ChatMessage] = []
@@ -32,6 +35,8 @@ public final class ShapeTreeViewModel {
   public var journalDraft: String = ""
   public var journalStatus: String? = nil
   public var journalError: String? = nil
+  /// Load failures for the journal calendar grid (separate from composer / subject `journalError`).
+  public var journalCalendarError: String? = nil
   public var isJournalWorking: Bool = false
 
   // MARK: - Push notifications
@@ -48,6 +53,7 @@ public final class ShapeTreeViewModel {
       journalSubjects.removeAll()
       journalStatus = nil
       journalError = nil
+      journalCalendarError = nil
       journalSelectedSubjectIDs = []
     }
   }
@@ -196,9 +202,7 @@ public final class ShapeTreeViewModel {
 
     case .undocumented(let statusCode, _):
       if statusCode == 401 {
-        throw AppError.server(
-          "Unauthorized (401). Paste a minted JWT (three segments like eyJ… . … . …)—not jwt.secret or JSON from shape-tree-config. Chat uses the same token as Journal (Connection)."
-        )
+        throw AppError.server(Self.journalUnauthorizedJWTMessage)
       }
       throw AppError.server("Server returned status \(statusCode)")
     }
@@ -230,15 +234,30 @@ public final class ShapeTreeViewModel {
       throw AppError.server(body.error.message)
     case .undocumented(let statusCode, _):
       if statusCode == 401 {
-        throw AppError.server(
-          "Unauthorized (401). Paste a minted JWT (three segments like eyJ… . … . …)—not jwt.secret or config JSON. Same token as Journal (Connection)."
-        )
+        throw AppError.server(Self.journalUnauthorizedJWTMessage)
       }
       throw AppError.server("Server returned status \(statusCode)")
     }
   }
 
   // MARK: - Journal endpoints
+
+  /// Two-digit journal day key `yy-MM-dd` for the device's local civil day (sent as `journal_day` on append).
+  private static func localJournalDayKey(for date: Date) -> String {
+    let calendar = Calendar.autoupdatingCurrent
+    let yy = calendar.component(.year, from: date) % 100
+    let mm = calendar.component(.month, from: date)
+    let dd = calendar.component(.day, from: date)
+    return String(format: "%02d-%02d-%02d", yy, mm, dd)
+  }
+
+  public func reportJournalCalendarLoadFailure(_ error: Error) {
+    journalCalendarError = error.localizedDescription
+  }
+
+  public func clearJournalCalendarError() {
+    journalCalendarError = nil
+  }
 
   public func refreshJournalSubjects() async {
     journalError = nil
@@ -248,9 +267,8 @@ public final class ShapeTreeViewModel {
       return
     }
 
-    isJournalWorking = true
-    defer { isJournalWorking = false }
-
+    // Subject list refresh runs on tab load and from the composer; do not use the global
+    // `isJournalWorking` overlay here — a slow or hung server would block the whole journal UI.
     do {
       let remote = try makeClient()
       let response = try await remote.listJournalSubjects(.init(headers: .init()))
@@ -281,14 +299,10 @@ public final class ShapeTreeViewModel {
 
       case .undocumented(let statusCode, _):
         if statusCode == 401 {
-          journalError =
-            "Unauthorized (401). Paste a minted JWT (starts with eyJ, two dots)—not jwt.secret or JSON from shape-tree-config.json. Mint with `swift run ShapeTreeClientCLI --mint-token` from apps/shape-tree (see README)."
+          journalError = Self.journalUnauthorizedJWTMessage
         } else {
           journalError = "Unexpected status \(statusCode) while fetching subjects."
         }
-
-      default:
-        journalError = "Could not load journal subjects."
       }
     } catch {
       journalError = error.localizedDescription
@@ -303,14 +317,75 @@ public final class ShapeTreeViewModel {
     }
   }
 
-  public func appendJournalEntryUsingServer() async {
+  /// Creates a subject label on the server when new; updates local chip list (Scribe ``appendJournalSubject`` parity).
+  @discardableResult
+  public func appendJournalSubjectAndRefresh(_ rawName: String) async -> Bool {
+    let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !name.isEmpty else {
+      journalError =
+        "Enter a subject name before adding."
+      return false
+    }
+
+    guard !serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      journalError = "Enter a ShapeTree server URL first."
+      return false
+    }
+
+    journalError = nil
+    journalStatus = nil
+    isJournalWorking = true
+    defer { isJournalWorking = false }
+
+    do {
+      let remote = try makeClient()
+      let response = try await remote.appendJournalSubject(
+        Operations.appendJournalSubject.Input(body: .json(.init(subject: name)))
+      )
+
+      switch response {
+      case .ok(let packet):
+        let payload = try packet.body.json
+        journalSubjects = payload.subjects.map { JournalSubjectRow(id: $0.id, label: $0.label) }
+        if let row = payload.subjects.first(where: { $0.label.caseInsensitiveCompare(name) == .orderedSame }) {
+          journalSelectedSubjectIDs.insert(row.id)
+        }
+        journalStatus = "Subject \"\(name)\" is available."
+        return true
+
+      case .badRequest(let err):
+        let body = try err.body.json
+        journalError = body.error.message
+
+      case .internalServerError(let err):
+        let body = try err.body.json
+        journalError = body.error.message
+
+      case .unauthorized:
+        journalError = Self.journalUnauthorizedJWTMessage
+
+      case .undocumented(let code, _):
+        if code == 401 {
+          journalError = Self.journalUnauthorizedJWTMessage
+        } else {
+          journalError = "Unexpected status \(code) while adding subject."
+        }
+      }
+    } catch {
+      journalError = error.localizedDescription
+    }
+    return false
+  }
+
+  public func appendJournalEntryUsingServer(filingDate: Date = Date()) async {
     let bodyText = journalDraft.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !bodyText.isEmpty else {
       journalError = "Write something before appending."
       return
     }
     guard !journalSelectedSubjectIDs.isEmpty else {
-      journalError = "Select at least one subject."
+      journalError =
+        "Select at least one subject (tap + to create one if the list is empty)."
       return
     }
 
@@ -324,6 +399,7 @@ public final class ShapeTreeViewModel {
       let payload = Components.Schemas.AppendJournalEntryRequest(
         subject_ids: Array(journalSelectedSubjectIDs).sorted(),
         body: bodyText,
+        journal_day: Self.localJournalDayKey(for: filingDate),
         created_at: nil
       )
 
@@ -347,17 +423,18 @@ public final class ShapeTreeViewModel {
         journalError = body.error.message
 
       case .undocumented(let code, _):
-        journalError = "Unexpected status \(code) while appending."
-
-      default:
-        journalError = "Unexpected append response."
+        if code == 401 {
+          journalError = Self.journalUnauthorizedJWTMessage
+        } else {
+          journalError = "Unexpected status \(code) while appending."
+        }
       }
     } catch {
       journalError = error.localizedDescription
     }
   }
 
-  /// Lists journal entry metadata for each day in the UTC-aligned span `[startDayKey, endDayKey]` (`yy-MM-dd`).
+  /// Lists journal entry metadata for each day in the span `[startDayKey, endDayKey]` (`yy-MM-dd`, device-local calendar).
   public func fetchJournalEntrySummaries(startDayKey: String, endDayKey: String) async throws
     -> [Components.Schemas.JournalEntrySummary]
   {
@@ -378,6 +455,9 @@ public final class ShapeTreeViewModel {
       let body = try err.body.json
       throw AppError.server(body.error.message)
     case .undocumented(let code, _):
+      if code == 401 {
+        throw AppError.server(Self.journalUnauthorizedJWTMessage)
+      }
       throw AppError.server("Unexpected status \(code) while listing journal entries.")
     }
   }
@@ -401,6 +481,9 @@ public final class ShapeTreeViewModel {
       let body = try err.body.json
       throw AppError.server(body.error.message)
     case .undocumented(let code, _):
+      if code == 401 {
+        throw AppError.server(Self.journalUnauthorizedJWTMessage)
+      }
       throw AppError.server("Unexpected status \(code) while loading journal entry.")
     }
   }

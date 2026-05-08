@@ -1,11 +1,25 @@
 import SwiftUI
 
 enum JournalEntrySectioning {
+
+  /// Strips per-block ISO‑8601 instant lines ShapeTree may persist between `# heading` and the body
+  /// (Scribe-shaped journals have no timestamp in the prose). Requires a flex gap after the instant so
+  /// we still match when the body follows on the next line or after a blank line.
+  private static func strippingLegacyHeadingTimestamps(_ raw: String) -> String {
+    guard let regex = try? NSRegularExpression(
+      pattern: #"(?m)^(#[^\n]+\n)\n*(\d{4}-\d{2}-\d{2}T[^\n]+)\n+"#,
+      options: []
+    )
+    else { return raw }
+    let range = NSRange(raw.startIndex..., in: raw)
+    return regex.stringByReplacingMatches(in: raw, options: [], range: range, withTemplate: "$1\n")
+  }
+
   /// Splits raw journal markdown on lines that are thematic breaks (three or more `-` after trimming whitespace).
   ///
   /// **Note:** A line of only dashes inside entry *body* becomes a visible section boundary (unlike the older reader that stripped `-----`). Prefer prose or headings if you need a horizontal rule without splitting.
   static func sections(from raw: String) -> [String] {
-    let unified = raw.replacingOccurrences(of: "\r\n", with: "\n")
+    let unified = strippingLegacyHeadingTimestamps(raw.replacingOccurrences(of: "\r\n", with: "\n"))
     var result: [String] = []
     var currentLines: [String] = []
 
@@ -42,7 +56,7 @@ struct JournalEntrySectionDivider: View {
         .frame(height: 1)
       Image(systemName: "rectangle.split.1x2")
         .font(.caption2.weight(.medium))
-        .foregroundStyle(.tertiary)
+        .foregroundStyle(Color.secondary.opacity(0.45))
         .accessibilityLabel("Section break")
       Rectangle()
         .fill(Color.secondary.opacity(0.22))
@@ -55,20 +69,98 @@ struct JournalEntrySectionedBody: View {
   let sections: [String]
   var textFont: Font
   var lineSpacing: CGFloat
+  /// Scribe journals read as continuous markdown; ornate dividers suit internal tooling previews.
+  var sectionSeparator: SectionSeparator = .iconRule
+
+  enum SectionSeparator {
+    case iconRule
+    case scribeSpacing
+  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 0) {
       ForEach(Array(sections.enumerated()), id: \.offset) { index, section in
         if index > 0 {
-          JournalEntrySectionDivider()
-            .padding(.vertical, 10)
+          switch sectionSeparator {
+          case .iconRule:
+            JournalEntrySectionDivider()
+              .padding(.vertical, 10)
+          case .scribeSpacing:
+            Color.clear
+              .frame(height: 20)
+          }
         }
-        Text(section)
-          .font(textFont)
+        // Scribe’s reader uses plain `Text(section)` so layout is predictable. We still want
+        // markdown (headings, links), but a single `.font` on `Text(AttributedString)` collapses
+        // typography to one run—everything looks “mashed” and `#` headings never read as headings.
+        // SwiftUI only gets explicit sizes if we copy presentation intents into per-range fonts.
+        Text(styledJournalMarkdown(section))
           .lineSpacing(lineSpacing)
+          .multilineTextAlignment(.leading)
           .frame(maxWidth: .infinity, alignment: .leading)
           .textSelection(.enabled)
       }
+    }
+  }
+
+  private func styledJournalMarkdown(_ raw: String) -> AttributedString {
+    var opts = AttributedString.MarkdownParsingOptions()
+    opts.interpretedSyntax = .full
+    opts.failurePolicy = .returnPartiallyParsedIfPossible
+    var output = (try? AttributedString(markdown: raw, options: opts)) ?? AttributedString(raw)
+    // `AttributedString(markdown:)` encodes block structure only in `PresentationIntent`, not as
+    // newline characters—so `# General` + `ok` becomes adjacent runs spelling `Generalok` and SwiftUI
+    // draws them on one line. Restore spacing whenever the presentation-intent “container” changes.
+    output = Self.reinsertMarkdownBlockNewlines(output)
+
+    let presentation = AttributeScopes.FoundationAttributes.PresentationIntentAttribute.self
+    // Reverse so attribute mutations remain stable over ranges.
+    for (intent, range) in output.runs[presentation].reversed() {
+      guard let intent else {
+        output[range].swiftUI.font = textFont
+        continue
+      }
+      var resolved = textFont
+      for component in intent.components {
+        if case .header(let level) = component.kind {
+          resolved = Self.headerFont(for: level)
+          break
+        }
+      }
+      output[range].swiftUI.font = resolved
+    }
+
+    return output
+  }
+
+  /// Inserts paragraph breaks between Markdown block runs. Required because Foundation’s Markdown
+  /// → `AttributedString` conversion does not insert `\n` between headers/paragraphs/list items—the
+  /// character view can literally read `Generalok` while the runs still carry distinct intents.
+  private static func reinsertMarkdownBlockNewlines(_ source: AttributedString) -> AttributedString {
+    var out = AttributedString()
+    var isFirst = true
+    var previousIntent: PresentationIntent?
+    for run in source.runs {
+      if !isFirst, previousIntent != run.presentationIntent {
+        out.append(AttributedString("\n\n"))
+      }
+      out.append(source[run.range])
+      previousIntent = run.presentationIntent
+      isFirst = false
+    }
+    return out
+  }
+
+  private static func headerFont(for level: Int) -> Font {
+    switch level {
+    case 1:
+      return .title2.weight(.bold)
+    case 2:
+      return .title3.weight(.semibold)
+    case 3:
+      return .headline.weight(.semibold)
+    default:
+      return .headline.weight(.semibold)
     }
   }
 }

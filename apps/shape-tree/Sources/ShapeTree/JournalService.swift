@@ -3,6 +3,7 @@ import System
 #else
 import SystemPackage
 #endif
+import CryptoKit
 import Foundation
 import Logging
 import Sit
@@ -10,6 +11,8 @@ import Sit
 public enum JournalServiceError: Error, Sendable, CustomStringConvertible {
   case emptySubjects
   case utf8EncodingFailed
+  case emptySubjectLabel
+  case invalidJournalDayKey
 
   public var description: String {
     switch self {
@@ -17,6 +20,10 @@ public enum JournalServiceError: Error, Sendable, CustomStringConvertible {
       "At least one subject id is required."
     case .utf8EncodingFailed:
       "Journal text is not valid UTF-8."
+    case .emptySubjectLabel:
+      "Subject label cannot be empty."
+    case .invalidJournalDayKey:
+      "journal_day must be a valid yy-MM-dd key."
     }
   }
 }
@@ -54,10 +61,31 @@ public actor JournalService {
     return try JSONDecoder().decode(JournalSubjectsFile.self, from: data)
   }
 
+  /// Adds a subject when no existing row has the same label (case-insensitive). Otherwise returns the file unchanged.
+  public func appendSubject(rawLabel: String) throws -> JournalSubjectsFile {
+    let label = rawLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !label.isEmpty else {
+      throw JournalServiceError.emptySubjectLabel
+    }
+
+    var file = try loadSubjects()
+    if file.subjects.contains(where: { $0.label.caseInsensitiveCompare(label) == .orderedSame }) {
+      return file
+    }
+
+    let usedIds = Set(file.subjects.map(\.id))
+    let newId = Self.makeUniqueSubjectId(for: label, existingIds: usedIds)
+    file.subjects.append(JournalSubjectsFile.Subject(id: newId, label: label))
+    try Self.writeSubjectsFile(file, to: layout.journalSubjectsFile, fileManager: fileManager)
+    log.info("event=journal.subject.append id=\(newId) label=\(label)")
+    return file
+  }
+
   public func appendEntry(
     subjectIds: [String],
     body: String,
-    createdAt: Date?
+    createdAt: Date?,
+    journalDayKey: String?
   ) async throws -> String {
     guard !subjectIds.isEmpty else {
       throw JournalServiceError.emptySubjects
@@ -68,13 +96,13 @@ public actor JournalService {
     let labels = subjectIds.map { lookup[$0] ?? $0 }
     let heading = labels.joined(separator: ", ")
 
-    let created = createdAt ?? Date()
-    let iso = ISO8601DateFormatter()
-    iso.formatOptions = [.withInternetDateTime]
+    let now = Date()
+    let rawCreated = createdAt ?? now
+    // Never persist a stamp or filing day in the future (bad clients / clock skew).
+    let created = rawCreated <= now ? rawCreated : now
 
     let blockLines = [
       "# \(heading)",
-      iso.string(from: created),
       "",
       body.trimmingCharacters(in: .whitespacesAndNewlines),
       "",
@@ -83,7 +111,18 @@ public actor JournalService {
     ]
     let block = blockLines.joined(separator: "\n")
 
-    let relativePath = JournalPathCodec.relativeMarkdownPath(for: created)
+    let filingDate: Date
+    if let journalDayKey {
+      let trimmed = journalDayKey.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard let d = JournalPathCodec.date(fromJournalDayKey: trimmed) else {
+        throw JournalServiceError.invalidJournalDayKey
+      }
+      filingDate = d
+    } else {
+      filingDate = created
+    }
+
+    let relativePath = JournalPathCodec.relativeMarkdownPath(for: filingDate)
     let entryURL = layout.journalRepoRoot.appendingPathComponent(relativePath, isDirectory: false)
     let parent = entryURL.deletingLastPathComponent()
     try fileManager.createDirectory(at: parent, withIntermediateDirectories: true)
@@ -137,5 +176,71 @@ public actor JournalService {
   private struct PersistedDeviceRecord: Encodable {
     let deviceToken: String
     let deviceId: String?
+  }
+
+  private static func writeSubjectsFile(
+    _ file: JournalSubjectsFile,
+    to url: URL,
+    fileManager: FileManager
+  ) throws {
+    let data = try file.encodedForSubjectsFile()
+    try fileManager.createDirectory(
+      at: url.deletingLastPathComponent(),
+      withIntermediateDirectories: true
+    )
+    try data.write(to: url, options: .atomic)
+  }
+
+  private static func makeUniqueSubjectId(for label: String, existingIds: Set<String>) -> String {
+    var base = deriveBaseId(from: label)
+    if base.isEmpty {
+      base = "subject"
+    }
+    if !existingIds.contains(base) {
+      return base
+    }
+    var n = 2
+    while existingIds.contains("\(base)-\(n)") {
+      n += 1
+    }
+    return "\(base)-\(n)"
+  }
+
+  private static func deriveBaseId(from label: String) -> String {
+    let normalized =
+      label
+      .precomposedStringWithCanonicalMapping
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+
+    var slug = ""
+    slug.reserveCapacity(normalized.count)
+    for ch in normalized {
+      if ch.isLetter || ch.isNumber {
+        slug.append(contentsOf: String(ch).lowercased())
+      } else if ch.isWhitespace || ch == "-" || ch == "_" {
+        slug.append("-")
+      } else {
+        slug.append("-")
+      }
+    }
+    while slug.contains("--") {
+      slug = slug.replacingOccurrences(of: "--", with: "-")
+    }
+    slug = slug.trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+    if slug.isEmpty {
+      return fallbackSubjectIdDigest(normalized)
+    }
+    let sanitized = JournalPathCodec.sanitizeFilenameComponent(slug).lowercased()
+    if sanitized.isEmpty || sanitized == "unknown-device" {
+      return fallbackSubjectIdDigest(normalized)
+    }
+    return sanitized
+  }
+
+  /// Stable, filename-safe token when the label does not slugify (e.g. emoji-only).
+  private static func fallbackSubjectIdDigest(_ normalizedLabel: String) -> String {
+    let hash = SHA256.hash(data: Data(normalizedLabel.utf8))
+    let hex = hash.prefix(6).map { String(format: "%02x", $0) }.joined()
+    return "s-\(hex)"
   }
 }

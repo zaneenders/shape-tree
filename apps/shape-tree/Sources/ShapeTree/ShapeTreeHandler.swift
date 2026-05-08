@@ -44,6 +44,48 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
     }
   }
 
+  // MARK: POST /journal/subjects
+
+  func appendJournalSubject(
+    _ input: Operations.appendJournalSubject.Input
+  ) async throws -> Operations.appendJournalSubject.Output {
+    guard case let .json(body) = input.body else {
+      let payload = Components.Schemas.HTTPErrorResponse(
+        error: .init(message: "Request body must be JSON.")
+      )
+      return .badRequest(.init(body: .json(payload)))
+    }
+
+    do {
+      let file = try await journalService.appendSubject(rawLabel: body.subject)
+      let subjects = file.subjects.map {
+        Components.Schemas.JournalSubject(id: $0.id, label: $0.label)
+      }
+      let response = Components.Schemas.JournalSubjectsResponse(subjects: subjects)
+      return .ok(.init(body: .json(response)))
+    } catch let error as JournalServiceError {
+      switch error {
+      case .emptySubjectLabel:
+        let payload = Components.Schemas.HTTPErrorResponse(
+          error: .init(message: error.description)
+        )
+        return .badRequest(.init(body: .json(payload)))
+      case .emptySubjects, .utf8EncodingFailed, .invalidJournalDayKey:
+        log.error("event=journal.subjects.append.unexpected_journal_error error=\(error.description)")
+        let payload = Components.Schemas.HTTPErrorResponse(
+          error: .init(message: "Failed to append journal subject.")
+        )
+        return .internalServerError(.init(body: .json(payload)))
+      }
+    } catch {
+      log.error("event=journal.subjects.append.failure error=\(error.localizedDescription)")
+      let payload = Components.Schemas.HTTPErrorResponse(
+        error: .init(message: "Failed to append journal subject.")
+      )
+      return .internalServerError(.init(body: .json(payload)))
+    }
+  }
+
   // MARK: GET /journal/entries
 
   func listJournalEntrySummaries(
@@ -143,7 +185,8 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
       let path = try await journalService.appendEntry(
         subjectIds: body.subject_ids,
         body: body.body,
-        createdAt: body.created_at)
+        createdAt: body.created_at,
+        journalDayKey: body.journal_day)
 
       let response = Components.Schemas.AppendJournalEntryResponse(
         journal_relative_path: path)

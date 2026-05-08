@@ -86,6 +86,38 @@ struct ClientTests {
     }
   }
 
+  @Test func appendJournalSubjectViaGeneratedClient() async throws {
+    let store = SessionStore()
+    let log = Logger(label: "test.client-append-subject")
+    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let journalQuery = JournalQueryService(layout: layout, log: log)
+    let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+    let router = buildRoutes(
+      store: store,
+      journalService: journal,
+      journalQuery: journalQuery,
+      jwtKeys: jwtKeys,
+      log: log)
+    let app = Application(router: router)
+
+    try await app.test(.live) { client in
+      let port = try #require(client.port)
+      let transport = AsyncHTTPClientTransport()
+      let token = try await ShapeTreeTokenIssuer.mintHS256(secret: JWTTestSupport.secret)
+      let api = Client(
+        serverURL: URL(string: "http://localhost:\(port)")!,
+        transport: transport,
+        middlewares: [BearerAuthClientMiddleware(bearerToken: token)]
+      )
+      let response = try await api.appendJournalSubject(
+        body: .json(.init(subject: "Ship Log"))
+      )
+      let ok = try response.ok
+      let decoded = try ok.body.json
+      #expect(decoded.subjects.contains { $0.label == "Ship Log" })
+    }
+  }
+
   // MARK: - POST /sessions/{id}/completions
 
   @Test func completionWithMalformedSessionId() async throws {

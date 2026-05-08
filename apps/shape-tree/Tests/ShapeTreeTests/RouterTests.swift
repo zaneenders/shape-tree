@@ -72,6 +72,80 @@ struct RouterTests {
     }
   }
 
+  @Test func appendJournalSubjectAddsLabelAndPersistsRoundTrip() async throws {
+    let store = SessionStore()
+    let log = Logger(label: "test.journal-subject-append")
+    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let journalQuery = JournalQueryService(layout: layout, log: log)
+    let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+    let router = buildRoutes(
+      store: store,
+      journalService: journal,
+      journalQuery: journalQuery,
+      jwtKeys: jwtKeys,
+      log: log
+    )
+    let app = Application(router: router)
+
+    try await app.test(.router) { client in
+      let bodyPayload = #"{"subject":"Field Notes"}"#
+      try await client.execute(
+        uri: "/journal/subjects",
+        method: .post,
+        headers: try await JWTTestSupport.bearerHeaders(),
+        body: ByteBuffer(string: bodyPayload)
+      ) { response in
+        #expect(response.status == .ok)
+        let decoded = try JSONDecoder().decode(
+          Components.Schemas.JournalSubjectsResponse.self,
+          from: Data(buffer: response.body)
+        )
+        #expect(decoded.subjects.contains { $0.label == "Field Notes" })
+      }
+
+      try await client.execute(
+        uri: "/journal/subjects",
+        method: .get,
+        headers: try await JWTTestSupport.bearerHeaders()
+      ) { response in
+        #expect(response.status == .ok)
+        let decoded = try JSONDecoder().decode(
+          Components.Schemas.JournalSubjectsResponse.self,
+          from: Data(buffer: response.body)
+        )
+        #expect(decoded.subjects.contains { $0.label == "Field Notes" })
+      }
+    }
+  }
+
+  @Test func appendJournalSubjectRejectsEmptyLabel() async throws {
+    let store = SessionStore()
+    let log = Logger(label: "test.journal-subject-empty")
+    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let journalQuery = JournalQueryService(layout: layout, log: log)
+    let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+    let router = buildRoutes(
+      store: store,
+      journalService: journal,
+      journalQuery: journalQuery,
+      jwtKeys: jwtKeys,
+      log: log
+    )
+    let app = Application(router: router)
+
+    try await app.test(.router) { client in
+      let bodyPayload = #"{"subject":"   "}"#
+      try await client.execute(
+        uri: "/journal/subjects",
+        method: .post,
+        headers: try await JWTTestSupport.bearerHeaders(),
+        body: ByteBuffer(string: bodyPayload)
+      ) { response in
+        #expect(response.status == .badRequest)
+      }
+    }
+  }
+
   @Test func appendJournalCommitsMarkdownBlock() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.journal-append")
@@ -88,7 +162,9 @@ struct RouterTests {
     let app = Application(router: router)
 
     try await app.test(.router) { client in
-      let bodyPayload = #"{"subject_ids":["general"],"body":"hello from test"}"#
+      let filingDayKey = JournalPathCodec.journalDayKey(for: Date(), calendar: .current)
+      let bodyPayload =
+        "{\"subject_ids\":[\"general\"],\"body\":\"hello from test\",\"journal_day\":\"\(filingDayKey)\"}"
       try await client.execute(
         uri: "/journal/entries",
         method: .post,
@@ -129,7 +205,7 @@ struct RouterTests {
 
     try await app.test(.router) { client in
       let appendBody =
-        #"{"subject_ids":["general"],"body":"calendar api","created_at":"2026-05-06T15:00:00Z"}"#
+        #"{"subject_ids":["general"],"body":"calendar api","created_at":"2026-05-06T15:00:00Z","journal_day":"26-05-06"}"#
       try await client.execute(
         uri: "/journal/entries",
         method: .post,
@@ -171,9 +247,11 @@ struct RouterTests {
     )
     let app = Application(router: router)
 
+    let filingDayKey = JournalPathCodec.journalDayKey(for: Date(), calendar: .current)
+
     try await app.test(.router) { client in
       let appendBody =
-        #"{"subject_ids":["general"],"body":"detail line","created_at":"2026-07-01T12:00:00Z"}"#
+        "{\"subject_ids\":[\"general\"],\"body\":\"detail line\",\"created_at\":\"2026-07-01T12:00:00Z\",\"journal_day\":\"\(filingDayKey)\"}"
       try await client.execute(
         uri: "/journal/entries",
         method: .post,
@@ -184,7 +262,7 @@ struct RouterTests {
       }
 
       try await client.execute(
-        uri: "/journal/entries/26-07-01",
+        uri: "/journal/entries/\(filingDayKey)",
         method: .get,
         headers: try await JWTTestSupport.bearerHeaders()
       ) { response in
@@ -193,7 +271,7 @@ struct RouterTests {
           Components.Schemas.JournalEntryDetailResponse.self,
           from: Data(buffer: response.body)
         )
-        #expect(decoded.date == "26-07-01")
+        #expect(decoded.date == filingDayKey)
         #expect(decoded.content.contains("detail line"))
       }
     }

@@ -1,9 +1,107 @@
 import ShapeTreeClient
 import SwiftUI
+#if os(macOS)
+  import AppKit
+#endif
+#if canImport(UIKit)
+  import UIKit
+#endif
+
+// MARK: - Main shell tabs (Chat · Journal)
+
+private enum ShapeTreeMainTab: String, CaseIterable, Identifiable {
+  case chat = "Chat"
+  case journal = "Journal"
+
+  var id: String { rawValue }
+
+  var systemImage: String {
+    switch self {
+    case .chat: return "bubble.left.and.bubble.right.fill"
+    case .journal: return "book.closed"
+    }
+  }
+}
+
+private struct ShapeTreeMainTabBar: View {
+  @Binding var tab: ShapeTreeMainTab
+  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+  @Environment(\.colorScheme) private var colorScheme
+
+  private var compact: Bool {
+    horizontalSizeClass == .compact
+  }
+
+  private var trackFill: Color {
+    Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.06)
+  }
+
+  private var selectionFill: Color {
+    Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.1)
+  }
+
+  var body: some View {
+    VStack(spacing: 0) {
+      HStack {
+        Spacer(minLength: 0)
+
+        HStack(spacing: 2) {
+          ForEach(ShapeTreeMainTab.allCases) { item in
+            Button {
+              withAnimation(.easeInOut(duration: 0.18)) {
+                tab = item
+              }
+            } label: {
+              HStack(spacing: compact ? 5 : 7) {
+                Image(systemName: item.systemImage)
+                  .font(.system(size: compact ? 12 : 13, weight: .semibold))
+                Text(item.rawValue)
+                  .font(.system(size: compact ? 13 : 14, weight: .semibold))
+              }
+              .foregroundStyle(tab == item ? Color.primary : Color.secondary)
+              .padding(.horizontal, compact ? 18 : 24)
+              .padding(.vertical, compact ? 7 : 8)
+              .background(
+                Capsule(style: .continuous)
+                  .fill(tab == item ? selectionFill : Color.clear)
+              )
+            }
+            #if os(macOS)
+              .buttonStyle(.borderless)
+            #else
+              .buttonStyle(.plain)
+            #endif
+          }
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 5)
+        .background(
+          Capsule(style: .continuous)
+            .fill(trackFill)
+        )
+
+        Spacer(minLength: 0)
+      }
+      .padding(.horizontal, 8)
+      .padding(.bottom, 2)
+      #if os(macOS)
+        .background(Color(nsColor: .windowBackgroundColor).opacity(0.98))
+      #elseif canImport(UIKit)
+        .background(Color(uiColor: UIColor.systemBackground))
+      #else
+        .background(Color.gray.opacity(0.08))
+      #endif
+
+      Divider()
+        .allowsHitTesting(false)
+    }
+  }
+}
 
 /// Main chat view for the ShapeTree client app.
 struct ShapeTreeChatView: View {
   @Bindable var viewModel: ShapeTreeViewModel
+  @State private var mainTab: ShapeTreeMainTab = .chat
   @State private var showConnectionSettings = false
   @State private var connectionDraftURL = ""
   @State private var connectionDraftToken = ""
@@ -44,15 +142,17 @@ struct ShapeTreeChatView: View {
           .background(Color.orange.opacity(0.12))
       }
 
-      TabView {
-        assistantRoot.tabItem {
-          Label("Chat", systemImage: "bubble.left.and.bubble.right.fill")
-        }
+      ShapeTreeMainTabBar(tab: $mainTab)
 
-        ShapeTreeJournalView(viewModel: viewModel).tabItem {
-          Label("Journal", systemImage: "book.closed")
+      Group {
+        switch mainTab {
+        case .chat:
+          assistantRoot
+        case .journal:
+          ShapeTreeJournalView(viewModel: viewModel)
         }
       }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     .task {
       await viewModel.refreshJournalSubjects()

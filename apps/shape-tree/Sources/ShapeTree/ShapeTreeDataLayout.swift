@@ -78,7 +78,7 @@ public struct ShapeTreeDataLayout: Sendable {
       withIntermediateDirectories: true)
 
     if !fileManager.fileExists(atPath: layout.journalSubjectsFile.path) {
-      let data = try JSONEncoder().encode(JournalSubjectsFile.defaultTemplate)
+      let data = try JournalSubjectsFile.defaultTemplate.encodedForSubjectsFile()
       try data.write(to: layout.journalSubjectsFile, options: .atomic)
 
     }
@@ -104,7 +104,7 @@ public enum JournalPathCodec: Sendable {
     return String(format: "%02d/%02d/%02d-%02d-%02d.md", yy, month, yy, month, day)
   }
 
-  /// Two‑digit journal day key `yy-MM-dd` derived from a UTC calendar day (matches filenames).
+  /// Two‑digit journal day key `yy-MM-dd` (Gregorian civil date components from the given calendar).
   public static func journalDayKey(for date: Date, calendar: Calendar = utcCalendar) -> String {
     let year = calendar.component(.year, from: date)
     let yy = year % 100
@@ -113,7 +113,7 @@ public enum JournalPathCodec: Sendable {
     return String(format: "%02d-%02d-%02d", yy, month, day)
   }
 
-  /// Parses `yy-MM-dd` into the corresponding UTC calendar day (midnight). Resolved calendar years use 2000 + yy when interpreting keys.
+  /// Parses `yy-MM-dd` into midnight on that civil day using `calendar` (defaults to stable UTC for key iteration).
   public static func date(fromJournalDayKey key: String, calendar: Calendar = utcCalendar) -> Date? {
     let parts = key.split(separator: "-")
     guard parts.count == 3,
@@ -172,4 +172,11 @@ public struct JournalSubjectsFile: Codable, Sendable, Equatable {
   public static let defaultTemplate = JournalSubjectsFile(
     subjects: [Subject(id: "general", label: "General")]
   )
+
+  /// On-disk JSON for `journal-subjects.json` (sorted keys, pretty-printed).
+  public func encodedForSubjectsFile() throws -> Data {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
+    return try encoder.encode(self)
+  }
 }
