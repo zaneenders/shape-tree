@@ -131,11 +131,8 @@ public final class ShapeTreeViewModel {
 
     let placeholderID = UUID()
     messages.append(
-      ChatMessage(
-        id: placeholderID,
-        assistantReasoning: "",
-        assistantAnswer: ""
-      ))
+      ChatMessage(id: placeholderID, assistantBlocks: [])
+    )
 
     Task { @MainActor in
       do {
@@ -148,29 +145,21 @@ public final class ShapeTreeViewModel {
   }
 
   private func replaceAssistantPlaceholder(
-    id: UUID, reasoning: String, answer: String, isLoading: Bool
+    id: UUID, blocks: [AssistantTimelineBlock], isLoading: Bool
   ) {
     guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
-    messages[index] = ChatMessage(
-      id: id,
-      assistantReasoning: reasoning,
-      assistantAnswer: answer
-    )
+    messages[index] = ChatMessage(id: id, assistantBlocks: blocks)
     self.isLoading = isLoading
   }
 
-  private func updateAssistantPlaceholder(id: UUID, reasoning: String, answer: String) {
+  private func updateAssistantPlaceholder(id: UUID, blocks: [AssistantTimelineBlock]) {
     guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
-    messages[index] = ChatMessage(
-      id: id,
-      assistantReasoning: reasoning,
-      assistantAnswer: answer
-    )
+    messages[index] = ChatMessage(id: id, assistantBlocks: blocks)
   }
 
   private func removePlaceholder(id: UUID, isLoading: Bool) {
     guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
-    if messages[index].assistantCombinedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+    if messages[index].isAssistantPlaceholderVisuallyEmpty {
       messages.remove(at: index)
     }
     self.isLoading = isLoading
@@ -241,40 +230,80 @@ public final class ShapeTreeViewModel {
     switch response {
     case .ok(let ok):
       let stream = try ok.decodedCompletionEvents()
-      var reasoning = ""
-      var answer = ""
+      var blocks: [AssistantTimelineBlock] = []
+
+      func appendReasoning(_ fragment: String) {
+        guard !fragment.isEmpty else { return }
+        if let last = blocks.last, case .reasoning(let prior) = last.kind {
+          blocks.removeLast()
+          blocks.append(
+            AssistantTimelineBlock(id: last.id, kind: .reasoning(prior + fragment)))
+        } else {
+          blocks.append(AssistantTimelineBlock(kind: .reasoning(fragment)))
+        }
+      }
+
+      func appendAnswer(_ fragment: String) {
+        guard !fragment.isEmpty else { return }
+        if let last = blocks.last, case .answer(let prior) = last.kind {
+          blocks.removeLast()
+          blocks.append(AssistantTimelineBlock(id: last.id, kind: .answer(prior + fragment)))
+        } else {
+          blocks.append(AssistantTimelineBlock(kind: .answer(fragment)))
+        }
+      }
+
+      func hasNonemptyAnswerBlock() -> Bool {
+        blocks.contains {
+          guard case .answer(let s) = $0.kind else { return false }
+          return !s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+      }
+
       for try await event in stream {
         switch event.kind {
         case .assistant_delta:
           guard let fragment = event.text, !fragment.isEmpty else { continue }
           switch event.stream_section {
           case .some(.reasoning):
-            reasoning += fragment
+            appendReasoning(fragment)
           case .some(.answer), .none:
-            answer += fragment
+            appendAnswer(fragment)
           }
-          updateAssistantPlaceholder(id: placeholderID, reasoning: reasoning, answer: answer)
-        case .done:
-          // Prefer streamed segments: reasoning vs answer tracks `stream_section` from the
-          // server. If the answer buffer is empty, fall back to persisted assistant text
-          // (e.g. no section metadata on deltas).
-          let finalReasoning = reasoning
-          var finalAnswer = answer
-          if finalAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-            let full = event.assistant_full_text
-          {
-            finalAnswer = full
-          }
-          replaceAssistantPlaceholder(
-            id: placeholderID,
-            reasoning: finalReasoning,
-            answer: finalAnswer,
-            isLoading: false
+          updateAssistantPlaceholder(id: placeholderID, blocks: blocks)
+
+        case .tool_round:
+          let round = event.round ?? 0
+          blocks.append(
+            AssistantTimelineBlock(kind: .toolRound(round: round, toolNames: event.tool_names ?? []))
           )
+          updateAssistantPlaceholder(id: placeholderID, blocks: blocks)
+
+        case .tool_invocation:
+          blocks.append(
+            AssistantTimelineBlock(
+              kind: .toolCall(
+                toolName: event.tool_name ?? "",
+                arguments: event.tool_arguments ?? "",
+                output: event.tool_output ?? ""
+              ))
+          )
+          updateAssistantPlaceholder(id: placeholderID, blocks: blocks)
+
+        case .done:
+          if let full = event.assistant_full_text,
+            !hasNonemptyAnswerBlock(),
+            !full.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+          {
+            appendAnswer(full)
+          }
+          replaceAssistantPlaceholder(id: placeholderID, blocks: blocks, isLoading: false)
           return
+
         case .harness_error:
           let msg = event.harness_error_message ?? "Agent error."
           throw AppError.server(msg)
+
         default:
           continue
         }
@@ -610,43 +639,81 @@ public final class ShapeTreeViewModel {
 
 // MARK: - Chat models
 
+/// One segment of an assistant turn in stream order (thinking, tools, final reply).
+public struct AssistantTimelineBlock: Identifiable, Equatable, Sendable {
+  public let id: UUID
+  public let kind: Kind
+
+  public enum Kind: Equatable, Sendable {
+    case reasoning(String)
+    case toolRound(round: Int, toolNames: [String])
+    case toolCall(toolName: String, arguments: String, output: String)
+    case answer(String)
+  }
+
+  public init(id: UUID = UUID(), kind: Kind) {
+    self.id = id
+    self.kind = kind
+  }
+
+  /// Stable scroll / diff signal for streaming updates.
+  fileprivate var scrollFingerprintPiece: String {
+    switch kind {
+    case .reasoning(let s): return "r:\(s)"
+    case .answer(let s): return "a:\(s)"
+    case .toolRound(let r, let names): return "tr:\(r):\(names.joined(separator: "|"))"
+    case .toolCall(let name, let args, let output):
+      return "tc:\(name)|\(args)|\(output)"
+    }
+  }
+
+  fileprivate var isVisuallyEmpty: Bool {
+    switch kind {
+    case .reasoning(let s), .answer(let s):
+      return s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    case .toolRound(_, let names):
+      return names.isEmpty
+    case .toolCall(let name, let args, let output):
+      return name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        && args.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        && output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+  }
+}
+
 /// A lightweight chat transcript row used by SwiftUI previews.
 public struct ChatMessage: Identifiable, Equatable {
   public let id: UUID
   public let isUser: Bool
   /// User message text; empty for assistant rows.
   public let content: String
-  /// Model “thinking” / reasoning stream; empty for user rows.
-  public let assistantReasoning: String
-  /// Final reply text; empty for user rows.
-  public let assistantAnswer: String
+  /// Ordered timeline for a single assistant reply (reasoning, tools, answer).
+  public let assistantBlocks: [AssistantTimelineBlock]
 
   /// User message.
   public init(id: UUID = UUID(), content: String, isUser: Bool) {
     self.id = id
     self.isUser = isUser
     self.content = content
-    self.assistantReasoning = ""
-    self.assistantAnswer = ""
+    self.assistantBlocks = []
   }
 
-  /// Assistant message with optional reasoning vs answer split from the completion stream.
-  public init(id: UUID, assistantReasoning: String, assistantAnswer: String) {
+  /// Assistant message built from streamed completion events.
+  public init(id: UUID, assistantBlocks: [AssistantTimelineBlock]) {
     self.id = id
     self.isUser = false
     self.content = ""
-    self.assistantReasoning = assistantReasoning
-    self.assistantAnswer = assistantAnswer
+    self.assistantBlocks = assistantBlocks
   }
 
   /// Fingerprint so scroll listeners observe streaming placeholder updates for assistant rows.
   public var scrollFingerprint: String {
     if isUser { return content }
-    return assistantReasoning + "\u{1e}" + assistantAnswer
+    return assistantBlocks.map(\.scrollFingerprintPiece).joined(separator: "\u{1e}")
   }
 
-  fileprivate var assistantCombinedText: String {
-    assistantReasoning + assistantAnswer
+  fileprivate var isAssistantPlaceholderVisuallyEmpty: Bool {
+    assistantBlocks.isEmpty || assistantBlocks.allSatisfy(\.isVisuallyEmpty)
   }
 }
 
