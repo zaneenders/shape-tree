@@ -113,6 +113,8 @@ private func mintHS256JWT(secret: String, subject: String, ttlSeconds: TimeInter
       throw ValidationError("Invalid server URL: \(server)")
     }
 
+    setbuf(stdout, nil)
+
     let transport = AsyncHTTPClientTransport()
     let middlewares = ShapeTreeAPIClientMiddleware.bearerJWT(token.isEmpty ? nil : token)
     let client = Client(
@@ -152,15 +154,35 @@ private func mintHS256JWT(secret: String, subject: String, ttlSeconds: TimeInter
         break
       }
 
-      let completionResponse = try await client.runCompletion(
+      let completionResponse = try await client.runCompletionStream(
         path: .init(id: session.id),
         body: .json(.init(message: line))
       )
 
       switch completionResponse {
       case .ok(let ok):
-        let result = try ok.body.json
-        print(result.assistant)
+        do {
+          let stream = try ok.decodedCompletionEvents()
+          for try await event in stream {
+            switch event.kind {
+            case .assistant_delta:
+              if let fragment = event.text, !fragment.isEmpty {
+                print(fragment, terminator: "")
+              }
+            case .done:
+              break
+            case .harness_error:
+              let msg = event.harness_error_message ?? "Completion error."
+              print()
+              print("Error: \(msg)")
+            default:
+              break
+            }
+          }
+        } catch {
+          print()
+          print("Error: \(error.localizedDescription)")
+        }
       case .badRequest(let err):
         let body = try err.body.json
         print("Error: \(body.error.message)")

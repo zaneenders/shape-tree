@@ -337,4 +337,93 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
     let response = Components.Schemas.CompletionResponse(assistant: assistantText)
     return .ok(.init(body: .json(response)))
   }
+
+  // MARK: POST /sessions/{id}/completions/stream
+
+  func runCompletionStream(
+    _ input: Operations.runCompletionStream.Input
+  ) async throws -> Operations.runCompletionStream.Output {
+
+    guard let sessionId = UUID(uuidString: input.path.id) else {
+      let error = Components.Schemas.HTTPErrorResponse(
+        error: .init(message: "Invalid or missing session id.")
+      )
+      return .badRequest(.init(body: .json(error)))
+    }
+
+    guard case .json(let body) = input.body else {
+      let error = Components.Schemas.HTTPErrorResponse(
+        error: .init(message: "Request body must be JSON.")
+      )
+      return .badRequest(.init(body: .json(error)))
+    }
+
+    guard let session = await store.get(sessionId) else {
+      let error = Components.Schemas.HTTPErrorResponse(
+        error: .init(message: "Session not found.")
+      )
+      return .notFound(.init(body: .json(error)))
+    }
+
+    let turnLog = Logger(label: "scribe.agent.turn.stream.\(sessionId)")
+    let turnStream = await session.agent.prompt(body.message, log: turnLog)
+
+    let lineStream = AsyncStream<Components.Schemas.CompletionStreamEvent> { continuation in
+      Task { [sessionId, store, log] in
+        do {
+          for await event in turnStream.events {
+            let schemaLine = CompletionStreamTranscriptMapping.line(for: event)
+            continuation.yield(schemaLine)
+          }
+
+          let result = try await turnStream.result.value
+          await store.setMessages(sessionId, messages: result.messages)
+
+          let assistantText =
+            result.messages.last(where: { $0.role == .assistant })?.content ?? ""
+
+          if assistantText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            continuation.yield(
+              Components.Schemas.CompletionStreamEvent(
+                kind: .harness_error,
+                harness_error_message: "No assistant response."
+              ))
+            continuation.finish()
+            return
+          }
+
+          log.info(
+            """
+            event=completion.stream.end \
+            session=\(sessionId) \
+            assistant_chars=\(assistantText.count)
+            """)
+
+          continuation.yield(
+            Components.Schemas.CompletionStreamEvent(
+              kind: .done,
+              outcome: CompletionStreamTranscriptMapping.outcome(result.outcome),
+              tool_round_limit_rounds: CompletionStreamTranscriptMapping.toolRoundLimitRounds(
+                result.outcome),
+              assistant_full_text: assistantText
+            ))
+          continuation.finish()
+        } catch {
+          continuation.yield(
+            Components.Schemas.CompletionStreamEvent(
+              kind: .harness_error,
+              harness_error_message: error.localizedDescription
+            ))
+          continuation.finish()
+        }
+      }
+    }
+
+    let httpBody = HTTPBody(
+      lineStream.asEncodedJSONLines(),
+      length: .unknown,
+      iterationBehavior: .single
+    )
+    return .ok(.init(body: .application_jsonl(httpBody)))
+  }
 }

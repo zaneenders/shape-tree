@@ -132,10 +132,9 @@ public final class ShapeTreeViewModel {
     let placeholderID = UUID()
     messages.append(ChatMessage(id: placeholderID, content: "", isUser: false))
 
-    Task {
+    Task { @MainActor in
       do {
-        let reply = try await runCompletion(userMessage: trimmed)
-        replacePlaceholder(id: placeholderID, with: reply, isLoading: false)
+        try await consumeStreamingCompletion(placeholderID: placeholderID, userMessage: trimmed)
       } catch {
         removePlaceholder(id: placeholderID, isLoading: false)
         errorMessage = error.localizedDescription
@@ -145,8 +144,13 @@ public final class ShapeTreeViewModel {
 
   private func replacePlaceholder(id: UUID, with content: String, isLoading: Bool) {
     guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
-    messages[index] = ChatMessage(content: content, isUser: false)
+    messages[index] = ChatMessage(id: id, content: content, isUser: false)
     self.isLoading = isLoading
+  }
+
+  private func updateAssistantPlaceholder(id: UUID, content: String) {
+    guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
+    messages[index] = ChatMessage(id: id, content: content, isUser: false)
   }
 
   private func removePlaceholder(id: UUID, isLoading: Bool) {
@@ -208,21 +212,41 @@ public final class ShapeTreeViewModel {
     }
   }
 
-  private func runCompletion(userMessage: String) async throws -> String {
+  private func consumeStreamingCompletion(placeholderID: UUID, userMessage: String) async throws {
     let workingClient = try await ensureSession()
     guard let sid = sessionId else {
       throw AppError.server("No active session.")
     }
 
-    let response = try await workingClient.runCompletion(
+    let response = try await workingClient.runCompletionStream(
       path: .init(id: sid),
       body: .json(.init(message: userMessage))
     )
 
     switch response {
     case .ok(let ok):
-      let result = try ok.body.json
-      return result.assistant
+      let stream = try ok.decodedCompletionEvents()
+      var partial = ""
+      for try await event in stream {
+        switch event.kind {
+        case .assistant_delta:
+          guard let fragment = event.text, !fragment.isEmpty else { continue }
+          partial += fragment
+          updateAssistantPlaceholder(id: placeholderID, content: partial)
+        case .done:
+          let final = (event.assistant_full_text ?? partial)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+          replacePlaceholder(id: placeholderID, with: final, isLoading: false)
+          return
+        case .harness_error:
+          let msg = event.harness_error_message ?? "Agent error."
+          throw AppError.server(msg)
+        default:
+          continue
+        }
+      }
+      throw AppError.server("Stream ended unexpectedly.")
+
     case .badRequest(let err):
       let body = try err.body.json
       throw AppError.server(body.error.message)
