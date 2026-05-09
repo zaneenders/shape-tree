@@ -32,7 +32,7 @@ XcodeGen **requires `project.local.yml` to exist** (even stubbed); copy from the
 
 | Tab | Purpose |
 |-----|---------|
-| **Chat** | Creates an agent session + streaming-ish completion loop (OpenAPI `POST /sessions`, `POST /sessions/{id}/completions`). |
+| **Chat** | Creates an agent session + streamed completion loop (OpenAPI `POST /sessions`, `POST /sessions/{id}/completions/stream`). |
 | **Journal** | Loads `GET /journal/subjects`, multi-selects subject ids, appends Markdown via `POST /journal/entries`. Push flow hits `POST /devices/register-token` for server-side JSON storage. |
 
 Default base URL: `http://127.0.0.1:42069` (see `ShapeTreeViewModel.serverURL`).

@@ -224,49 +224,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/HTTPErrorResponse"
 
-  /sessions/{id}/completions:
-    post:
-      operationId: runCompletion
-      summary: Run one completion turn for a session.
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CompletionRequest"
-      responses:
-        "200":
-          description: Completion result.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CompletionResponse"
-        "400":
-          description: Invalid or missing session id.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HTTPErrorResponse"
-        "404":
-          description: Session not found.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HTTPErrorResponse"
-        "500":
-          description: Internal server error.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HTTPErrorResponse"
-
   /sessions/{id}/completions/stream:
     post:
       operationId: runCompletionStream
@@ -489,15 +446,6 @@ components:
         message:
           type: string
           description: The user message to send to the agent.
-
-    CompletionResponse:
-      type: object
-      required:
-        - assistant
-      properties:
-        assistant:
-          type: string
-          description: The assistant's reply text.
 
     CompletionStreamSection:
       type: string

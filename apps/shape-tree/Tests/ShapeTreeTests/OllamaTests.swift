@@ -49,22 +49,30 @@ import Testing
       return json.id
     }
 
-    // 2. Run a completion.
+    // 2. Stream a completion.
     let completionBody = #"{"message": "Say hello in exactly one word."}"#
     try await client.execute(
-      uri: "/sessions/\(sessionId)/completions",
+      uri: "/sessions/\(sessionId)/completions/stream",
       method: .post,
       headers: try await JWTTestSupport.bearerHeaders(),
       body: ByteBuffer(string: completionBody)
     ) { response in
       #expect(response.status == .ok)
 
+      let bodyText = String(buffer: response.body)
       let decoder = JSONDecoder()
-      let json = try decoder.decode(
-        Components.Schemas.CompletionResponse.self,
-        from: Data(buffer: response.body)
-      )
-      #expect(!json.assistant.isEmpty)
+      var assistant = ""
+      for line in bodyText.split(separator: "\n", omittingEmptySubsequences: true) {
+        let event = try decoder.decode(
+          Components.Schemas.CompletionStreamEvent.self,
+          from: Data(line.utf8)
+        )
+        if event.kind == .done {
+          assistant = event.assistant_full_text ?? ""
+          break
+        }
+      }
+      #expect(!assistant.isEmpty)
     }
   }
 }

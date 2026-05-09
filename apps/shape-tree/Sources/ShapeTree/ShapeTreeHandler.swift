@@ -284,60 +284,6 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
     return .ok(.init(body: .json(response)))
   }
 
-  // MARK: POST /sessions/{id}/completions
-
-  func runCompletion(
-    _ input: Operations.runCompletion.Input
-  ) async throws -> Operations.runCompletion.Output {
-    // Path parameter id is a String (extracted from the URL).
-    guard let sessionId = UUID(uuidString: input.path.id) else {
-      let error = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "Invalid or missing session id.")
-      )
-      return .badRequest(.init(body: .json(error)))
-    }
-
-    guard case .json(let body) = input.body else {
-      let error = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "Request body must be JSON.")
-      )
-      return .badRequest(.init(body: .json(error)))
-    }
-
-    guard var session = await store.get(sessionId) else {
-      let error = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "Session not found.")
-      )
-      return .notFound(.init(body: .json(error)))
-    }
-
-    let turnLog = Logger(label: "scribe.agent.turn.\(sessionId)")
-    let ts = await session.agent.prompt(body.message, log: turnLog)
-    Task { for await _ in ts.events {} }
-    let result = try await ts.result.value
-    session.messages = result.messages
-
-    // Persist updated messages.
-    await store.setMessages(sessionId, messages: session.messages)
-
-    guard let assistantText = result.messages.last(where: { $0.role == .assistant })?.content, !assistantText.isEmpty else {
-      let error = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "No assistant response.")
-      )
-      return .internalServerError(.init(body: .json(error)))
-    }
-
-    log.info(
-      """
-      event=completion.end \
-      session=\(sessionId) \
-      assistant_chars=\(assistantText.count)
-      """)
-
-    let response = Components.Schemas.CompletionResponse(assistant: assistantText)
-    return .ok(.init(body: .json(response)))
-  }
-
   // MARK: POST /sessions/{id}/completions/stream
 
   func runCompletionStream(

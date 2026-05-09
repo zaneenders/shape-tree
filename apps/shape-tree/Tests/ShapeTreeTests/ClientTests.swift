@@ -154,47 +154,11 @@ struct ClientTests {
     }
   }
 
-  // MARK: - POST /sessions/{id}/completions
+  // MARK: - POST /sessions/{id}/completions/stream
 
-  @Test func completionWithMalformedSessionId() async throws {
+  @Test func completionStreamWithNonexistentSession() async throws {
     let store = SessionStore()
-    let log = Logger(label: "test.client-bad-id")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
-    let jwtKeys = await JWTTestSupport.makeVerifierKeys()
-    let router = buildRoutes(
-      store: store,
-      journalService: journal,
-      journalQuery: journalQuery,
-      jwtKeys: jwtKeys,
-      log: log)
-    let app = Application(router: router)
-
-    try await app.test(.live) { client in
-      let port = try #require(client.port)
-
-      let transport = AsyncHTTPClientTransport()
-      let token = try await ShapeTreeTokenIssuer.mintHS256(secret: JWTTestSupport.secret)
-      let api = Client(
-        serverURL: URL(string: "http://localhost:\(port)")!,
-        transport: transport,
-        middlewares: [BearerAuthClientMiddleware(bearerToken: token)]
-      )
-
-      let response = try await api.runCompletion(
-        path: .init(id: "not-a-uuid"),
-        body: .json(.init(message: "Hello"))
-      )
-
-      let badRequest = try response.badRequest
-      let errorJson = try badRequest.body.json
-      #expect(!errorJson.error.message.isEmpty)
-    }
-  }
-
-  @Test func completionWithNonexistentSession() async throws {
-    let store = SessionStore()
-    let log = Logger(label: "test.client-not-found")
+    let log = Logger(label: "test.client-stream-not-found")
     let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let journalQuery = JournalQueryService(layout: layout, log: log)
     let jwtKeys = await JWTTestSupport.makeVerifierKeys()
@@ -218,7 +182,7 @@ struct ClientTests {
       )
 
       let bogusId = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
-      let response = try await api.runCompletion(
+      let response = try await api.runCompletionStream(
         path: .init(id: bogusId.uuidString),
         body: .json(.init(message: "Hello"))
       )

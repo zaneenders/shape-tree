@@ -374,9 +374,9 @@ struct RouterTests {
     }
   }
 
-  // MARK: - POST /sessions/{id}/completions
+  // MARK: - POST /sessions/{id}/completions/stream
 
-  @Test func completionWithMalformedSessionId() async throws {
+  @Test func completionStreamWithMalformedSessionId() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.completion-bad-id")
     let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
@@ -394,7 +394,7 @@ struct RouterTests {
     try await app.test(.router) { client in
       let body = #"{"message": "Hello"}"#
       try await client.execute(
-        uri: "/sessions/not-a-uuid/completions",
+        uri: "/sessions/not-a-uuid/completions/stream",
         method: .post,
         headers: try await JWTTestSupport.bearerHeaders(),
         body: ByteBuffer(string: body)
@@ -404,7 +404,7 @@ struct RouterTests {
     }
   }
 
-  @Test func completionWithNonexistentSession() async throws {
+  @Test func completionStreamWithNonexistentSession() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.completion-not-found")
     let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
@@ -423,7 +423,7 @@ struct RouterTests {
       let body = #"{"message": "Hello"}"#
       let bogusId = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
       try await client.execute(
-        uri: "/sessions/\(bogusId.uuidString)/completions",
+        uri: "/sessions/\(bogusId.uuidString)/completions/stream",
         method: .post,
         headers: try await JWTTestSupport.bearerHeaders(),
         body: ByteBuffer(string: body)

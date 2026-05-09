@@ -3,7 +3,7 @@ import OpenAPIAsyncHTTPClient
 import ShapeTreeClient
 import SwiftUI
 
-/// Hosts chat + ShapeTree-specific OpenAPI calls (sessions, completions, journal, push registration).
+/// Hosts chat + ShapeTree-specific OpenAPI calls (sessions, streamed completions, journal, push registration).
 @Observable
 @MainActor
 public final class ShapeTreeViewModel {
