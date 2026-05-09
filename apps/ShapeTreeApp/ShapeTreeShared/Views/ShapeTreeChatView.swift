@@ -276,7 +276,7 @@ struct ShapeTreeChatView: View {
         .onChange(of: viewModel.messages.count) { _, _ in
           scrollToBottom(using: proxy)
         }
-        .onChange(of: viewModel.messages.last?.content) { _, _ in
+        .onChange(of: viewModel.messages.last?.scrollFingerprint) { _, _ in
           scrollToBottom(using: proxy)
         }
         .onChange(of: viewModel.isLoading) { _, _ in
@@ -373,23 +373,92 @@ struct ShapeTreeChatView: View {
 
 struct ShapeTreeMessageBubble: View {
   let message: ChatMessage
+  @Environment(\.colorScheme) private var colorScheme
 
   var body: some View {
-    HStack {
+    HStack(alignment: .top) {
       if message.isUser { Spacer() }
 
-      Text(message.content)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(message.isUser ? Color.accentColor : Color.accentColor.opacity(0.15))
-        .foregroundColor(message.isUser ? .white : .primary)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .textSelection(.enabled)
-        .frame(maxWidth: 600, alignment: message.isUser ? .trailing : .leading)
+      Group {
+        if message.isUser {
+          userBubble
+        } else {
+          assistantBubbles
+        }
+      }
+      .frame(maxWidth: 600, alignment: message.isUser ? .trailing : .leading)
 
       if !message.isUser { Spacer() }
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 4)
+  }
+
+  private var userBubble: some View {
+    Text(message.content)
+      .padding(.horizontal, 12)
+      .padding(.vertical, 8)
+      .background(Color.accentColor)
+      .foregroundStyle(.white)
+      .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+      .textSelection(.enabled)
+  }
+
+  private var assistantBubbles: some View {
+    VStack(alignment: .leading, spacing: 10) {
+      if !message.assistantReasoning.trimmedForDisplay.isEmpty {
+        thinkingBlock(message.assistantReasoning)
+      }
+      if !message.assistantAnswer.trimmedForDisplay.isEmpty {
+        answerBlock(message.assistantAnswer)
+      }
+    }
+  }
+
+  private func thinkingBlock(_ text: String) -> some View {
+    VStack(alignment: .leading, spacing: 6) {
+      HStack(spacing: 6) {
+        Image(systemName: "sparkles")
+          .font(.caption.weight(.semibold))
+          .symbolRenderingMode(.hierarchical)
+        Text("Thinking")
+          .font(.caption.weight(.semibold))
+      }
+      .foregroundStyle(.secondary)
+
+      Text(text)
+        .font(.callout)
+        .foregroundStyle(.primary)
+        .multilineTextAlignment(.leading)
+        .textSelection(.enabled)
+    }
+    .padding(.horizontal, 12)
+    .padding(.vertical, 10)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(
+      RoundedRectangle(cornerRadius: 14, style: .continuous)
+        .fill(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.05)))
+    .overlay(
+      RoundedRectangle(cornerRadius: 14, style: .continuous)
+        .stroke(Color.secondary.opacity(0.35), lineWidth: 1)
+    )
+  }
+
+  private func answerBlock(_ text: String) -> some View {
+    Text(text)
+      .font(.body)
+      .padding(.horizontal, 12)
+      .padding(.vertical, 8)
+      .foregroundStyle(.primary)
+      .background(Color.accentColor.opacity(0.15))
+      .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+      .textSelection(.enabled)
+      .multilineTextAlignment(.leading)
+  }
+}
+
+private extension String {
+  var trimmedForDisplay: String {
+    trimmingCharacters(in: .whitespacesAndNewlines)
   }
 }

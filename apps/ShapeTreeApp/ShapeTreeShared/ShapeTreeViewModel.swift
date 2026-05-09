@@ -130,7 +130,12 @@ public final class ShapeTreeViewModel {
     errorMessage = nil
 
     let placeholderID = UUID()
-    messages.append(ChatMessage(id: placeholderID, content: "", isUser: false))
+    messages.append(
+      ChatMessage(
+        id: placeholderID,
+        assistantReasoning: "",
+        assistantAnswer: ""
+      ))
 
     Task { @MainActor in
       do {
@@ -142,20 +147,30 @@ public final class ShapeTreeViewModel {
     }
   }
 
-  private func replacePlaceholder(id: UUID, with content: String, isLoading: Bool) {
+  private func replaceAssistantPlaceholder(
+    id: UUID, reasoning: String, answer: String, isLoading: Bool
+  ) {
     guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
-    messages[index] = ChatMessage(id: id, content: content, isUser: false)
+    messages[index] = ChatMessage(
+      id: id,
+      assistantReasoning: reasoning,
+      assistantAnswer: answer
+    )
     self.isLoading = isLoading
   }
 
-  private func updateAssistantPlaceholder(id: UUID, content: String) {
+  private func updateAssistantPlaceholder(id: UUID, reasoning: String, answer: String) {
     guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
-    messages[index] = ChatMessage(id: id, content: content, isUser: false)
+    messages[index] = ChatMessage(
+      id: id,
+      assistantReasoning: reasoning,
+      assistantAnswer: answer
+    )
   }
 
   private func removePlaceholder(id: UUID, isLoading: Bool) {
     guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
-    if messages[index].content.isEmpty {
+    if messages[index].assistantCombinedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
       messages.remove(at: index)
     }
     self.isLoading = isLoading
@@ -226,17 +241,36 @@ public final class ShapeTreeViewModel {
     switch response {
     case .ok(let ok):
       let stream = try ok.decodedCompletionEvents()
-      var partial = ""
+      var reasoning = ""
+      var answer = ""
       for try await event in stream {
         switch event.kind {
         case .assistant_delta:
           guard let fragment = event.text, !fragment.isEmpty else { continue }
-          partial += fragment
-          updateAssistantPlaceholder(id: placeholderID, content: partial)
+          switch event.stream_section {
+          case .some(.reasoning):
+            reasoning += fragment
+          case .some(.answer), .none:
+            answer += fragment
+          }
+          updateAssistantPlaceholder(id: placeholderID, reasoning: reasoning, answer: answer)
         case .done:
-          let final = (event.assistant_full_text ?? partial)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-          replacePlaceholder(id: placeholderID, with: final, isLoading: false)
+          // Prefer streamed segments: reasoning vs answer tracks `stream_section` from the
+          // server. If the answer buffer is empty, fall back to persisted assistant text
+          // (e.g. no section metadata on deltas).
+          let finalReasoning = reasoning
+          var finalAnswer = answer
+          if finalAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            let full = event.assistant_full_text
+          {
+            finalAnswer = full
+          }
+          replaceAssistantPlaceholder(
+            id: placeholderID,
+            reasoning: finalReasoning,
+            answer: finalAnswer,
+            isLoading: false
+          )
           return
         case .harness_error:
           let msg = event.harness_error_message ?? "Agent error."
@@ -579,13 +613,40 @@ public final class ShapeTreeViewModel {
 /// A lightweight chat transcript row used by SwiftUI previews.
 public struct ChatMessage: Identifiable, Equatable {
   public let id: UUID
-  public let content: String
   public let isUser: Bool
+  /// User message text; empty for assistant rows.
+  public let content: String
+  /// Model “thinking” / reasoning stream; empty for user rows.
+  public let assistantReasoning: String
+  /// Final reply text; empty for user rows.
+  public let assistantAnswer: String
 
+  /// User message.
   public init(id: UUID = UUID(), content: String, isUser: Bool) {
     self.id = id
-    self.content = content
     self.isUser = isUser
+    self.content = content
+    self.assistantReasoning = ""
+    self.assistantAnswer = ""
+  }
+
+  /// Assistant message with optional reasoning vs answer split from the completion stream.
+  public init(id: UUID, assistantReasoning: String, assistantAnswer: String) {
+    self.id = id
+    self.isUser = false
+    self.content = ""
+    self.assistantReasoning = assistantReasoning
+    self.assistantAnswer = assistantAnswer
+  }
+
+  /// Fingerprint so scroll listeners observe streaming placeholder updates for assistant rows.
+  public var scrollFingerprint: String {
+    if isUser { return content }
+    return assistantReasoning + "\u{1e}" + assistantAnswer
+  }
+
+  fileprivate var assistantCombinedText: String {
+    assistantReasoning + assistantAnswer
   }
 }
 
