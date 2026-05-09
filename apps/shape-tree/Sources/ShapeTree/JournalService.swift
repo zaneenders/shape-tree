@@ -162,23 +162,6 @@ public actor JournalService {
     return relativePath
   }
 
-  public func persistDeviceRegistration(deviceToken: String, deviceId: String?) throws {
-    let record = PersistedDeviceRecord(deviceToken: deviceToken, deviceId: deviceId)
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys]
-    encoder.keyEncodingStrategy = .convertToSnakeCase
-    let storageKey = deviceId ?? UUID().uuidString
-    let url = layout.deviceRegistrationFile(deviceId: storageKey)
-    let data = try encoder.encode(record)
-    try data.write(to: url, options: .atomic)
-    log.info("event=device.register path=\(url.lastPathComponent)")
-  }
-
-  private struct PersistedDeviceRecord: Encodable {
-    let deviceToken: String
-    let deviceId: String?
-  }
-
   private static func writeSubjectsFile(
     _ file: JournalSubjectsFile,
     to url: URL,

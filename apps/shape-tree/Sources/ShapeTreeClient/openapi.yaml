@@ -170,36 +170,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/HTTPErrorResponse"
 
-  /devices/register-token:
-    post:
-      operationId: registerDeviceToken
-      summary: Persist an APNs device token alongside optional device metadata.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/DeviceTokenRegistrationRequest"
-      responses:
-        "200":
-          description: Stored.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DeviceTokenRegistrationResponse"
-        "400":
-          description: Invalid token payload.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HTTPErrorResponse"
-        "500":
-          description: Server failure.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HTTPErrorResponse"
-
   /sessions:
     post:
       operationId: createSession
@@ -397,26 +367,6 @@ components:
         journal_relative_path:
           type: string
           description: Repo-relative Markdown path (`yy/MM/yy-MM-dd.md`) under `.shape-tree/Journal`.
-
-    DeviceTokenRegistrationRequest:
-      type: object
-      required:
-        - device_token
-      properties:
-        device_token:
-          type: string
-          description: APNs device token string.
-        device_id:
-          type: string
-          description: Optional stable client id for the on-disk JSON filename.
-
-    DeviceTokenRegistrationResponse:
-      type: object
-      required:
-        - stored
-      properties:
-        stored:
-          type: boolean
 
     CreateSessionRequest:
       type: object

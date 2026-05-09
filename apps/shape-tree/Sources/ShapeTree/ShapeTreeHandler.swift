@@ -204,34 +204,6 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
     }
   }
 
-  // MARK: POST /devices/register-token
-
-  func registerDeviceToken(
-    _ input: Operations.registerDeviceToken.Input
-  ) async throws -> Operations.registerDeviceToken.Output {
-    guard case .json(let body) = input.body else {
-      let payload = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "Request body must be JSON.")
-      )
-      return .badRequest(.init(body: .json(payload)))
-    }
-
-    do {
-      try await journalService.persistDeviceRegistration(
-        deviceToken: body.device_token,
-        deviceId: body.device_id)
-
-      let response = Components.Schemas.DeviceTokenRegistrationResponse(stored: true)
-      return .ok(.init(body: .json(response)))
-    } catch {
-      log.error("event=device.register.failure error=\(error.localizedDescription)")
-      let payload = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "Failed to persist device registration.")
-      )
-      return .internalServerError(.init(body: .json(payload)))
-    }
-  }
-
   // MARK: POST /sessions
 
   func createSession(

@@ -8,7 +8,6 @@ public struct ShapeTreeDataLayout: Sendable {
   public static let dotFolderName = ".shape-tree"
   public static let subjectsFileName = "journal-subjects.json"
   public static let journalDirectoryName = "Journal"
-  public static let devicesDirectoryName = "devices"
 
   public let dataRoot: URL
 
@@ -28,20 +27,11 @@ public struct ShapeTreeDataLayout: Sendable {
     dotFolder.appendingPathComponent(Self.subjectsFileName, isDirectory: false)
   }
 
-  public var devicesDirectory: URL {
-    dotFolder.appendingPathComponent(Self.devicesDirectoryName, isDirectory: true)
-  }
-
   public func journalEntryFile(for date: Date) -> URL {
     journalRepoRoot.appendingPathComponent(
       JournalPathCodec.relativeMarkdownPath(for: date),
       isDirectory: false
     )
-  }
-
-  public func deviceRegistrationFile(deviceId: String) -> URL {
-    let safe = JournalPathCodec.sanitizeFilenameComponent(deviceId)
-    return devicesDirectory.appendingPathComponent("\(safe).json", isDirectory: false)
   }
 
   /// Resolves the configured `data_path` string into an absolute directory URL.
@@ -60,7 +50,7 @@ public struct ShapeTreeDataLayout: Sendable {
       .standardizedFileURL
   }
 
-  /// Ensures dot folder, journal directory, subjects JSON, and device registration directory exist (`git init` happens from ``JournalService``).
+  /// Ensures dot folder, journal directory, and subjects JSON exist (`git init` happens from ``JournalService``).
   public static func bootstrapIfNeeded(
     layout: ShapeTreeDataLayout,
     fileManager: FileManager = .default
@@ -71,10 +61,6 @@ public struct ShapeTreeDataLayout: Sendable {
 
     try fileManager.createDirectory(
       at: layout.journalRepoRoot,
-      withIntermediateDirectories: true)
-
-    try fileManager.createDirectory(
-      at: layout.devicesDirectory,
       withIntermediateDirectories: true)
 
     if !fileManager.fileExists(atPath: layout.journalSubjectsFile.path) {

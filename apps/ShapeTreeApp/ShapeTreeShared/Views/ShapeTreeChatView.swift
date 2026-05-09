@@ -110,17 +110,6 @@ struct ShapeTreeChatView: View {
 
   var body: some View {
     VStack(spacing: 0) {
-      if let pushErr = viewModel.pushNotificationError {
-        Text(pushErr)
-          .font(.caption)
-          .foregroundStyle(.orange)
-          .multilineTextAlignment(.center)
-          .padding(.horizontal, 12)
-          .padding(.vertical, 8)
-          .frame(maxWidth: .infinity)
-          .background(Color.orange.opacity(0.12))
-      }
-
       if let apiErr = viewModel.journalError, !apiErr.isEmpty {
         Text(apiErr)
           .font(.caption)
