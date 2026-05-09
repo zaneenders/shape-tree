@@ -58,6 +58,7 @@ let package = Package(
       dependencies: [
         .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
         .product(name: "OpenAPIAsyncHTTPClient", package: "swift-openapi-async-http-client"),
+        .product(name: "JWTKit", package: "jwt-kit"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6)

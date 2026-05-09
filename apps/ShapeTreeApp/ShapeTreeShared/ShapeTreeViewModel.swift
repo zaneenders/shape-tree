@@ -72,11 +72,12 @@ public final class ShapeTreeViewModel {
 
   private static let serverURLDefaultsKey = "shape_tree_server_url"
   private static let apiBearerTokenDefaultsKey = "shape_tree_api_bearer_token"
+  public static let defaultServerURL = "http://localhost:42069"
 
   // MARK: - Init
 
   public init(
-    serverURL defaultServerURL: String = "http://127.0.0.1:42069",
+    serverURL defaultServerURL: String,
     apiBearerToken defaultToken: String? = nil
   ) {
     self.transport = AsyncHTTPClientTransport()
@@ -193,7 +194,7 @@ public final class ShapeTreeViewModel {
 
     let freshClient = try makeClient()
 
-      let response = try await freshClient.createSession(
+    let response = try await freshClient.createSession(
       Operations.createSession.Input(body: .json(.init(systemPrompt: nil)))
     )
 
@@ -550,7 +551,8 @@ public final class ShapeTreeViewModel {
   }
 
   /// Loads Markdown for `journal_day` (`yy-MM-dd`), or nil when the server reports no file.
-  public func fetchJournalEntryDetailIfPresent(dayKey: String) async throws -> Components.Schemas.JournalEntryDetailResponse?
+  public func fetchJournalEntryDetailIfPresent(dayKey: String) async throws -> Components.Schemas
+    .JournalEntryDetailResponse?
   {
     let remote = try makeClient()
     let response = try await remote.getJournalEntryDetail(

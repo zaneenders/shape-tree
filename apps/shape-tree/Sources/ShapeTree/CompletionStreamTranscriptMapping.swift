@@ -40,14 +40,14 @@ enum CompletionStreamTranscriptMapping {
     case .blankLine:
       return Components.Schemas.CompletionStreamEvent(kind: .blank_line)
 
-    case .toolRoundHeader(round: let round, toolNames: let names):
+    case .toolRoundHeader(let round, toolNames: let names):
       return Components.Schemas.CompletionStreamEvent(
         kind: .tool_round,
         round: round,
         tool_names: names
       )
 
-    case .toolInvocation(name: let name, arguments: let arguments, output: let output):
+    case .toolInvocation(let name, let arguments, let output):
       return Components.Schemas.CompletionStreamEvent(
         kind: .tool_invocation,
         tool_name: name,

@@ -49,7 +49,7 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
   func appendJournalSubject(
     _ input: Operations.appendJournalSubject.Input
   ) async throws -> Operations.appendJournalSubject.Output {
-    guard case let .json(body) = input.body else {
+    guard case .json(let body) = input.body else {
       let payload = Components.Schemas.HTTPErrorResponse(
         error: .init(message: "Request body must be JSON.")
       )

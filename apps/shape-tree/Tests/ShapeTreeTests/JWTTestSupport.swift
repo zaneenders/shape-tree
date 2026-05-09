@@ -1,6 +1,7 @@
 import HTTPTypes
-@testable import ShapeTree
 import JWTKit
+
+@testable import ShapeTree
 
 enum JWTTestSupport {
   /// Shared secret for router/client integration tests (`HS256`).

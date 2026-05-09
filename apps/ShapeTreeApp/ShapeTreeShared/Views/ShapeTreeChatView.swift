@@ -1,10 +1,11 @@
 import ShapeTreeClient
 import SwiftUI
+
 #if os(macOS)
-  import AppKit
+import AppKit
 #endif
 #if canImport(UIKit)
-  import UIKit
+import UIKit
 #endif
 
 // MARK: - Main shell tabs (Chat · Journal)
@@ -67,9 +68,9 @@ private struct ShapeTreeMainTabBar: View {
               )
             }
             #if os(macOS)
-              .buttonStyle(.borderless)
+            .buttonStyle(.borderless)
             #else
-              .buttonStyle(.plain)
+            .buttonStyle(.plain)
             #endif
           }
         }
@@ -85,11 +86,11 @@ private struct ShapeTreeMainTabBar: View {
       .padding(.horizontal, 8)
       .padding(.bottom, 2)
       #if os(macOS)
-        .background(Color(nsColor: .windowBackgroundColor).opacity(0.98))
+      .background(Color(nsColor: .windowBackgroundColor).opacity(0.98))
       #elseif canImport(UIKit)
-        .background(Color(uiColor: UIColor.systemBackground))
+      .background(Color(uiColor: UIColor.systemBackground))
       #else
-        .background(Color.gray.opacity(0.08))
+      .background(Color.gray.opacity(0.08))
       #endif
 
       Divider()
@@ -178,8 +179,8 @@ struct ShapeTreeChatView: View {
           TextField("Server URL", text: $connectionDraftURL)
             .textContentType(.URL)
             #if os(iOS)
-              .textInputAutocapitalization(.never)
-              .keyboardType(.URL)
+          .textInputAutocapitalization(.never)
+          .keyboardType(.URL)
             #endif
         } header: {
           Text("ShapeTree server")
@@ -191,9 +192,9 @@ struct ShapeTreeChatView: View {
 
         Section {
           SecureField("Bearer JWT", text: $connectionDraftToken)
-          #if os(iOS)
-            .textContentType(.password)
-          #endif
+            #if os(iOS)
+          .textContentType(.password)
+            #endif
           if let hint = connectionTokenFormatWarning {
             Text(hint)
               .font(.footnote)
@@ -209,7 +210,7 @@ struct ShapeTreeChatView: View {
       }
       .navigationTitle("Connection")
       #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
+      .navigationBarTitleDisplayMode(.inline)
       #endif
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
@@ -239,7 +240,7 @@ struct ShapeTreeChatView: View {
       }
     }
     #if os(macOS)
-      .frame(minWidth: 400, minHeight: 280)
+    .frame(minWidth: 400, minHeight: 280)
     #endif
   }
 
@@ -453,7 +454,8 @@ struct ShapeTreeMessageBubble: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
       RoundedRectangle(cornerRadius: 14, style: .continuous)
-        .fill(Color.teal.opacity(colorScheme == .dark ? 0.18 : 0.1)))
+        .fill(Color.teal.opacity(colorScheme == .dark ? 0.18 : 0.1))
+    )
     .overlay(
       RoundedRectangle(cornerRadius: 14, style: .continuous)
         .stroke(Color.teal.opacity(colorScheme == .dark ? 0.45 : 0.35), lineWidth: 1)
@@ -492,7 +494,8 @@ struct ShapeTreeMessageBubble: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
       RoundedRectangle(cornerRadius: 14, style: .continuous)
-        .fill(Color.cyan.opacity(colorScheme == .dark ? 0.12 : 0.08)))
+        .fill(Color.cyan.opacity(colorScheme == .dark ? 0.12 : 0.08))
+    )
     .overlay(
       RoundedRectangle(cornerRadius: 14, style: .continuous)
         .stroke(Color.cyan.opacity(colorScheme == .dark ? 0.4 : 0.28), lineWidth: 1)
@@ -540,7 +543,8 @@ struct ShapeTreeMessageBubble: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .background(
       RoundedRectangle(cornerRadius: 14, style: .continuous)
-        .fill(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.05)))
+        .fill(Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.05))
+    )
     .overlay(
       RoundedRectangle(cornerRadius: 14, style: .continuous)
         .stroke(Color.secondary.opacity(0.35), lineWidth: 1)
@@ -581,8 +585,8 @@ private struct FlowingNameChips: View {
   }
 }
 
-private extension String {
-  var trimmedForDisplay: String {
+extension String {
+  fileprivate var trimmedForDisplay: String {
     trimmingCharacters(in: .whitespacesAndNewlines)
   }
 }

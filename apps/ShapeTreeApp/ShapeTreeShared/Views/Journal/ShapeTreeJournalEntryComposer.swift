@@ -120,9 +120,9 @@ struct ShapeTreeJournalEntryComposer: View {
     HStack(alignment: .center) {
       Text("Add to today")
         #if os(iOS)
-          .font(.subheadline.weight(.semibold))
+      .font(.subheadline.weight(.semibold))
         #else
-          .font(.headline)
+      .font(.headline)
         #endif
         .foregroundStyle(titleForeground)
 
@@ -196,9 +196,9 @@ struct ShapeTreeJournalEntryComposer: View {
     VStack(alignment: .leading, spacing: contextSectionSpacing) {
       Text("Context")
         #if os(iOS)
-          .font(.caption.weight(.semibold))
+      .font(.caption.weight(.semibold))
         #else
-          .font(.subheadline.weight(.semibold))
+      .font(.subheadline.weight(.semibold))
         #endif
         .foregroundStyle(secondaryForeground)
 
@@ -260,10 +260,10 @@ struct ShapeTreeJournalEntryComposer: View {
   private var draftEditor: some View {
     TextEditor(text: $viewModel.journalDraft)
       #if os(macOS)
-      .font(.system(size: 18))
+    .font(.system(size: 18))
       #else
-      .font(.body)
-      .fontDesign(.monospaced)
+    .font(.body)
+    .fontDesign(.monospaced)
       #endif
       .foregroundStyle(deepChrome ? Color.white.opacity(0.92) : Color.primary)
       .scrollContentBackground(.hidden)
@@ -321,7 +321,7 @@ struct ShapeTreeJournalEntryComposer: View {
       Form {
         TextField("Subject label", text: $newSubjectDraft)
           #if os(iOS)
-          .textInputAutocapitalization(.words)
+        .textInputAutocapitalization(.words)
           #endif
       }
       .navigationTitle("New subject")
@@ -499,60 +499,60 @@ private struct ShapeTreeJournalInlineComposerChromeModifier: ViewModifier {
   @ViewBuilder
   private func deepChromeChrome(_ content: Content) -> some View {
     #if os(iOS)
-      content
-        .padding(.horizontal, 4)
-        .padding(.vertical, 8)
-        .background(
-          RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .fill(ComposerPalette.composerCard)
-        )
-        .overlay(
-          RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .stroke(Color.white.opacity(0.06), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.45), radius: 28, y: 14)
+    content
+      .padding(.horizontal, 4)
+      .padding(.vertical, 8)
+      .background(
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+          .fill(ComposerPalette.composerCard)
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: 14, style: .continuous)
+          .stroke(Color.white.opacity(0.06), lineWidth: 1)
+      )
+      .shadow(color: Color.black.opacity(0.45), radius: 28, y: 14)
     #else
-      content
-        .padding(.horizontal, 4)
-        .padding(.vertical, 8)
-        .background(
-          RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .fill(ComposerPalette.composerCard)
-        )
-        .overlay(
-          RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .stroke(Color.white.opacity(0.06), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.45), radius: 28, y: 14)
+    content
+      .padding(.horizontal, 4)
+      .padding(.vertical, 8)
+      .background(
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+          .fill(ComposerPalette.composerCard)
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+          .stroke(Color.white.opacity(0.06), lineWidth: 1)
+      )
+      .shadow(color: Color.black.opacity(0.45), radius: 28, y: 14)
     #endif
   }
 
   @ViewBuilder
   private func lightChrome(_ content: Content) -> some View {
     #if os(iOS)
-      content
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-          RoundedRectangle(cornerRadius: 8)
-            .fill(Color.secondary.opacity(0.05))
-        )
-        .overlay(
-          RoundedRectangle(cornerRadius: 8)
-            .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
-        )
+    content
+      .padding(.horizontal, 8)
+      .padding(.vertical, 6)
+      .background(
+        RoundedRectangle(cornerRadius: 8)
+          .fill(Color.secondary.opacity(0.05))
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: 8)
+          .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+      )
     #else
-      content
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(
-          RoundedRectangle(cornerRadius: 12)
-            .fill(Color.secondary.opacity(0.05))
-        )
-        .overlay(
-          RoundedRectangle(cornerRadius: 12)
-            .stroke(Color.secondary.opacity(0.22), lineWidth: 1)
-        )
+    content
+      .padding(.horizontal, 12)
+      .padding(.vertical, 10)
+      .background(
+        RoundedRectangle(cornerRadius: 12)
+          .fill(Color.secondary.opacity(0.05))
+      )
+      .overlay(
+        RoundedRectangle(cornerRadius: 12)
+          .stroke(Color.secondary.opacity(0.22), lineWidth: 1)
+      )
     #endif
   }
 }

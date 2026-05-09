@@ -6,10 +6,11 @@ enum JournalEntrySectioning {
   /// (Scribe-shaped journals have no timestamp in the prose). Requires a flex gap after the instant so
   /// we still match when the body follows on the next line or after a blank line.
   private static func strippingLegacyHeadingTimestamps(_ raw: String) -> String {
-    guard let regex = try? NSRegularExpression(
-      pattern: #"(?m)^(#[^\n]+\n)\n*(\d{4}-\d{2}-\d{2}T[^\n]+)\n+"#,
-      options: []
-    )
+    guard
+      let regex = try? NSRegularExpression(
+        pattern: #"(?m)^(#[^\n]+\n)\n*(\d{4}-\d{2}-\d{2}T[^\n]+)\n+"#,
+        options: []
+      )
     else { return raw }
     let range = NSRange(raw.startIndex..., in: raw)
     return regex.stringByReplacingMatches(in: raw, options: [], range: range, withTemplate: "$1\n")

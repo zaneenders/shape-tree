@@ -1,10 +1,11 @@
 import ShapeTreeClient
 import SwiftUI
+
 #if os(macOS)
-  import AppKit
+import AppKit
 #endif
 #if canImport(UIKit)
-  import UIKit
+import UIKit
 #endif
 
 // MARK: - Journal visual chrome (Scribe-like dark layout)
@@ -98,12 +99,14 @@ private final class ShapeTreeJournalCalendarModel {
   }
 
   func previousMonth() {
-    guard let d = ShapeTreeJournalLocalFormatting.deviceCalendar.date(byAdding: .month, value: -1, to: currentMonth) else { return }
+    guard let d = ShapeTreeJournalLocalFormatting.deviceCalendar.date(byAdding: .month, value: -1, to: currentMonth)
+    else { return }
     currentMonth = d
   }
 
   func nextMonth() {
-    guard let d = ShapeTreeJournalLocalFormatting.deviceCalendar.date(byAdding: .month, value: 1, to: currentMonth) else { return }
+    guard let d = ShapeTreeJournalLocalFormatting.deviceCalendar.date(byAdding: .month, value: 1, to: currentMonth)
+    else { return }
     currentMonth = d
   }
 }
@@ -153,11 +156,11 @@ struct ShapeTreeJournalContainerView: View {
   private var editorialBackground: Color {
     if deepJournalChrome { return ShapeTreeJournalPalette.contentPanel }
     #if os(macOS)
-      return Color(nsColor: .textBackgroundColor)
+    return Color(nsColor: .textBackgroundColor)
     #elseif canImport(UIKit)
-      return Color(uiColor: UIColor.systemBackground)
+    return Color(uiColor: UIColor.systemBackground)
     #else
-      return Color(white: 0.95)
+    return Color(white: 0.95)
     #endif
   }
 
@@ -176,9 +179,9 @@ struct ShapeTreeJournalContainerView: View {
   @ViewBuilder
   private var coreLayout: some View {
     #if os(macOS)
-      macOSLayout
+    macOSLayout
     #else
-      iOSLayout
+    iOSLayout
     #endif
   }
 
@@ -599,7 +602,8 @@ private struct ShapeTreeJournalCalendarSection: View {
     .task(
       id: CalendarLoadIdentity(
         monthStart:
-          ShapeTreeJournalLocalFormatting.deviceCalendar.dateInterval(of: .month, for: calendarModel.currentMonth)?.start
+          ShapeTreeJournalLocalFormatting.deviceCalendar.dateInterval(of: .month, for: calendarModel.currentMonth)?
+          .start
           .timeIntervalSince1970 ?? 0,
         nonce: calendarReloadNonce)
     ) {
@@ -674,9 +678,9 @@ private struct ShapeTreeJournalDayCell: View {
       .frame(height: Self.cellHeight)
     }
     #if os(macOS)
-      .buttonStyle(.borderless)
+    .buttonStyle(.borderless)
     #else
-      .buttonStyle(.plain)
+    .buttonStyle(.plain)
     #endif
   }
 
@@ -715,19 +719,19 @@ private struct ShapeTreeJournalEntryPreviewView: View {
 
   private var previewSectionFont: Font {
     #if os(macOS)
-      .system(size: 17)
+    .system(size: 17)
     #elseif os(iOS)
-      .body
+    .body
     #else
-      .body
+    .body
     #endif
   }
 
   private var entryPreviewEmptyMinHeight: CGFloat {
     #if os(iOS)
-      120
+    120
     #else
-      200
+    200
     #endif
   }
 
@@ -778,9 +782,9 @@ private struct ShapeTreeJournalEntryPreviewView: View {
     return VStack(alignment: .leading, spacing: 16) {
       Text("\(detail.word_count) \(wordText) — \(detail.line_count) \(lineText)")
         #if os(iOS)
-        .font(.caption)
+      .font(.caption)
         #else
-        .font(.subheadline)
+      .font(.subheadline)
         #endif
         .foregroundStyle(deepChrome ? Color.white.opacity(0.45) : Color.secondary)
 
@@ -800,9 +804,9 @@ private struct ShapeTreeJournalEntryPreviewView: View {
     VStack(spacing: 12) {
       Image(systemName: "doc.text")
         #if os(iOS)
-        .font(.title2)
+      .font(.title2)
         #else
-        .font(.largeTitle)
+      .font(.largeTitle)
         #endif
         .foregroundStyle(deepChrome ? Color.white.opacity(0.38) : Color.secondary)
       Text("No entry for this date")

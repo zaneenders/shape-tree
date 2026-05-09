@@ -1,12 +1,13 @@
+import Foundation
+import Logging
+import Sit
+import Testing
+
 #if canImport(System)
 import System
 #else
 import SystemPackage
 #endif
-import Foundation
-import Logging
-import Sit
-import Testing
 
 @Suite
 struct SitSmokeTests {

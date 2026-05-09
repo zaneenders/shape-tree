@@ -5,7 +5,7 @@ import UserNotifications
 @main
 struct ShapeTreeApp: App {
   @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-  @State private var viewModel = ShapeTreeViewModel()
+  @State private var viewModel = ShapeTreeViewModel(serverURL: ShapeTreeViewModel.defaultServerURL)
 
   var body: some Scene {
     WindowGroup {

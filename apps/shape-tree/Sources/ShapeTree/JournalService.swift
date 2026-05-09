@@ -1,12 +1,13 @@
+import CryptoKit
+import Foundation
+import Logging
+import Sit
+
 #if canImport(System)
 import System
 #else
 import SystemPackage
 #endif
-import CryptoKit
-import Foundation
-import Logging
-import Sit
 
 public enum JournalServiceError: Error, Sendable, CustomStringConvertible {
   case emptySubjects

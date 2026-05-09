@@ -1,11 +1,12 @@
+import Foundation
+import Logging
+import Subprocess
+
 #if canImport(System)
 import System
 #else
 import SystemPackage
 #endif
-import Foundation
-import Logging
-import Subprocess
 
 public enum SitError: Error, Sendable, CustomStringConvertible {
   case gitCommandFailed(command: String, status: TerminationStatus, stderr: String)
@@ -65,7 +66,8 @@ public struct Sit: Sendable {
     guard outcome.status.isSuccess else {
       if Self.isLikelyBenignPullFailure(stderr: outcome.stderr) {
         log.debug(
-          "git pull --rebase skipped (benign/no remote/upstream): \(outcome.stderr.trimmingCharacters(in: .whitespacesAndNewlines))")
+          "git pull --rebase skipped (benign/no remote/upstream): \(outcome.stderr.trimmingCharacters(in: .whitespacesAndNewlines))"
+        )
       } else {
         log.warning(
           "git pull --rebase exited non‑zero; continuing without pull",
