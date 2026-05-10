@@ -1,5 +1,5 @@
 {
-  "originHash" : "e074db24aa01882601c0dd4bbc810cfa793ab75f5f79b56535a813512a682c81",
+  "originHash" : "f06e47d1449801e35d5cd74d872fe93d177a84c1e0a9df1d972bb11c7ecdce27",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/jwt-kit.git",
       "state" : {
-        "revision" : "a93a262fefb0938b799191b54f581ffa43422d96",
-        "version" : "5.5.0"
+        "revision" : "2033b3e661238dda3d30e36a2d40987499d987de",
+        "version" : "5.2.0"
       }
     },
     {
@@ -42,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/zaneenders/scribe.git",
       "state" : {
-        "branch" : "88e7ba5",
-        "revision" : "88e7ba50c2aec87bb2335d9932d93b4ffc2e5617"
+        "branch" : "9bf9ce8",
+        "revision" : "9bf9ce86595b9bd835ec7dc2913ec299b0e34705"
       }
     },
     {
@@ -51,8 +51,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/zaneenders/slate",
       "state" : {
-        "branch" : "27af18f",
-        "revision" : "27af18f8211cf51e4414f889211dccc1c6ce9381"
+        "branch" : "c016913",
+        "revision" : "c01691336246676193dd2f12b9e0805da76b897c"
       }
     },
     {
@@ -141,8 +141,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto.git",
       "state" : {
-        "revision" : "1b6b2e274e85105bfa155183145a1dcfd63331f1",
-        "version" : "4.5.0"
+        "revision" : "95ba0316a9b733e92bb6b071255ff46263bbe7dc",
+        "version" : "3.15.1"
       }
     },
     {

@@ -113,8 +113,6 @@ private func mintHS256JWT(secret: String, subject: String, ttlSeconds: TimeInter
       throw ValidationError("Invalid server URL: \(server)")
     }
 
-    setbuf(stdout, nil)
-
     let transport = AsyncHTTPClientTransport()
     let middlewares = ShapeTreeAPIClientMiddleware.bearerJWT(token.isEmpty ? nil : token)
     let client = Client(
@@ -145,7 +143,7 @@ private func mintHS256JWT(secret: String, subject: String, ttlSeconds: TimeInter
 
     // Interactive REPL
     while true {
-      print("> ", terminator: "")
+      FileHandle.standardOutput.write(Data("> ".utf8))
       guard let line = readLine() else { break }
       if line.isEmpty { continue }
 

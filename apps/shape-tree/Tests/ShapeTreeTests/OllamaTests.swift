@@ -44,7 +44,7 @@ import Testing
       decoder.dateDecodingStrategy = .iso8601
       let json = try decoder.decode(
         Components.Schemas.CreateSessionResponse.self,
-        from: Data(buffer: response.body)
+        from: response.body.withUnsafeReadableBytes { Data($0) }
       )
       return json.id
     }
@@ -59,7 +59,7 @@ import Testing
     ) { response in
       #expect(response.status == .ok)
 
-      let bodyText = String(buffer: response.body)
+      let bodyText = response.body.withUnsafeReadableBytes { String(decoding: $0, as: UTF8.self) }
       let decoder = JSONDecoder()
       var assistant = ""
       for line in bodyText.split(separator: "\n", omittingEmptySubsequences: true) {

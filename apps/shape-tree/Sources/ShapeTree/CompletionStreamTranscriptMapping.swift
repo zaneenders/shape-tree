@@ -67,11 +67,11 @@ enum CompletionStreamTranscriptMapping {
     case .turnInterrupted:
       return Components.Schemas.CompletionStreamEvent(kind: .turn_interrupted)
 
-    case .modelTurnRunning(let running):
-      return Components.Schemas.CompletionStreamEvent(
-        kind: .model_running,
-        model_running: running
-      )
+    case .userSubmitted:
+      return Components.Schemas.CompletionStreamEvent(kind: .blank_line)
+
+    case .turnComplete:
+      return Components.Schemas.CompletionStreamEvent(kind: .finalize_assistant)
     }
   }
 

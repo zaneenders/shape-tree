@@ -12,7 +12,7 @@ let package = Package(
     .library(name: "ShapeTreeClient", targets: ["ShapeTreeClient"])
   ],
   dependencies: [
-    .package(url: "https://github.com/zaneenders/scribe.git", revision: "88e7ba5"),
+    .package(url: "https://github.com/zaneenders/scribe.git", revision: "9bf9ce8"),
     .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0"),
     .package(url: "https://github.com/hummingbird-project/swift-openapi-hummingbird.git", revision: "c464db1"),
     .package(url: "https://github.com/apple/swift-openapi-generator.git", from: "1.0.0"),
@@ -24,6 +24,7 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-system.git", from: "1.4.0"),
     .package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"),
     .package(url: "https://github.com/vapor/jwt-kit.git", from: "5.0.0"),
+    .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
   ],
   targets: [
     .target(
@@ -48,6 +49,7 @@ let package = Package(
         .product(name: "OpenAPIHummingbird", package: "swift-openapi-hummingbird"),
         .product(name: "Configuration", package: "swift-configuration"),
         .product(name: "JWTKit", package: "jwt-kit"),
+        .product(name: "Crypto", package: "swift-crypto", condition: .when(platforms: [.linux])),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6)

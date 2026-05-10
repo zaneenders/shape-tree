@@ -22,6 +22,7 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
   let bearerToken: String?
   let contextWindow: Int
   let contextWindowThreshold: Double
+  let workingDirectory: String
 
   // MARK: GET /journal/subjects
 
@@ -231,7 +232,8 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
       contextWindowThreshold: contextWindowThreshold,
       serverURL: defaultOllamaURL,
       apiKey: bearerToken,
-      tools: tools
+      tools: tools,
+      workingDirectory: workingDirectory
     )
 
     let agent = try ScribeAgent(

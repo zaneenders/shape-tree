@@ -22,7 +22,8 @@ func buildRoutes(
   systemPrompt: String = "You are a helpful coding assistant.",
   bearerToken: String? = nil,
   contextWindow: Int = 131_072,
-  contextWindowThreshold: Double = 0.85
+  contextWindowThreshold: Double = 0.85,
+  workingDirectory: String = "/tmp"
 ) -> Router<BasicRequestContext> {
   let router = Router(context: BasicRequestContext.self)
 
@@ -38,7 +39,8 @@ func buildRoutes(
     systemPrompt: systemPrompt,
     bearerToken: bearerToken,
     contextWindow: contextWindow,
-    contextWindowThreshold: contextWindowThreshold
+    contextWindowThreshold: contextWindowThreshold,
+    workingDirectory: workingDirectory
   )
 
   try! handler.registerHandlers(on: router)

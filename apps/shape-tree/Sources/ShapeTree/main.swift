@@ -72,7 +72,8 @@ let router = buildRoutes(
   systemPrompt: systemPrompt,
   bearerToken: bearerToken,
   contextWindow: contextWindow,
-  contextWindowThreshold: contextWindowThreshold
+  contextWindowThreshold: contextWindowThreshold,
+  workingDirectory: resolvedDataRoot.path
 )
 let host = "0.0.0.0"
 

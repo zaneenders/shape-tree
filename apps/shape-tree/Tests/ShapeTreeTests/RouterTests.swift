@@ -65,7 +65,7 @@ struct RouterTests {
         #expect(response.status == .ok)
         let decoded = try JSONDecoder().decode(
           Components.Schemas.JournalSubjectsResponse.self,
-          from: Data(buffer: response.body)
+          from: response.body.withUnsafeReadableBytes { Data($0) }
         )
         #expect(decoded.subjects.contains { $0.id == "general" })
       }
@@ -98,7 +98,7 @@ struct RouterTests {
         #expect(response.status == .ok)
         let decoded = try JSONDecoder().decode(
           Components.Schemas.JournalSubjectsResponse.self,
-          from: Data(buffer: response.body)
+          from: response.body.withUnsafeReadableBytes { Data($0) }
         )
         #expect(decoded.subjects.contains { $0.label == "Field Notes" })
       }
@@ -111,7 +111,7 @@ struct RouterTests {
         #expect(response.status == .ok)
         let decoded = try JSONDecoder().decode(
           Components.Schemas.JournalSubjectsResponse.self,
-          from: Data(buffer: response.body)
+          from: response.body.withUnsafeReadableBytes { Data($0) }
         )
         #expect(decoded.subjects.contains { $0.label == "Field Notes" })
       }
@@ -174,7 +174,7 @@ struct RouterTests {
         #expect(response.status == .created)
         let decoded = try JSONDecoder().decode(
           Components.Schemas.AppendJournalEntryResponse.self,
-          from: Data(buffer: response.body)
+          from: response.body.withUnsafeReadableBytes { Data($0) }
         )
         var entryURL = layout.journalRepoRoot
         for fragment in decoded.journal_relative_path.split(separator: "/") where !fragment.isEmpty {
@@ -223,7 +223,7 @@ struct RouterTests {
         #expect(response.status == .ok)
         let decoded = try JSONDecoder().decode(
           Components.Schemas.JournalEntriesSummariesResponse.self,
-          from: Data(buffer: response.body)
+          from: response.body.withUnsafeReadableBytes { Data($0) }
         )
         let hit = decoded.entries.first { $0.date == "26-05-06" }
         #expect(hit != nil)
@@ -269,7 +269,7 @@ struct RouterTests {
         #expect(response.status == .ok)
         let decoded = try JSONDecoder().decode(
           Components.Schemas.JournalEntryDetailResponse.self,
-          from: Data(buffer: response.body)
+          from: response.body.withUnsafeReadableBytes { Data($0) }
         )
         #expect(decoded.date == filingDayKey)
         #expect(decoded.content.contains("detail line"))
@@ -366,7 +366,7 @@ struct RouterTests {
         decoder.dateDecodingStrategy = .iso8601
         let json = try decoder.decode(
           Components.Schemas.CreateSessionResponse.self,
-          from: Data(buffer: response.body)
+          from: response.body.withUnsafeReadableBytes { Data($0) }
         )
         #expect(UUID(uuidString: json.id) != nil)
         #expect(json.createdAt.timeIntervalSince1970 > 0)
