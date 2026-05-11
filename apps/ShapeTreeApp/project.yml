@@ -20,6 +20,8 @@ targets:
       - ShapeTree-iOS-Only
     resources:
       - ShapeTree-iOS-Only/Assets.xcassets
+    entitlements:
+      path: ShapeTree-iOS-Only/ShapeTree.entitlements
     settings:
       PRODUCT_NAME: ShapeTree
       PRODUCT_BUNDLE_IDENTIFIER: org.shapetree.shapetree-client
@@ -38,6 +40,8 @@ targets:
       INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
       INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
       INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+      INFOPLIST_KEY_NSAppTransportSecurity:
+        NSAllowsLocalNetworking: YES
     dependencies:
       - package: ShapeTreeClient
         product: ShapeTreeClient

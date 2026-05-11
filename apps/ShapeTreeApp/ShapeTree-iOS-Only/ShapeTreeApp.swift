@@ -2,7 +2,8 @@ import SwiftUI
 
 @main
 struct ShapeTreeApp: App {
-  @State private var viewModel = ShapeTreeViewModel()
+  @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+  @State private var viewModel = ShapeTreeViewModel(serverURL: ShapeTreeViewModel.defaultServerURL)
 
   var body: some Scene {
     WindowGroup {

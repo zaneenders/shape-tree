@@ -16,16 +16,27 @@ struct ClientTests {
   @Test func createSession() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.client-create-session")
-    let router = buildRoutes(store: store, log: log)
+    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let journalQuery = JournalQueryService(layout: layout, log: log)
+    let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+    let router = buildRoutes(
+      store: store,
+      journalService: journal,
+      journalQuery: journalQuery,
+      jwtKeys: jwtKeys,
+      log: log
+    )
     let app = Application(router: router)
 
     try await app.test(.live) { client in
       let port = try #require(client.port, "Expected live server to have a port")
 
       let transport = AsyncHTTPClientTransport()
+      let token = try await ShapeTreeTokenIssuer.mintHS256(secret: JWTTestSupport.secret)
       let api = Client(
         serverURL: URL(string: "http://localhost:\(port)")!,
-        transport: transport
+        transport: transport,
+        middlewares: [BearerAuthClientMiddleware(bearerToken: token)]
       )
 
       let response = try await api.createSession(
@@ -43,24 +54,96 @@ struct ClientTests {
     }
   }
 
-  // MARK: - POST /sessions/{id}/completions
+  // MARK: - Journal routes (generated client)
 
-  @Test func completionWithMalformedSessionId() async throws {
+  @Test func listJournalSubjects() async throws {
     let store = SessionStore()
-    let log = Logger(label: "test.client-bad-id")
-    let router = buildRoutes(store: store, log: log)
+    let log = Logger(label: "test.client-journal-subjects")
+    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let journalQuery = JournalQueryService(layout: layout, log: log)
+    let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+    let router = buildRoutes(
+      store: store,
+      journalService: journal,
+      journalQuery: journalQuery,
+      jwtKeys: jwtKeys,
+      log: log)
+    let app = Application(router: router)
+
+    try await app.test(.live) { client in
+      let port = try #require(client.port)
+      let transport = AsyncHTTPClientTransport()
+      let token = try await ShapeTreeTokenIssuer.mintHS256(secret: JWTTestSupport.secret)
+      let api = Client(
+        serverURL: URL(string: "http://localhost:\(port)")!,
+        transport: transport,
+        middlewares: [BearerAuthClientMiddleware(bearerToken: token)]
+      )
+      let response = try await api.listJournalSubjects()
+      let ok = try response.ok
+      let decoded = try ok.body.json
+      #expect(decoded.subjects.contains { $0.id == "general" })
+    }
+  }
+
+  @Test func appendJournalSubjectViaGeneratedClient() async throws {
+    let store = SessionStore()
+    let log = Logger(label: "test.client-append-subject")
+    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let journalQuery = JournalQueryService(layout: layout, log: log)
+    let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+    let router = buildRoutes(
+      store: store,
+      journalService: journal,
+      journalQuery: journalQuery,
+      jwtKeys: jwtKeys,
+      log: log)
+    let app = Application(router: router)
+
+    try await app.test(.live) { client in
+      let port = try #require(client.port)
+      let transport = AsyncHTTPClientTransport()
+      let token = try await ShapeTreeTokenIssuer.mintHS256(secret: JWTTestSupport.secret)
+      let api = Client(
+        serverURL: URL(string: "http://localhost:\(port)")!,
+        transport: transport,
+        middlewares: [BearerAuthClientMiddleware(bearerToken: token)]
+      )
+      let response = try await api.appendJournalSubject(
+        body: .json(.init(subject: "Ship Log"))
+      )
+      let ok = try response.ok
+      let decoded = try ok.body.json
+      #expect(decoded.subjects.contains { $0.label == "Ship Log" })
+    }
+  }
+
+  @Test func completionStreamWithMalformedSessionId() async throws {
+    let store = SessionStore()
+    let log = Logger(label: "test.client-stream-bad-id")
+    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let journalQuery = JournalQueryService(layout: layout, log: log)
+    let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+    let router = buildRoutes(
+      store: store,
+      journalService: journal,
+      journalQuery: journalQuery,
+      jwtKeys: jwtKeys,
+      log: log)
     let app = Application(router: router)
 
     try await app.test(.live) { client in
       let port = try #require(client.port)
 
       let transport = AsyncHTTPClientTransport()
+      let token = try await ShapeTreeTokenIssuer.mintHS256(secret: JWTTestSupport.secret)
       let api = Client(
         serverURL: URL(string: "http://localhost:\(port)")!,
-        transport: transport
+        transport: transport,
+        middlewares: [BearerAuthClientMiddleware(bearerToken: token)]
       )
 
-      let response = try await api.runCompletion(
+      let response = try await api.runCompletionStream(
         path: .init(id: "not-a-uuid"),
         body: .json(.init(message: "Hello"))
       )
@@ -71,23 +154,35 @@ struct ClientTests {
     }
   }
 
-  @Test func completionWithNonexistentSession() async throws {
+  // MARK: - POST /sessions/{id}/completions/stream
+
+  @Test func completionStreamWithNonexistentSession() async throws {
     let store = SessionStore()
-    let log = Logger(label: "test.client-not-found")
-    let router = buildRoutes(store: store, log: log)
+    let log = Logger(label: "test.client-stream-not-found")
+    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let journalQuery = JournalQueryService(layout: layout, log: log)
+    let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+    let router = buildRoutes(
+      store: store,
+      journalService: journal,
+      journalQuery: journalQuery,
+      jwtKeys: jwtKeys,
+      log: log)
     let app = Application(router: router)
 
     try await app.test(.live) { client in
       let port = try #require(client.port)
 
       let transport = AsyncHTTPClientTransport()
+      let token = try await ShapeTreeTokenIssuer.mintHS256(secret: JWTTestSupport.secret)
       let api = Client(
         serverURL: URL(string: "http://localhost:\(port)")!,
-        transport: transport
+        transport: transport,
+        middlewares: [BearerAuthClientMiddleware(bearerToken: token)]
       )
 
       let bogusId = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
-      let response = try await api.runCompletion(
+      let response = try await api.runCompletionStream(
         path: .init(id: bogusId.uuidString),
         body: .json(.init(message: "Hello"))
       )

@@ -8,7 +8,167 @@ servers:
   - url: http://localhost:42069
     description: Local development server.
 
+security:
+  - bearerAuth: []
+
 paths:
+
+  /journal/subjects:
+    get:
+      operationId: listJournalSubjects
+      summary: List configured journal subjects.
+      responses:
+        "200":
+          description: Subject catalogue.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalSubjectsResponse"
+        "500":
+          description: Server failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+    post:
+      operationId: appendJournalSubject
+      summary: Add a journal subject (idempotent when the label already exists).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JournalSubjectAppendRequest"
+      responses:
+        "200":
+          description: Full catalogue after applying the append.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalSubjectsResponse"
+        "400":
+          description: Empty or invalid label.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "500":
+          description: Server failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "401":
+          description: Missing or invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+
+  /journal/entries:
+    get:
+      operationId: listJournalEntrySummaries
+      summary: List journal entry metadata for each day in the date span that has a Markdown file.
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9]{2}-[0-9]{2}-[0-9]{2}$'
+          description: Inclusive range start (`yy-MM-dd`).
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9]{2}-[0-9]{2}-[0-9]{2}$'
+          description: Inclusive range end (`yy-MM-dd`).
+      responses:
+        "200":
+          description: Summaries for days that have an entry file on disk.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntriesSummariesResponse"
+        "400":
+          description: Invalid or malformed query parameters.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "500":
+          description: Server failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+    post:
+      operationId: appendJournalEntry
+      summary: Append a markdown journal block (git-managed).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AppendJournalEntryRequest"
+      responses:
+        "201":
+          description: Entry persisted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AppendJournalEntryResponse"
+        "400":
+          description: Invalid request body.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "500":
+          description: Server failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+
+  /journal/entries/{journal_day}:
+    get:
+      operationId: getJournalEntryDetail
+      summary: Load Markdown journal content for a single calendar day.
+      parameters:
+        - name: journal_day
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9]{2}-[0-9]{2}-[0-9]{2}$'
+          description: Calendar day key `yy-MM-dd`.
+      responses:
+        "200":
+          description: Entry body found on disk.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JournalEntryDetailResponse"
+        "404":
+          description: No Markdown file for this day.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "400":
+          description: Invalid path parameter.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "500":
+          description: Server failure.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
 
   /sessions:
     post:
@@ -34,10 +194,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/HTTPErrorResponse"
 
-  /sessions/{id}/completions:
+  /sessions/{id}/completions/stream:
     post:
-      operationId: runCompletion
-      summary: Run one completion turn for a session.
+      operationId: runCompletionStream
+      summary: >-
+        Stream one completion turn for a session using JSON Lines
+        (`application/jsonl`), mirroring Scribe `TurnStream.events` followed by a
+        terminal `done` event.
       parameters:
         - name: id
           in: path
@@ -53,11 +216,11 @@ paths:
               $ref: "#/components/schemas/CompletionRequest"
       responses:
         "200":
-          description: Completion result.
+          description: Stream of CompletionStreamEvent lines (JSON Lines).
           content:
-            application/json:
+            application/jsonl:
               schema:
-                $ref: "#/components/schemas/CompletionResponse"
+                $ref: "#/components/schemas/CompletionStreamEvent"
         "400":
           description: Invalid or missing session id.
           content:
@@ -78,7 +241,132 @@ paths:
                 $ref: "#/components/schemas/HTTPErrorResponse"
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
+
+    JournalSubject:
+      type: object
+      required:
+        - id
+        - label
+      properties:
+        id:
+          type: string
+          description: Stable subject identifier used when creating entries.
+        label:
+          type: string
+          description: Heading label shown in Markdown blocks.
+
+    JournalSubjectsResponse:
+      type: object
+      required:
+        - subjects
+      properties:
+        subjects:
+          type: array
+          items:
+            $ref: "#/components/schemas/JournalSubject"
+
+    JournalSubjectAppendRequest:
+      type: object
+      required:
+        - subject
+      properties:
+        subject:
+          type: string
+          description: >-
+            Display label for the subject (whitespace trimmed on the server); a stable id is assigned if new.
+
+    JournalEntrySummary:
+      type: object
+      required:
+        - date
+        - journal_relative_path
+        - word_count
+        - line_count
+      properties:
+        date:
+          type: string
+          description: Calendar day key (`yy-MM-dd`).
+        journal_relative_path:
+          type: string
+          description: Repo-relative Markdown path (`yy/MM/yy-MM-dd.md`).
+        word_count:
+          type: integer
+          minimum: 0
+        line_count:
+          type: integer
+          minimum: 0
+
+    JournalEntriesSummariesResponse:
+      type: object
+      required:
+        - entries
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/JournalEntrySummary"
+
+    JournalEntryDetailResponse:
+      type: object
+      required:
+        - date
+        - journal_relative_path
+        - content
+        - word_count
+        - line_count
+      properties:
+        date:
+          type: string
+        journal_relative_path:
+          type: string
+        content:
+          type: string
+        word_count:
+          type: integer
+          minimum: 0
+        line_count:
+          type: integer
+          minimum: 0
+
+    AppendJournalEntryRequest:
+      type: object
+      required:
+        - subject_ids
+        - body
+      properties:
+        subject_ids:
+          type: array
+          items:
+            type: string
+          description: Subject ids to render as `# label1, label2`.
+        body:
+          type: string
+          description: Markdown body for this block (`# headings`… are added by the server).
+        journal_day:
+          type: string
+          pattern: '^[0-9]{2}-[0-9]{2}-[0-9]{2}$'
+          description: >-
+            Calendar day key (`yy-MM-dd`) for the client's local civil day that should receive this block
+            (recommended; when omitted the server derives the path from `created_at` using UTC components).
+        created_at:
+          type: string
+          format: date-time
+          description: Optional anchor instant; not written into Markdown. When `journal_day` is omitted, filepath derives from this instant (UTC civil date).
+
+    AppendJournalEntryResponse:
+      type: object
+      required:
+        - journal_relative_path
+      properties:
+        journal_relative_path:
+          type: string
+          description: Repo-relative Markdown path (`yy/MM/yy-MM-dd.md`) under `.shape-tree/Journal`.
 
     CreateSessionRequest:
       type: object
@@ -109,14 +397,86 @@ components:
           type: string
           description: The user message to send to the agent.
 
-    CompletionResponse:
+    CompletionStreamSection:
+      type: string
+      enum:
+        - reasoning
+        - answer
+
+    CompletionStreamOutcome:
+      type: string
+      enum:
+        - completed
+        - interrupted
+        - tool_round_limit
+
+    CompletionStreamEvent:
       type: object
+      description: >-
+        One JSON Lines record. Maps from Scribe `TranscriptEvent` while the turn
+        runs; always ends with `kind: done` on success paths.
       required:
-        - assistant
+        - kind
       properties:
-        assistant:
+        kind:
           type: string
-          description: The assistant's reply text.
+          enum:
+            - section_enter
+            - assistant_delta
+            - finalize_assistant
+            - empty_turn
+            - blank_line
+            - usage
+            - tool_round
+            - tool_invocation
+            - skipped_line
+            - harness_error
+            - turn_interrupted
+            - model_running
+            - done
+        stream_section:
+          $ref: "#/components/schemas/CompletionStreamSection"
+        previous_stream_section:
+          $ref: "#/components/schemas/CompletionStreamSection"
+        text:
+          type: string
+          description: Delta for `assistant_delta` or human-readable tool output preview.
+        round:
+          type: integer
+          minimum: 0
+        tool_names:
+          type: array
+          items:
+            type: string
+        tool_name:
+          type: string
+        tool_arguments:
+          type: string
+        tool_output:
+          type: string
+        prompt_tokens:
+          type: integer
+          minimum: 0
+        completion_tokens:
+          type: integer
+          minimum: 0
+        total_tokens:
+          type: integer
+          minimum: 0
+        tokens_per_second:
+          type: number
+        harness_error_message:
+          type: string
+        model_running:
+          type: boolean
+        outcome:
+          $ref: "#/components/schemas/CompletionStreamOutcome"
+        tool_round_limit_rounds:
+          type: integer
+          minimum: 0
+        assistant_full_text:
+          type: string
+          description: Full assistant message after the turn (only on `done`).
 
     HTTPErrorResponse:
       type: object
