@@ -1,6 +1,5 @@
 import Foundation
 import Hummingbird
-import JWTKit
 import Logging
 import OpenAPIHummingbird
 import ShapeTreeClient
@@ -15,7 +14,7 @@ func buildRoutes(
   store: SessionStore,
   journalService: JournalService,
   journalQuery: JournalQueryService,
-  jwtKeys: JWTKeyCollection,
+  authorizedKeys: AuthorizedKeysStore,
   log: Logger,
   defaultOllamaURL: String = "http://127.0.0.1:11434",
   agentModel: String = "gemma4:e2b",
@@ -27,7 +26,7 @@ func buildRoutes(
 ) -> Router<BasicRequestContext> {
   let router = Router(context: BasicRequestContext.self)
 
-  router.add(middleware: ShapeTreeJWTAuthMiddleware(keys: jwtKeys))
+  router.add(middleware: ShapeTreeJWTAuthMiddleware(store: authorizedKeys))
 
   let handler = ShapeTreeHandler(
     store: store,

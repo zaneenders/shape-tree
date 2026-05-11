@@ -1,5 +1,6 @@
 import Foundation
 import OpenAPIAsyncHTTPClient
+import OpenAPIRuntime
 import ShapeTreeClient
 import SwiftUI
 
@@ -7,29 +8,29 @@ import SwiftUI
 @Observable
 @MainActor
 public final class ShapeTreeViewModel {
-    
-    fileprivate nonisolated static let journalUnauthorizedJWTMessage =
-    "Unauthorized (401). Paste a minted JWT (three segments like eyJ… . … . …)—not jwt.secret or JSON from shape-tree-config.json. Mint with `swift run ShapeTreeClientCLI --mint-token` from apps/shape-tree. Same token as Chat (Connection)."
-    
+
+    fileprivate nonisolated static let unauthorizedMessage =
+    "Unauthorized (401). This device's public key isn't enrolled on the server. Tap the network icon to copy the public JWK, then drop it into the server's authorized_keys/<kid>.jwk."
+
     // MARK: - Chat UI
-    
+
     public var messages: [ChatMessage] = []
     public var inputText: String = ""
     public var isLoading: Bool = false
     public var errorMessage: String? = nil
-    
+
     // MARK: - Journal UI
-    
+
     public struct JournalSubjectRow: Identifiable, Hashable, Sendable {
         public let id: String
         public let label: String
-        
+
         public init(id: String, label: String) {
             self.id = id
             self.label = label
         }
     }
-    
+
     public var journalSubjects: [JournalSubjectRow] = []
     public var journalSelectedSubjectIDs: Set<String> = Set(["general"])
     public var journalDraft: String = ""
@@ -38,9 +39,9 @@ public final class ShapeTreeViewModel {
     /// Load failures for the journal calendar grid (separate from composer / subject `journalError`).
     public var journalCalendarError: String? = nil
     public var isJournalWorking: Bool = false
-    
+
     // MARK: - Runtime configuration
-    
+
     public var serverURL: String {
         didSet {
             UserDefaults.standard.set(serverURL, forKey: Self.serverURLDefaultsKey)
@@ -52,31 +53,27 @@ public final class ShapeTreeViewModel {
             journalSelectedSubjectIDs = []
         }
     }
-    
-    /// Bearer JWT string (`Authorization: Bearer …`). Mint this elsewhere with the server's **`jwt.secret`**; never embed the secret in the app.
-    public var apiBearerToken: String? {
-        didSet {
-            persistApiBearerToken(apiBearerToken)
-            resetSession()
-        }
-    }
-    
+
+    /// On-device ES256 keypair used to mint short-lived bearer JWTs (auth.md).
+    /// The view layer reads its public JWK to surface the trust-bootstrap blob.
+    public let keyStore: ShapeTreeKeyStore
+
     private var client: Client?
     private var sessionId: String?
     private let transport: AsyncHTTPClientTransport
-    
+
     private static let serverURLDefaultsKey = "shape_tree_server_url"
-    private static let apiBearerTokenDefaultsKey = "shape_tree_api_bearer_token"
     public static let defaultServerURL = "http://localhost:42069"
-    
+
     // MARK: - Init
-    
+
     public init(
         serverURL defaultServerURL: String,
-        apiBearerToken defaultToken: String? = nil
+        keyStore: ShapeTreeKeyStore = ShapeTreeKeyStore()
     ) {
         self.transport = AsyncHTTPClientTransport()
-        
+        self.keyStore = keyStore
+
         if let storedURL = UserDefaults.standard.string(forKey: Self.serverURLDefaultsKey)?
             .trimmingCharacters(in: .whitespacesAndNewlines),
            !storedURL.isEmpty
@@ -85,51 +82,57 @@ public final class ShapeTreeViewModel {
         } else {
             self.serverURL = defaultServerURL
         }
-        
-        if let storedToken = UserDefaults.standard.string(forKey: Self.apiBearerTokenDefaultsKey)?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-           !storedToken.isEmpty
-        {
-            self.apiBearerToken = storedToken
-        } else {
-            self.apiBearerToken = defaultToken
-        }
+
+        // Best-effort generation: if Keychain access is restricted (locked
+        // device, etc.) we surface the failure on first network call instead
+        // of crashing at init.
+        _ = try? keyStore.loadOrGenerate()
     }
-    
-    private func persistApiBearerToken(_ token: String?) {
-        let trimmed = token?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        if trimmed.isEmpty {
-            UserDefaults.standard.removeObject(forKey: Self.apiBearerTokenDefaultsKey)
-        } else {
-            UserDefaults.standard.set(trimmed, forKey: Self.apiBearerTokenDefaultsKey)
-        }
-    }
-    
+
     private func makeClient() throws -> Client {
         guard let endpoint = URL(string: serverURL) else {
             throw AppError.invalidURL(serverURL)
         }
-        let trimmedToken = apiBearerToken?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let middlewares = ShapeTreeAPIClientMiddleware.bearerJWT(trimmedToken.isEmpty ? nil : trimmedToken)
+        let middlewares: [any ClientMiddleware] = [
+            ShapeTreeAutoMintBearer(keyStore: keyStore)
+        ]
         return Client(serverURL: endpoint, transport: transport, middlewares: middlewares)
     }
-    
+
+    // MARK: - Identity surface for Settings
+
+    /// The trust-bootstrap blob the operator drops into `authorized_keys/<kid>.jwk`.
+    public func currentPublicJWKJSON() -> String? {
+        try? keyStore.publicJWKJSON()
+    }
+
+    public func currentKid() -> String? {
+        try? keyStore.kid()
+    }
+
+    /// Forces a key rotation. Existing sessions are invalidated; the operator
+    /// must drop the new public JWK into the server's `authorized_keys/`.
+    public func regenerateDeviceKey() throws {
+        try keyStore.regenerate()
+        resetSession()
+    }
+
     // MARK: - Chat
-    
+
     public func sendMessage() {
         let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !isLoading else { return }
-        
+
         messages.append(ChatMessage(content: trimmed, isUser: true))
         inputText = ""
         isLoading = true
         errorMessage = nil
-        
+
         let placeholderID = UUID()
         messages.append(
             ChatMessage(id: placeholderID, assistantBlocks: [])
         )
-        
+
         Task { @MainActor in
             do {
                 try await consumeStreamingCompletion(placeholderID: placeholderID, userMessage: trimmed)
@@ -139,7 +142,7 @@ public final class ShapeTreeViewModel {
             }
         }
     }
-    
+
     private func replaceAssistantPlaceholder(
         id: UUID, blocks: [AssistantTimelineBlock], isLoading: Bool
     ) {
@@ -147,12 +150,12 @@ public final class ShapeTreeViewModel {
         messages[index] = ChatMessage(id: id, assistantBlocks: blocks)
         self.isLoading = isLoading
     }
-    
+
     private func updateAssistantPlaceholder(id: UUID, blocks: [AssistantTimelineBlock]) {
         guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
         messages[index] = ChatMessage(id: id, assistantBlocks: blocks)
     }
-    
+
     private func removePlaceholder(id: UUID, isLoading: Bool) {
         guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
         if messages[index].isAssistantPlaceholderVisuallyEmpty {
@@ -160,7 +163,7 @@ public final class ShapeTreeViewModel {
         }
         self.isLoading = isLoading
     }
-    
+
     /// Clears the chat transcript and rotates outbound session state.
     public func reset() {
         messages.removeAll()
@@ -168,65 +171,65 @@ public final class ShapeTreeViewModel {
         isLoading = false
         errorMessage = nil
         resetSession()
-        
+
         journalDraft = ""
         journalStatus = nil
         journalError = nil
         journalSelectedSubjectIDs = Set(["general"])
         journalSubjects.removeAll()
     }
-    
+
     private func resetSession() {
         sessionId = nil
         client = nil
     }
-    
+
     private func ensureSession() async throws -> Client {
         if let client, sessionId != nil {
             return client
         }
-        
+
         let freshClient = try makeClient()
-        
+
         let response = try await freshClient.createSession(
             Operations.createSession.Input(body: .json(.init(systemPrompt: nil)))
         )
-        
+
         switch response {
         case .ok(let ok):
             let payload = try ok.body.json
             sessionId = payload.id
             client = freshClient
             return freshClient
-            
+
         case .badRequest(let err):
             let body = try err.body.json
             throw AppError.server(body.error.message)
-            
+
         case .undocumented(let statusCode, _):
             if statusCode == 401 {
-                throw AppError.server(Self.journalUnauthorizedJWTMessage)
+                throw AppError.server(Self.unauthorizedMessage)
             }
             throw AppError.server("Server returned status \(statusCode)")
         }
     }
-    
+
     private func consumeStreamingCompletion(placeholderID: UUID, userMessage: String) async throws {
         let workingClient = try await ensureSession()
         guard let sid = sessionId else {
             throw AppError.server("No active session.")
         }
-        
+
         let response = try await workingClient.runCompletionStream(
             path: .init(id: sid),
             body: .json(.init(message: userMessage))
         )
-        
+
         switch response {
         case .ok(let ok):
             let stream = try ok.decodedCompletionEvents()
             var blocks: [AssistantTimelineBlock] = []
-            
+
             func appendReasoning(_ fragment: String) {
                 guard !fragment.isEmpty else { return }
                 if let last = blocks.last, case .reasoning(let prior) = last.kind {
@@ -237,7 +240,7 @@ public final class ShapeTreeViewModel {
                     blocks.append(AssistantTimelineBlock(kind: .reasoning(fragment)))
                 }
             }
-            
+
             func appendAnswer(_ fragment: String) {
                 guard !fragment.isEmpty else { return }
                 if let last = blocks.last, case .answer(let prior) = last.kind {
@@ -247,14 +250,14 @@ public final class ShapeTreeViewModel {
                     blocks.append(AssistantTimelineBlock(kind: .answer(fragment)))
                 }
             }
-            
+
             func hasNonemptyAnswerBlock() -> Bool {
                 blocks.contains {
                     guard case .answer(let s) = $0.kind else { return false }
                     return !s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 }
             }
-            
+
             for try await event in stream {
                 switch event.kind {
                 case .assistant_delta:
@@ -266,14 +269,14 @@ public final class ShapeTreeViewModel {
                         appendAnswer(fragment)
                     }
                     updateAssistantPlaceholder(id: placeholderID, blocks: blocks)
-                    
+
                 case .tool_round:
                     let round = event.round ?? 0
                     blocks.append(
                         AssistantTimelineBlock(kind: .toolRound(round: round, toolNames: event.tool_names ?? []))
                     )
                     updateAssistantPlaceholder(id: placeholderID, blocks: blocks)
-                    
+
                 case .tool_invocation:
                     blocks.append(
                         AssistantTimelineBlock(
@@ -284,7 +287,7 @@ public final class ShapeTreeViewModel {
                             ))
                     )
                     updateAssistantPlaceholder(id: placeholderID, blocks: blocks)
-                    
+
                 case .done:
                     if let full = event.assistant_full_text,
                        !hasNonemptyAnswerBlock(),
@@ -294,17 +297,17 @@ public final class ShapeTreeViewModel {
                     }
                     replaceAssistantPlaceholder(id: placeholderID, blocks: blocks, isLoading: false)
                     return
-                    
+
                 case .harness_error:
                     let msg = event.harness_error_message ?? "Agent error."
                     throw AppError.server(msg)
-                    
+
                 default:
                     continue
                 }
             }
             throw AppError.server("Stream ended unexpectedly.")
-            
+
         case .badRequest(let err):
             let body = try err.body.json
             throw AppError.server(body.error.message)
@@ -316,14 +319,14 @@ public final class ShapeTreeViewModel {
             throw AppError.server(body.error.message)
         case .undocumented(let statusCode, _):
             if statusCode == 401 {
-                throw AppError.server(Self.journalUnauthorizedJWTMessage)
+                throw AppError.server(Self.unauthorizedMessage)
             }
             throw AppError.server("Server returned status \(statusCode)")
         }
     }
-    
+
     // MARK: - Journal endpoints
-    
+
     /// Two-digit journal day key `yy-MM-dd` for the device's local civil day (sent as `journal_day` on append).
     private static func localJournalDayKey(for date: Date) -> String {
         let calendar = Calendar.autoupdatingCurrent
@@ -332,15 +335,15 @@ public final class ShapeTreeViewModel {
         let dd = calendar.component(.day, from: date)
         return String(format: "%02d-%02d-%02d", yy, mm, dd)
     }
-    
+
     public func reportJournalCalendarLoadFailure(_ error: Error) {
         journalCalendarError = error.localizedDescription
     }
-    
+
     public func clearJournalCalendarError() {
         journalCalendarError = nil
     }
-    
+
     public func refreshJournalSubjects() async {
         journalError = nil
         journalStatus = nil
@@ -348,22 +351,22 @@ public final class ShapeTreeViewModel {
             journalError = "Enter a ShapeTree server URL first."
             return
         }
-        
+
         // Subject list refresh runs on tab load and from the composer; do not use the global
         // `isJournalWorking` overlay here — a slow or hung server would block the whole journal UI.
         do {
             let remote = try makeClient()
             let response = try await remote.listJournalSubjects(.init(headers: .init()))
-            
+
             switch response {
             case .ok(let packet):
                 let payload = try packet.body.json
                 journalSubjects = payload.subjects.map { JournalSubjectRow(id: $0.id, label: $0.label) }
-                
+
                 let validIds = Set(journalSubjects.map(\.id))
-                
+
                 journalSelectedSubjectIDs.formIntersection(validIds)
-                
+
                 if journalSelectedSubjectIDs.isEmpty {
                     if validIds.contains("general") {
                         journalSelectedSubjectIDs = Set(["general"])
@@ -371,17 +374,17 @@ public final class ShapeTreeViewModel {
                         journalSelectedSubjectIDs = Set([firstSubject.id])
                     }
                 }
-                
+
                 journalStatus =
                 journalSubjects.isEmpty ? "Server returned zero subjects." : "\(journalSubjects.count) subjects loaded."
-                
+
             case .internalServerError(let err):
                 let body = try err.body.json
                 journalError = body.error.message
-                
+
             case .undocumented(let statusCode, _):
                 if statusCode == 401 {
-                    journalError = Self.journalUnauthorizedJWTMessage
+                    journalError = Self.unauthorizedMessage
                 } else {
                     journalError = "Unexpected status \(statusCode) while fetching subjects."
                 }
@@ -390,7 +393,7 @@ public final class ShapeTreeViewModel {
             journalError = error.localizedDescription
         }
     }
-    
+
     public func toggleJournalSubjectSelection(_ subjectId: String) {
         if journalSelectedSubjectIDs.contains(subjectId) {
             journalSelectedSubjectIDs.remove(subjectId)
@@ -398,7 +401,7 @@ public final class ShapeTreeViewModel {
             journalSelectedSubjectIDs.insert(subjectId)
         }
     }
-    
+
     /// Creates a subject label on the server when new; updates local chip list (Scribe ``appendJournalSubject`` parity).
     @discardableResult
     public func appendJournalSubjectAndRefresh(_ rawName: String) async -> Bool {
@@ -408,23 +411,23 @@ public final class ShapeTreeViewModel {
             "Enter a subject name before adding."
             return false
         }
-        
+
         guard !serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             journalError = "Enter a ShapeTree server URL first."
             return false
         }
-        
+
         journalError = nil
         journalStatus = nil
         isJournalWorking = true
         defer { isJournalWorking = false }
-        
+
         do {
             let remote = try makeClient()
             let response = try await remote.appendJournalSubject(
                 Operations.appendJournalSubject.Input(body: .json(.init(subject: name)))
             )
-            
+
             switch response {
             case .ok(let packet):
                 let payload = try packet.body.json
@@ -434,21 +437,21 @@ public final class ShapeTreeViewModel {
                 }
                 journalStatus = "Subject \"\(name)\" is available."
                 return true
-                
+
             case .badRequest(let err):
                 let body = try err.body.json
                 journalError = body.error.message
-                
+
             case .internalServerError(let err):
                 let body = try err.body.json
                 journalError = body.error.message
-                
+
             case .unauthorized:
-                journalError = Self.journalUnauthorizedJWTMessage
-                
+                journalError = Self.unauthorizedMessage
+
             case .undocumented(let code, _):
                 if code == 401 {
-                    journalError = Self.journalUnauthorizedJWTMessage
+                    journalError = Self.unauthorizedMessage
                 } else {
                     journalError = "Unexpected status \(code) while adding subject."
                 }
@@ -458,7 +461,7 @@ public final class ShapeTreeViewModel {
         }
         return false
     }
-    
+
     public func appendJournalEntryUsingServer(filingDate: Date = Date()) async {
         let bodyText = journalDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !bodyText.isEmpty else {
@@ -470,12 +473,12 @@ public final class ShapeTreeViewModel {
             "Select at least one subject (tap + to create one if the list is empty)."
             return
         }
-        
+
         journalError = nil
         journalStatus = nil
         isJournalWorking = true
         defer { isJournalWorking = false }
-        
+
         do {
             let remote = try makeClient()
             let payload = Components.Schemas.AppendJournalEntryRequest(
@@ -484,29 +487,29 @@ public final class ShapeTreeViewModel {
                 journal_day: Self.localJournalDayKey(for: filingDate),
                 created_at: nil
             )
-            
+
             let response = try await remote.appendJournalEntry(
                 Operations.appendJournalEntry.Input(body: .json(payload))
             )
-            
+
             switch response {
             case .created(let packet):
                 let summary = try packet.body.json
                 journalDraft = ""
                 journalStatus =
                 "Saved Markdown at repo path \(summary.journal_relative_path)."
-                
+
             case .badRequest(let err):
                 let body = try err.body.json
                 journalError = body.error.message
-                
+
             case .internalServerError(let err):
                 let body = try err.body.json
                 journalError = body.error.message
-                
+
             case .undocumented(let code, _):
                 if code == 401 {
-                    journalError = Self.journalUnauthorizedJWTMessage
+                    journalError = Self.unauthorizedMessage
                 } else {
                     journalError = "Unexpected status \(code) while appending."
                 }
@@ -515,7 +518,7 @@ public final class ShapeTreeViewModel {
             journalError = error.localizedDescription
         }
     }
-    
+
     /// Lists journal entry metadata for each day in the span `[startDayKey, endDayKey]` (`yy-MM-dd`, device-local calendar).
     public func fetchJournalEntrySummaries(startDayKey: String, endDayKey: String) async throws
     -> [Components.Schemas.JournalEntrySummary]
@@ -525,7 +528,7 @@ public final class ShapeTreeViewModel {
             Operations.listJournalEntrySummaries.Input(
                 query: .init(start_date: startDayKey, end_date: endDayKey)
             ))
-        
+
         switch response {
         case .ok(let packet):
             let payload = try packet.body.json
@@ -538,12 +541,12 @@ public final class ShapeTreeViewModel {
             throw AppError.server(body.error.message)
         case .undocumented(let code, _):
             if code == 401 {
-                throw AppError.server(Self.journalUnauthorizedJWTMessage)
+                throw AppError.server(Self.unauthorizedMessage)
             }
             throw AppError.server("Unexpected status \(code) while listing journal entries.")
         }
     }
-    
+
     /// Loads Markdown for `journal_day` (`yy-MM-dd`), or nil when the server reports no file.
     public func fetchJournalEntryDetailIfPresent(dayKey: String) async throws -> Components.Schemas
         .JournalEntryDetailResponse?
@@ -551,7 +554,7 @@ public final class ShapeTreeViewModel {
         let remote = try makeClient()
         let response = try await remote.getJournalEntryDetail(
             Operations.getJournalEntryDetail.Input(path: .init(journal_day: dayKey)))
-        
+
         switch response {
         case .ok(let packet):
             return try packet.body.json
@@ -565,7 +568,7 @@ public final class ShapeTreeViewModel {
             throw AppError.server(body.error.message)
         case .undocumented(let code, _):
             if code == 401 {
-                throw AppError.server(Self.journalUnauthorizedJWTMessage)
+                throw AppError.server(Self.unauthorizedMessage)
             }
             throw AppError.server("Unexpected status \(code) while loading journal entry.")
         }

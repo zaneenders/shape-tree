@@ -105,8 +105,9 @@ struct ShapeTreeChatView: View {
   @State private var mainTab: ShapeTreeMainTab = .chat
   @State private var showConnectionSettings = false
   @State private var connectionDraftURL = ""
-  @State private var connectionDraftToken = ""
-  @State private var connectionTokenFormatWarning: String?
+  @State private var connectionDraftLabel = ""
+  @State private var regenerateConfirmation = false
+  @State private var copyFeedback: String?
 
   var body: some View {
     VStack(spacing: 0) {
@@ -150,8 +151,8 @@ struct ShapeTreeChatView: View {
     .onChange(of: showConnectionSettings) { _, isPresented in
       guard isPresented else { return }
       connectionDraftURL = viewModel.serverURL
-      connectionDraftToken = viewModel.apiBearerToken ?? ""
-      connectionTokenFormatWarning = nil
+      connectionDraftLabel = viewModel.keyStore.deviceLabel
+      copyFeedback = nil
     }
     .sheet(isPresented: $showConnectionSettings) {
       connectionSettingsSheet
@@ -180,20 +181,72 @@ struct ShapeTreeChatView: View {
         }
 
         Section {
-          SecureField("Bearer JWT", text: $connectionDraftToken)
+          TextField("Device label", text: $connectionDraftLabel)
             #if os(iOS)
-          .textContentType(.password)
+          .textInputAutocapitalization(.never)
             #endif
-          if let hint = connectionTokenFormatWarning {
-            Text(hint)
-              .font(.footnote)
-              .foregroundStyle(.red)
-          }
         } header: {
-          Text("API access token")
+          Text("Device label")
         } footer: {
           Text(
-            "Paste a signed JWT (HS256), usually starting with eyJ and with two dots in the string—not jwt.secret, not JSON from shape-tree-config.json. Those stay on the server only; mint a short-lived token with the same secret. Optional \"Bearer \" prefix is OK."
+            "Carried in the JWT `dev` header for log breadcrumbs only. Identity is the public key thumbprint."
+          )
+        }
+
+        Section {
+          if let kid = viewModel.currentKid() {
+            HStack(alignment: .firstTextBaseline) {
+              Text("kid")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+              Spacer()
+              Text(formatThumbprint(kid))
+                .font(.system(.caption, design: .monospaced))
+                .multilineTextAlignment(.trailing)
+                .textSelection(.enabled)
+                .lineLimit(2)
+            }
+          }
+
+          if let json = viewModel.currentPublicJWKJSON() {
+            ScrollView(.horizontal) {
+              Text(json)
+                .font(.system(.caption, design: .monospaced))
+                .textSelection(.enabled)
+                .padding(.vertical, 4)
+            }
+            .frame(maxHeight: 220)
+
+            Button {
+              copyToPasteboard(json)
+              copyFeedback = "Copied. Drop into authorized_keys/<kid>.jwk on the server."
+            } label: {
+              Label("Copy public JWK", systemImage: "doc.on.doc")
+            }
+            #if os(macOS)
+            .buttonStyle(.borderless)
+            #endif
+          }
+
+          Button(role: .destructive) {
+            regenerateConfirmation = true
+          } label: {
+            Label("Regenerate device key", systemImage: "arrow.clockwise.circle")
+          }
+          #if os(macOS)
+          .buttonStyle(.borderless)
+          #endif
+
+          if let copyFeedback {
+            Text(copyFeedback)
+              .font(.footnote)
+              .foregroundStyle(.green)
+          }
+        } header: {
+          Text("Device public key")
+        } footer: {
+          Text(
+            "Each request is signed with this device's on-device P-256 key (Secure Enclave when available). Enroll the device by copying the JWK above and saving it on the server as authorized_keys/<kid>.jwk."
           )
         }
       }
@@ -204,21 +257,14 @@ struct ShapeTreeChatView: View {
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
           Button("Done") {
-            connectionTokenFormatWarning = nil
             let url = connectionDraftURL.trimmingCharacters(in: .whitespacesAndNewlines)
-            let tok = connectionDraftToken.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            if !tok.isEmpty, let issue = ShapeTreeAPIClientMiddleware.bearerTokenFormatIssue(tok) {
-              connectionTokenFormatWarning = issue
-              return
-            }
+            let label = connectionDraftLabel.trimmingCharacters(in: .whitespacesAndNewlines)
 
             if !url.isEmpty, url != viewModel.serverURL {
               viewModel.serverURL = url
             }
-            let normalized: String? = tok.isEmpty ? nil : ShapeTreeAPIClientMiddleware.normalizedBearerJWT(tok)
-            if normalized != viewModel.apiBearerToken {
-              viewModel.apiBearerToken = normalized
+            if label != viewModel.keyStore.deviceLabel {
+              viewModel.keyStore.deviceLabel = label
             }
             showConnectionSettings = false
             Task {
@@ -227,9 +273,44 @@ struct ShapeTreeChatView: View {
           }
         }
       }
+      .alert("Regenerate device key?", isPresented: $regenerateConfirmation) {
+        Button("Regenerate", role: .destructive) {
+          do {
+            try viewModel.regenerateDeviceKey()
+            copyFeedback =
+              "New keypair generated. Re-enroll the new public JWK before this device can call the server."
+          } catch {
+            copyFeedback = "Failed to regenerate: \(error.localizedDescription)"
+          }
+        }
+        Button("Cancel", role: .cancel) {}
+      } message: {
+        Text(
+          "Existing tokens stop verifying as soon as the server's authorized_keys/<old-kid>.jwk is removed. You'll need to enroll the new public key on the server."
+        )
+      }
     }
     #if os(macOS)
-    .frame(minWidth: 400, minHeight: 280)
+    .frame(minWidth: 480, minHeight: 460)
+    #endif
+  }
+
+  /// Display the 43-char base64url thumbprint in 8-char groups (SSH-style).
+  private func formatThumbprint(_ kid: String) -> String {
+    var out = ""
+    for (i, ch) in kid.enumerated() {
+      if i > 0, i % 8 == 0 { out.append(" ") }
+      out.append(ch)
+    }
+    return out
+  }
+
+  private func copyToPasteboard(_ value: String) {
+    #if os(macOS)
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(value, forType: .string)
+    #elseif canImport(UIKit)
+    UIPasteboard.general.string = value
     #endif
   }
 

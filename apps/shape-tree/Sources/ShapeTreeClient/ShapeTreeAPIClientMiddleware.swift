@@ -39,29 +39,27 @@ public enum ShapeTreeAPIClientMiddleware {
 
   // MARK: - Token format validation (uses JWTKit for proper JWT structure parsing)
 
-  /// If non-empty `raw` cannot plausibly be a JWT string, returns guidance for the Connection sheet.
+  /// If non-empty `raw` cannot plausibly be a JWT string, returns guidance for the caller.
   ///
   /// Uses JWTKit's `unverified` parser to validate JWT structure (header, payload, signature segments,
-  /// base64url encoding, JSON body) without verifying the cryptographic signature—that's the server's job.
+  /// base64url encoding, JSON body) without verifying the cryptographic signature — that's the server's job.
   public static func bearerTokenFormatIssue(_ raw: String) -> String? {
     let t = normalizedBearerJWT(raw)
     guard !t.isEmpty else { return nil }
 
     let trimmed = t.trimmingCharacters(in: .whitespacesAndNewlines)
 
-    // Quick heuristic: the user pasted the config file or the secret itself.
     if trimmed.first == "{"
       || trimmed.range(of: "\"secret\"", options: .caseInsensitive) != nil
       || trimmed.range(of: "\"jwt\"", options: .caseInsensitive) != nil
     {
       return """
-        That looks like JSON or a config snippet—not a JWT. The server's jwt.secret stays in shape-tree-config.json only. \
-        Here paste a signed token (three segments like eyJ… . … . …), minted with the same HS256 setup as this server (JWTKit + swift-crypto).
+        That looks like JSON or a config snippet—not a JWT. \
+        Provide a signed token (three segments like eyJ… . … . …), e.g. \
+        the output of `shape-tree-client mint-token`.
         """
     }
 
-    // Use JWTKit's parser to validate the token structure (3 segments, valid base64url,
-    // well-formed JSON header and payload). This replaces manual dot-counting with proper JWT parsing.
     do {
       let parser = DefaultJWTParser()
       _ = try parser.parse([UInt8](trimmed.utf8), as: PlaceholderJWTPayload.self)
@@ -80,8 +78,7 @@ public enum ShapeTreeAPIClientMiddleware {
       return """
         That doesn't look like a valid JWT: \(error.localizedDescription) \
         A JWT has three dot-separated base64url segments (header.payload.signature). \
-        If you pasted jwt.secret from config, that value signs tokens but is not a token itself—mint a JWT first \
-        (see apps/shape-tree README).
+        Mint one with `shape-tree-client mint-token`.
         """
     default:
       return "The JWT couldn't be parsed: \(error.localizedDescription)"

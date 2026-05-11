@@ -49,7 +49,7 @@ let package = Package(
         .product(name: "OpenAPIHummingbird", package: "swift-openapi-hummingbird"),
         .product(name: "Configuration", package: "swift-configuration"),
         .product(name: "JWTKit", package: "jwt-kit"),
-        .product(name: "Crypto", package: "swift-crypto", condition: .when(platforms: [.linux])),
+        .product(name: "Crypto", package: "swift-crypto"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6)
@@ -61,6 +61,7 @@ let package = Package(
         .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
         .product(name: "OpenAPIAsyncHTTPClient", package: "swift-openapi-async-http-client"),
         .product(name: "JWTKit", package: "jwt-kit"),
+        .product(name: "Crypto", package: "swift-crypto"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6)
@@ -75,7 +76,7 @@ let package = Package(
         "ShapeTreeClient",
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
         .product(name: "JWTKit", package: "jwt-kit"),
-        .product(name: "Configuration", package: "swift-configuration"),
+        .product(name: "Crypto", package: "swift-crypto"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6)
@@ -100,6 +101,7 @@ let package = Package(
         .product(name: "HummingbirdTesting", package: "hummingbird"),
         .product(name: "OpenAPIAsyncHTTPClient", package: "swift-openapi-async-http-client"),
         .product(name: "JWTKit", package: "jwt-kit"),
+        .product(name: "Crypto", package: "swift-crypto"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6)

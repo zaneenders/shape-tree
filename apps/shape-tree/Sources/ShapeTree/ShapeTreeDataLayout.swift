@@ -8,6 +8,7 @@ public struct ShapeTreeDataLayout: Sendable {
   public static let dotFolderName = ".shape-tree"
   public static let subjectsFileName = "journal-subjects.json"
   public static let journalDirectoryName = "Journal"
+  public static let authorizedKeysDirectoryName = "authorized_keys"
 
   public let dataRoot: URL
 
@@ -25,6 +26,11 @@ public struct ShapeTreeDataLayout: Sendable {
 
   public var journalSubjectsFile: URL {
     dotFolder.appendingPathComponent(Self.subjectsFileName, isDirectory: false)
+  }
+
+  /// SSH-`authorized_keys`-style trust store: `R/.shape-tree/authorized_keys/<thumbprint>.jwk` (auth.md).
+  public var authorizedKeysDirectory: URL {
+    dotFolder.appendingPathComponent(Self.authorizedKeysDirectoryName, isDirectory: true)
   }
 
   public func journalEntryFile(for date: Date) -> URL {
@@ -61,6 +67,10 @@ public struct ShapeTreeDataLayout: Sendable {
 
     try fileManager.createDirectory(
       at: layout.journalRepoRoot,
+      withIntermediateDirectories: true)
+
+    try fileManager.createDirectory(
+      at: layout.authorizedKeysDirectory,
       withIntermediateDirectories: true)
 
     if !fileManager.fileExists(atPath: layout.journalSubjectsFile.path) {

@@ -1,7 +1,6 @@
 import Configuration
 import Foundation
 import Hummingbird
-import JWTKit
 import Logging
 
 let log = Logger(label: "shape-tree.server")
@@ -13,7 +12,6 @@ enum Key {
   static let dataPath: ConfigKey = "data.path"
   static let ollamaURL: ConfigKey = "ollama.url"
   static let ollamaToken: ConfigKey = "ollama.token"
-  static let jwtSecret: ConfigKey = "jwt.secret"
   static let agentModel: ConfigKey = "agent.model"
   static let systemPrompt: ConfigKey = "agent.systemPrompt"
   static let contextWindow: ConfigKey = "agent.contextWindow"
@@ -35,15 +33,6 @@ let systemPrompt = try await reader.fetchRequiredString(forKey: Key.systemPrompt
 let contextWindow = try await reader.fetchRequiredInt(forKey: Key.contextWindow)
 let contextWindowThreshold = try await reader.fetchRequiredDouble(forKey: Key.contextWindowThreshold)
 let dataPathRaw = try await reader.fetchRequiredString(forKey: Key.dataPath)
-let jwtSecret = try await reader.fetchRequiredString(forKey: Key.jwtSecret)
-
-guard !jwtSecret.isEmpty else {
-  log.critical("jwt.secret is empty — set a non-empty HS256 secret in \(configPath)")
-  fatalError("Missing jwt.secret")
-}
-
-let jwtKeys = JWTKeyCollection()
-await jwtKeys.add(hmac: HMACKey(from: jwtSecret), digestAlgorithm: .sha256)
 
 // MARK: Data root + journal repo (`git init` only — first append creates `HEAD`)
 
@@ -56,6 +45,8 @@ let journalService = JournalService(layout: layout, log: log)
 try await journalService.initializeJournalGitRepoIfNeeded()
 let journalQuery = JournalQueryService(layout: layout, log: log)
 
+let authorizedKeys = AuthorizedKeysStore(directory: layout.authorizedKeysDirectory)
+
 // MARK: - Start server
 
 let bearerToken: String? = ollamaToken.isEmpty ? nil : ollamaToken
@@ -65,7 +56,7 @@ let router = buildRoutes(
   store: store,
   journalService: journalService,
   journalQuery: journalQuery,
-  jwtKeys: jwtKeys,
+  authorizedKeys: authorizedKeys,
   log: log,
   defaultOllamaURL: ollamaURL,
   agentModel: agentModel,
@@ -89,6 +80,7 @@ log.info(
   event=server.start \
   address=\(host):\(port) \
   data_root=\(layout.dataRoot.path) \
+  authorized_keys=\(layout.authorizedKeysDirectory.path) \
   ollama=\(ollamaURL) \
   model=\(agentModel)
   """)
