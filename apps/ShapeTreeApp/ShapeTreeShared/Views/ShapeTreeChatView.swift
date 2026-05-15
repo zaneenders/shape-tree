@@ -195,16 +195,15 @@ struct ShapeTreeChatView: View {
 
         Section {
           if let kid = viewModel.currentKid() {
-            HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 6) {
               Text("kid")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
-              Spacer()
-              Text(formatThumbprint(kid))
+              Text(kid)
                 .font(.system(.caption, design: .monospaced))
-                .multilineTextAlignment(.trailing)
                 .textSelection(.enabled)
-                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
             }
           }
 
@@ -293,16 +292,6 @@ struct ShapeTreeChatView: View {
     #if os(macOS)
     .frame(minWidth: 480, minHeight: 460)
     #endif
-  }
-
-  /// Display the 43-char base64url thumbprint in 8-char groups (SSH-style).
-  private func formatThumbprint(_ kid: String) -> String {
-    var out = ""
-    for (i, ch) in kid.enumerated() {
-      if i > 0, i % 8 == 0 { out.append(" ") }
-      out.append(ch)
-    }
-    return out
   }
 
   private func copyToPasteboard(_ value: String) {
