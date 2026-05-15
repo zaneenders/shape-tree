@@ -2,7 +2,6 @@ import Foundation
 import HTTPTypes
 import OpenAPIRuntime
 
-/// Injects `Authorization: Bearer …` on every OpenAPI client request.
 public struct BearerAuthClientMiddleware: ClientMiddleware {
   public let bearerToken: String
 
