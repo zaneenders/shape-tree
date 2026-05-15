@@ -16,6 +16,8 @@ enum Key {
   static let systemPrompt: ConfigKey = "agent.systemPrompt"
   static let contextWindow: ConfigKey = "agent.contextWindow"
   static let contextWindowThreshold: ConfigKey = "agent.contextWindowThreshold"
+  static let journalCommitAuthorName: ConfigKey = "journal.commitAuthor.name"
+  static let journalCommitAuthorEmail: ConfigKey = "journal.commitAuthor.email"
 }
 
 // MARK: - Load configuration
@@ -34,6 +36,19 @@ let contextWindow = try await reader.fetchRequiredInt(forKey: Key.contextWindow)
 let contextWindowThreshold = try await reader.fetchRequiredDouble(forKey: Key.contextWindowThreshold)
 let dataPathRaw = try await reader.fetchRequiredString(forKey: Key.dataPath)
 
+let journalCommitFallbackNameRaw = try await reader.fetchString(forKey: Key.journalCommitAuthorName)
+let journalCommitFallbackEmailRaw = try await reader.fetchString(forKey: Key.journalCommitAuthorEmail)
+
+let trimmedJournalCommitName = journalCommitFallbackNameRaw?
+  .trimmingCharacters(in: .whitespacesAndNewlines)
+let trimmedJournalCommitEmail = journalCommitFallbackEmailRaw?
+  .trimmingCharacters(in: .whitespacesAndNewlines)
+
+let journalCommitFallbackName =
+  trimmedJournalCommitName.flatMap { $0.isEmpty ? nil : $0 } ?? "ShapeTree"
+let journalCommitFallbackEmail =
+  trimmedJournalCommitEmail.flatMap { $0.isEmpty ? nil : $0 } ?? "shape-tree@localhost"
+
 // MARK: Data root + journal repo (`git init` only — first append creates `HEAD`)
 
 let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
@@ -41,7 +56,11 @@ let resolvedDataRoot = ShapeTreeDataLayout.resolveDataRoot(rawPath: dataPathRaw,
 let layout = ShapeTreeDataLayout(dataRoot: resolvedDataRoot)
 try ShapeTreeDataLayout.bootstrapIfNeeded(layout: layout)
 
-let journalService = JournalService(layout: layout, log: log)
+let journalService = JournalService(
+  layout: layout,
+  log: log,
+  fallbackCommitAuthorName: journalCommitFallbackName,
+  fallbackCommitAuthorEmail: journalCommitFallbackEmail)
 try await journalService.initializeJournalGitRepoIfNeeded()
 let journalQuery = JournalQueryService(layout: layout, log: log)
 

@@ -41,7 +41,15 @@ public struct Sit: Sendable {
 
   /// Writes repo-local `user.name` / `user.email` only when Git's effective identity is unset (typical for
   /// detached daemons with no `HOME` gitconfig), so ``addCommitPush``'s `commit` step cannot fail for that reason.
-  public func ensureCommitAuthorIfUnset(cwd: FilePath, log: Logger) async throws {
+  ///
+  /// When a value must be supplied, ``fallbackCommitName`` / ``fallbackCommitEmail`` are written (typically
+  /// mirrored from ``shape-tree-config.json`` optional `journal.commitAuthor` keys).
+  public func ensureCommitAuthorIfUnset(
+    cwd: FilePath,
+    log: Logger,
+    fallbackCommitName: String = "ShapeTree",
+    fallbackCommitEmail: String = "shape-tree@localhost"
+  ) async throws {
     let nameLookup = try await run(
       arguments: ["config", "--get", "user.name"],
       cwd: cwd,
@@ -49,7 +57,7 @@ public struct Sit: Sendable {
     let name = nameLookup.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
     if !nameLookup.status.isSuccess || name.isEmpty {
       try await invokeExpectingSuccess(
-        arguments: ["config", "--local", "user.name", "ShapeTree"],
+        arguments: ["config", "--local", "user.name", fallbackCommitName],
         cwd: cwd,
         commandLabel: "config user.name",
         log: log)
@@ -62,7 +70,7 @@ public struct Sit: Sendable {
     let email = emailLookup.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
     if !emailLookup.status.isSuccess || email.isEmpty {
       try await invokeExpectingSuccess(
-        arguments: ["config", "--local", "user.email", "shape-tree@localhost"],
+        arguments: ["config", "--local", "user.email", fallbackCommitEmail],
         cwd: cwd,
         commandLabel: "config user.email",
         log: log)

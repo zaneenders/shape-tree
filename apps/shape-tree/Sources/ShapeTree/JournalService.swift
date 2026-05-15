@@ -40,17 +40,23 @@ public actor JournalService {
   private let sit: Sit
   private let log: Logger
   private let fileManager: FileManager
+  private let fallbackCommitAuthorName: String
+  private let fallbackCommitAuthorEmail: String
 
   public init(
     layout: ShapeTreeDataLayout,
     sit: Sit = Sit(),
     log: Logger,
-    fileManager: FileManager = .default
+    fileManager: FileManager = .default,
+    fallbackCommitAuthorName: String = "ShapeTree",
+    fallbackCommitAuthorEmail: String = "shape-tree@localhost"
   ) {
     self.layout = layout
     self.sit = sit
     self.log = log
     self.fileManager = fileManager
+    self.fallbackCommitAuthorName = fallbackCommitAuthorName
+    self.fallbackCommitAuthorEmail = fallbackCommitAuthorEmail
   }
 
   /// Runs ``git init`` inside `Journal/` when `.git` is missing.
@@ -59,7 +65,11 @@ public actor JournalService {
   public func initializeJournalGitRepoIfNeeded() async throws {
     let cwd = FilePath(layout.journalRepoRoot.path)
     try await sit.initializeRepoIfNeeded(cwd: cwd, log: log)
-    try await sit.ensureCommitAuthorIfUnset(cwd: cwd, log: log)
+    try await sit.ensureCommitAuthorIfUnset(
+      cwd: cwd,
+      log: log,
+      fallbackCommitName: fallbackCommitAuthorName,
+      fallbackCommitEmail: fallbackCommitAuthorEmail)
   }
 
   public func loadSubjects() throws -> JournalSubjectsFile {
