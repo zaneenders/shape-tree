@@ -297,7 +297,8 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
           }
 
           let result = try await turnStream.result.value
-          await store.setMessages(sessionId, messages: result.messages)
+          await store.setMessages(
+            sessionId, messages: result.messages.map { $0.toComponentsChatMessage() })
 
           let assistantText =
             result.messages.last(where: { $0.role == .assistant })?.content ?? ""

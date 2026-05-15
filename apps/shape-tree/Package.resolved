@@ -1,5 +1,5 @@
 {
-  "originHash" : "013322c643d8d46ba9b4f28075fce27742ac6257c2642d20f861e2f1ac17f8c9",
+  "originHash" : "89ce3e0e8799c0433bf4360d1c2213026698a014b2e518dad0e389018eb6b46d",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -42,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/zaneenders/scribe.git",
       "state" : {
-        "branch" : "3a391a2",
-        "revision" : "3a391a2543aa3d8a6dbb3b25f44e9417bfe2bbad"
+        "branch" : "efd9ed3",
+        "revision" : "efd9ed3cb781f7ff8dc47472f515395e353386ff"
       }
     },
     {
