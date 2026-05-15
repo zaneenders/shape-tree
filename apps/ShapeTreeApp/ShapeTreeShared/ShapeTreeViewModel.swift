@@ -12,6 +12,8 @@ public final class ShapeTreeViewModel {
     fileprivate nonisolated static let unauthorizedMessage =
     "Unauthorized (401). This device's public key isn't enrolled on the server. Tap the network icon to copy the public JWK, then drop it into the server's authorized_keys/<kid>.jwk."
 
+    private static let serverURLDefaultsKey = "shape_tree_server_url"
+
     // MARK: - Chat UI
 
     public var messages: [ChatMessage] = []
@@ -62,26 +64,15 @@ public final class ShapeTreeViewModel {
     private var sessionId: String?
     private let transport: AsyncHTTPClientTransport
 
-    private static let serverURLDefaultsKey = "shape_tree_server_url"
-    public static let defaultServerURL = "http://localhost:42069"
-
-    // MARK: - Init
+    public static let serverURL = "http://localhost:42069"
 
     public init(
-        serverURL defaultServerURL: String,
+        serverURL: String,
         keyStore: ShapeTreeKeyStore = ShapeTreeKeyStore()
     ) {
         self.transport = AsyncHTTPClientTransport()
         self.keyStore = keyStore
-
-        if let storedURL = UserDefaults.standard.string(forKey: Self.serverURLDefaultsKey)?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-           !storedURL.isEmpty
-        {
-            self.serverURL = storedURL
-        } else {
-            self.serverURL = defaultServerURL
-        }
+        self.serverURL = serverURL
 
         // Best-effort generation: if Keychain access is restricted (locked
         // device, etc.) we surface the failure on first network call instead

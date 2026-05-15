@@ -59,6 +59,7 @@ public actor JournalService {
   public func initializeJournalGitRepoIfNeeded() async throws {
     let cwd = FilePath(layout.journalRepoRoot.path)
     try await sit.initializeRepoIfNeeded(cwd: cwd, log: log)
+    try await sit.ensureCommitAuthorIfUnset(cwd: cwd, log: log)
   }
 
   public func loadSubjects() throws -> JournalSubjectsFile {
