@@ -23,6 +23,12 @@ All values are **required**. Create `shape-tree-config.json` in the working dire
     "systemPrompt": "You are a helpful coding assistant.",
     "contextWindow": 131072,
     "contextWindowThreshold": 0.85
+  },
+  "journal": {
+    "commitAuthor": {
+      "name": "ShapeTree",
+      "email": "shape-tree@localhost"
+    }
   }
 }
 ```

@@ -5,8 +5,6 @@ import Logging
 
 let log = Logger(label: "shape-tree.server")
 
-// MARK: - Config key bindings
-
 enum Key {
   static let serverPort: ConfigKey = "server.port"
   static let dataPath: ConfigKey = "data.path"
@@ -19,8 +17,6 @@ enum Key {
   static let journalCommitAuthorName: ConfigKey = "journal.commitAuthor.name"
   static let journalCommitAuthorEmail: ConfigKey = "journal.commitAuthor.email"
 }
-
-// MARK: - Load configuration
 
 let configPath = "shape-tree-config.json"
 
@@ -36,20 +32,8 @@ let contextWindow = try await reader.fetchRequiredInt(forKey: Key.contextWindow)
 let contextWindowThreshold = try await reader.fetchRequiredDouble(forKey: Key.contextWindowThreshold)
 let dataPathRaw = try await reader.fetchRequiredString(forKey: Key.dataPath)
 
-let journalCommitFallbackNameRaw = try await reader.fetchString(forKey: Key.journalCommitAuthorName)
-let journalCommitFallbackEmailRaw = try await reader.fetchString(forKey: Key.journalCommitAuthorEmail)
-
-let trimmedJournalCommitName = journalCommitFallbackNameRaw?
-  .trimmingCharacters(in: .whitespacesAndNewlines)
-let trimmedJournalCommitEmail = journalCommitFallbackEmailRaw?
-  .trimmingCharacters(in: .whitespacesAndNewlines)
-
-let journalCommitFallbackName =
-  trimmedJournalCommitName.flatMap { $0.isEmpty ? nil : $0 } ?? "ShapeTree"
-let journalCommitFallbackEmail =
-  trimmedJournalCommitEmail.flatMap { $0.isEmpty ? nil : $0 } ?? "shape-tree@localhost"
-
-// MARK: Data root + journal repo (`git init` only — first append creates `HEAD`)
+let journalCommitFallbackName = try await reader.fetchRequiredString(forKey: Key.journalCommitAuthorName)
+let journalCommitFallbackEmail = try await reader.fetchRequiredString(forKey: Key.journalCommitAuthorEmail)
 
 let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
 let resolvedDataRoot = ShapeTreeDataLayout.resolveDataRoot(rawPath: dataPathRaw, cwd: cwd)

@@ -2,9 +2,6 @@ import Foundation
 import ScribeCore
 import ScribeLLM
 
-// MARK: - Session Store
-
-/// Thread-safe store for active agent sessions.
 actor SessionStore {
 
   struct Session {
@@ -15,7 +12,6 @@ actor SessionStore {
 
   private var sessions: [UUID: Session] = [:]
 
-  /// Create a new session and return its ID.
   func create(agent: ScribeAgent, systemPrompt: String) -> UUID {
     let id = UUID()
     sessions[id] = Session(
