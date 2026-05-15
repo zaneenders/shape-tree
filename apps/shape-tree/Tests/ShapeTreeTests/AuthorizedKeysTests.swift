@@ -11,11 +11,8 @@ import Testing
 
 @testable import ShapeTree
 
-/// auth.md verification flow exercised end-to-end through the middleware.
 @Suite
 struct AuthorizedKeysTests {
-
-  // MARK: - Thumbprint helpers
 
   @Test func thumbprintIsStableAndWellFormed() {
     let kid = JWKThumbprint.thumbprint(
@@ -34,8 +31,6 @@ struct AuthorizedKeysTests {
     let padded = String(repeating: "A", count: 43) + "="
     #expect(!JWKThumbprint.isWellFormed(padded))
   }
-
-  // MARK: - Outer alg pin
 
   @Test func rejectsHS256TokenSignedWithSharedSecret() async throws {
     let log = Logger(label: "test.auth.alg-pin")
@@ -176,8 +171,6 @@ struct AuthorizedKeysTests {
     }
   }
 
-  // MARK: - Trust-store integrity (verification flow step 5)
-
   @Test func rejectsKeyfileSwappedUnderExistingFilename() async throws {
     let log = Logger(label: "test.auth.tampered-store")
     let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
@@ -252,6 +245,54 @@ struct AuthorizedKeysTests {
         uri: "/journal/subjects",
         method: .get,
         headers: try await JWTTestSupport.bearerHeaders(fixture)
+      ) { response in
+        #expect(response.status == .unauthorized)
+      }
+    }
+  }
+
+  @Test func rejectsTokenWhereSubDoesNotMatchKid() async throws {
+    let log = Logger(label: "test.auth.sub-binding")
+    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let journalQuery = JournalQueryService(layout: layout, log: log)
+
+    // Enroll key A in the trust store.
+    let fixtureA = try await JWTTestSupport.makeFixture()
+
+    // Generate key B but do NOT enroll it — we only need its thumbprint.
+    let fixtureB = try await JWTTestSupport.makeFixture()
+
+    let router = buildRoutes(
+      store: SessionStore(),
+      journalService: journal,
+      journalQuery: journalQuery,
+      authorizedKeys: fixtureA.store,
+      log: log
+    )
+    let app = Application(router: router)
+
+    // Construct a JWT signed by key A, kid=A in the header (so the outer pin,
+    // filesystem lookup, and signature verification all pass), but with
+    // sub=B in the payload — the sub==kid guard should reject it.
+    let payload = ShapeTreeJWTPayload(
+      sub: SubjectClaim(value: fixtureB.kid),
+      iat: IssuedAtClaim(value: Date()),
+      exp: ExpirationClaim(value: Date().addingTimeInterval(900))
+    )
+    let keys = JWTKeyCollection()
+    await keys.add(ecdsa: fixtureA.privateKey)
+    let header: JWTHeader = [
+      "typ": "JWT",
+      "alg": "ES256",
+      "kid": .string(fixtureA.kid),
+    ]
+    let token = try await keys.sign(payload, header: header)
+
+    try await app.test(.router) { client in
+      try await client.execute(
+        uri: "/journal/subjects",
+        method: .get,
+        headers: [.authorization: "Bearer \(token)"]
       ) { response in
         #expect(response.status == .unauthorized)
       }

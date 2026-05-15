@@ -110,8 +110,9 @@ struct ShapeTreeJWTAuthMiddleware: MiddlewareProtocol {
     let keys = JWTKeyCollection()
     await keys.add(ecdsa: stored.publicKey)
 
+    let payload: ShapeTreeJWTPayload
     do {
-      _ = try await keys.verify(token, as: ShapeTreeJWTPayload.self)
+      payload = try await keys.verify(token, as: ShapeTreeJWTPayload.self)
     } catch let error as JWTError {
       if error.errorType == JWTError.ErrorType.claimVerificationFailure,
         error.failedClaim is ExpirationClaim
@@ -125,9 +126,20 @@ struct ShapeTreeJWTAuthMiddleware: MiddlewareProtocol {
       throw HTTPError(.unauthorized, message: "Invalid or expired JWT")
     }
 
+    // ---- Bind sub to kid: the subject must be the RFC 7638 thumbprint of the
+    //      key that signed this token. Since kid == filename == thumbprint
+    //      (enforced by AuthorizedKeysStore), this prevents a token signed by
+    //      one enrolled key from claiming the identity of a different key.
+    guard payload.sub.value == kid else {
+      context.logger.warning(
+        "event=auth.sub_mismatch kid=\(kid) sub=\(payload.sub.value)"
+      )
+      throw HTTPError(.unauthorized, message: "Invalid or expired JWT")
+    }
+
     let dev = header.dev?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     context.logger.info(
-      "event=auth.ok kid=\(stored.thumbprint) dev=\(dev.isEmpty ? "-" : dev)"
+      "event=auth.ok kid=\(stored.thumbprint) sub=\(payload.sub.value) dev=\(dev.isEmpty ? "-" : dev)"
     )
 
     return try await next(request, context)
