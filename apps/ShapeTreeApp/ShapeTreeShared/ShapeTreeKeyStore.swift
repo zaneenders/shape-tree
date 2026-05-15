@@ -25,14 +25,12 @@ public final class ShapeTreeKeyStore {
   public enum KeyStoreError: Error, LocalizedError {
     case keychain(OSStatus)
     case missingMaterial
-    case signingFailed
     case malformedKeyMaterial
 
     public var errorDescription: String? {
       switch self {
       case .keychain(let s): return "Keychain error: OSStatus \(s)"
       case .missingMaterial: return "Device key material missing — generate a key first."
-      case .signingFailed: return "Failed to sign JWT with on-device key."
       case .malformedKeyMaterial: return "Stored key material is malformed; regenerate."
       }
     }
@@ -163,46 +161,22 @@ public final class ShapeTreeKeyStore {
 
   // MARK: - Signing
 
-  public func sign(_ data: Data) throws -> Data {
-    let backing = try loadOrGenerate()
-    do {
-      switch backing {
-      case .secureEnclave(let key): return try key.signature(for: data).rawRepresentation
-      case .software(let key): return try key.signature(for: data).rawRepresentation
-      }
-    } catch {
-      throw KeyStoreError.signingFailed
-    }
-  }
-
   /// Mints an ES256 JWT signed by the on-device key (auth.md, "JWT shape").
   public func mintES256JWT(ttl: TimeInterval = 900) throws -> String {
     let kid = try kid()
     let label = deviceLabel
-    let now = Int(Date().timeIntervalSince1970)
-
-    let header: [String: String] = [
-      "typ": "JWT",
-      "alg": "ES256",
-      "kid": kid,
-      "dev": label,
-    ]
-    let payload: [String: Any] = [
-      "sub": kid,
-      "iat": now,
-      "exp": now + Int(ttl),
-      "jti": UUID().uuidString,
-    ]
-
-    let headerJSON = try JSONSerialization.data(withJSONObject: header, options: [.sortedKeys])
-    let payloadJSON = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
-
-    let h = headerJSON.base64URLEncodedStringNoPadding()
-    let p = payloadJSON.base64URLEncodedStringNoPadding()
-    let signingInput = Data("\(h).\(p)".utf8)
-    let signature = try sign(signingInput)
-    let s = signature.base64URLEncodedStringNoPadding()
-    return "\(h).\(p).\(s)"
+    let backing = try loadOrGenerate()
+    return try ShapeTreeTokenIssuer.mintES256(
+      kid: kid,
+      deviceLabel: label,
+      ttl: ttl,
+      sign: { data in
+        switch backing {
+        case .secureEnclave(let key): return try key.signature(for: data).rawRepresentation
+        case .software(let key): return try key.signature(for: data).rawRepresentation
+        }
+      }
+    )
   }
 
   // MARK: - Internals

@@ -20,7 +20,6 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-openapi-runtime.git", from: "1.0.0"),
     .package(url: "https://github.com/swift-server/swift-openapi-async-http-client.git", from: "1.0.0"),
     .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0"),
-    .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.6.0"),
     .package(url: "https://github.com/swiftlang/swift-subprocess.git", from: "0.4.0"),
     .package(url: "https://github.com/apple/swift-system.git", from: "1.4.0"),
     .package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"),
@@ -69,18 +68,6 @@ let package = Package(
       ],
       plugins: [
         .plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")
-      ]
-    ),
-    .executableTarget(
-      name: "ShapeTreeClientCLI",
-      dependencies: [
-        "ShapeTreeClient",
-        .product(name: "ArgumentParser", package: "swift-argument-parser"),
-        .product(name: "JWTKit", package: "jwt-kit"),
-        .product(name: "Crypto", package: "swift-crypto"),
-      ],
-      swiftSettings: [
-        .swiftLanguageMode(.v6)
       ]
     ),
     .testTarget(

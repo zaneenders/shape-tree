@@ -42,7 +42,7 @@ required (e.g. local Ollama).
 
 ## Authentication: per-device ES256 keys
 
-ShapeTree uses an SSH-`authorized_keys`-style trust model. Each frontend (CLI, iOS app, Mac app)
+ShapeTree uses an SSH-`authorized_keys`-style trust model. Each frontend (iOS app, Mac app)
 owns a P-256 private key; the server only knows public keys. The full design lives in
 [`.dev/auth.md`](../../.dev/auth.md); this section covers the day-to-day usage.
 
@@ -74,31 +74,6 @@ JWTs carry:
 - `sub == kid`, plus `iat`, `exp`, and a random `jti`. TTL is short (5–15 minutes); clients mint
   fresh tokens per request.
 
-### Bootstrapping a CLI device
-
-From `apps/shape-tree`:
-
-```bash
-swift run ShapeTreeClientCLI keygen --label "$(hostname -s)"
-```
-
-This creates a P-256 keypair under `~/.config/shape-tree/`:
-
-- `id_p256.pem` — private key, `0600`.
-- `id_p256.meta.json` — cached `kid` and label, `0600`.
-- `id_p256.pub.jwk` — public JWK with `kid` and `label` baked in, `0644`.
-
-`keygen` prints the public JWK and the thumbprint. To enroll the CLI on a server you control:
-
-```bash
-cp ~/.config/shape-tree/id_p256.pub.jwk \
-   "$DATA_ROOT/.shape-tree/authorized_keys/$(jq -r .kid ~/.config/shape-tree/id_p256.pub.jwk).jwk"
-```
-
-(In a hardened deploy this is a `sudo install -o root -g shape-tree -m 0640 …` against
-`/opt/shape-tree/data/.shape-tree/authorized_keys/`. See `.dev/auth.md`, "Install layout and
-permissions".)
-
 ### Bootstrapping an iOS / macOS app device
 
 The first launch generates a P-256 keypair via the Security framework — Secure Enclave on real
@@ -109,19 +84,6 @@ JWK so it can be eyeballed against the filename.
 
 "Regenerate device key" wipes and re-creates the on-device keypair; the operator must re-enroll
 the new public JWK before the device can call the server.
-
-### Tokens (CLI)
-
-```bash
-# Print a 15-minute ES256 JWT signed with ~/.config/shape-tree/id_p256.pem.
-swift run ShapeTreeClientCLI mint-token
-
-# Drop into the interactive REPL — auto-mints a token from the on-disk key.
-swift run ShapeTreeClientCLI
-
-# REPL with a token you minted yourself.
-swift run ShapeTreeClientCLI --token "$(swift run ShapeTreeClientCLI mint-token)"
-```
 
 There is no shared secret: nothing in the config file or in any client image authorizes a request.
 The trust anchor is the `<thumbprint>.jwk` file on the server.

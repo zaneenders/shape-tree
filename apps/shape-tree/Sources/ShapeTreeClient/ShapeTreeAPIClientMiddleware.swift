@@ -55,8 +55,7 @@ public enum ShapeTreeAPIClientMiddleware {
     {
       return """
         That looks like JSON or a config snippet—not a JWT. \
-        Provide a signed token (three segments like eyJ… . … . …), e.g. \
-        the output of `shape-tree-client mint-token`.
+        Provide a signed token (three segments like eyJ… . … . …).
         """
     }
 
@@ -77,8 +76,7 @@ public enum ShapeTreeAPIClientMiddleware {
     case .malformedToken:
       return """
         That doesn't look like a valid JWT: \(error.localizedDescription) \
-        A JWT has three dot-separated base64url segments (header.payload.signature). \
-        Mint one with `shape-tree-client mint-token`.
+        A JWT has three dot-separated base64url segments (header.payload.signature).
         """
     default:
       return "The JWT couldn't be parsed: \(error.localizedDescription)"
