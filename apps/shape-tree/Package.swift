@@ -9,7 +9,8 @@ let package = Package(
     .iOS(.v26),
   ],
   products: [
-    .library(name: "ShapeTreeClient", targets: ["ShapeTreeClient"])
+    .library(name: "ShapeTreeClient", targets: ["ShapeTreeClient"]),
+    .executable(name: "ShapeTree", targets: ["ShapeTree"]),
   ],
   dependencies: [
     .package(url: "https://github.com/zaneenders/scribe.git", revision: "efd9ed3"),
