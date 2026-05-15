@@ -170,9 +170,13 @@ struct ShapeTreeJournalContainerView: View {
         guard let newStatus,
           newStatus.localizedCaseInsensitiveContains("saved markdown")
         else { return }
-        entryRefreshToken = UUID()
-        calendarReloadNonce += 1
-        dismissTodayComposer()
+        // Defer: mutating several @State values in one onChange pass trips
+        // “tried to update multiple times per frame” for Optional<String> observers.
+        Task { @MainActor in
+          entryRefreshToken = UUID()
+          calendarReloadNonce += 1
+          dismissTodayComposer()
+        }
       }
   }
 

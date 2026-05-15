@@ -101,6 +101,15 @@ private struct ShapeTreeMainTabBar: View {
 
 /// Main chat view for the ShapeTree client app.
 struct ShapeTreeChatView: View {
+  /// Batches chat list scroll signals so one `onChange` runs per update instead of several
+  /// (e.g. `messages.last?.scrollFingerprint` is `String?`, and multiple per-frame `onChange`
+  /// callbacks each driving `scrollToBottom` tripped “updated multiple times per frame”).
+  private struct ChatScrollDriver: Equatable {
+    var messageCount: Int
+    var lastScrollFingerprint: String?
+    var isLoading: Bool
+  }
+
   @Bindable var viewModel: ShapeTreeViewModel
   @State private var mainTab: ShapeTreeMainTab = .chat
   @State private var showConnectionSettings = false
@@ -333,14 +342,14 @@ struct ShapeTreeChatView: View {
           }
           .padding(.vertical, 8)
         }
-        .onChange(of: viewModel.messages.count) { _, _ in
-          scrollToBottom(using: proxy)
-        }
-        .onChange(of: viewModel.messages.last?.scrollFingerprint) { _, _ in
-          scrollToBottom(using: proxy)
-        }
-        .onChange(of: viewModel.isLoading) { _, _ in
-          scrollToBottom(using: proxy)
+        .onChange(of: ChatScrollDriver(
+          messageCount: viewModel.messages.count,
+          lastScrollFingerprint: viewModel.messages.last?.scrollFingerprint,
+          isLoading: viewModel.isLoading
+        )) { _, _ in
+          Task { @MainActor in
+            scrollToBottom(using: proxy)
+          }
         }
       }
 
