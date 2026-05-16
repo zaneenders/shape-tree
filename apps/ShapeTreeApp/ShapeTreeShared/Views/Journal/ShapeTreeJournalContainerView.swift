@@ -8,9 +8,7 @@ import AppKit
 import UIKit
 #endif
 
-// MARK: - Journal visual chrome (Scribe-like dark layout)
-
-private enum ShapeTreeJournalPalette {
+enum ShapeTreeJournalPalette {
   static let accentBlue = Color(red: 0, green: 122 / 255, blue: 1)
   static let sidebar = Color(red: 28 / 255, green: 28 / 255, blue: 30 / 255)
   static let contentPanel = Color(red: 18 / 255, green: 18 / 255, blue: 19 / 255)
@@ -20,7 +18,7 @@ private enum ShapeTreeJournalPalette {
 
 // MARK: - Local journal day keys (device calendar — matches `journal_day` on append)
 
-private enum ShapeTreeJournalLocalFormatting {
+enum ShapeTreeJournalLocalFormatting {
   static var deviceCalendar: Calendar { .autoupdatingCurrent }
 
   static func dayTitle(for date: Date) -> String {
@@ -31,15 +29,11 @@ private enum ShapeTreeJournalLocalFormatting {
     return formatter.string(from: date)
   }
 
+  /// Device-calendar `yy-MM-dd`; matches the `journal_day` key the view model sends on append.
   static func dayKey(for date: Date) -> String {
-    let cal = deviceCalendar
-    let yy = cal.component(.year, from: date) % 100
-    let mm = cal.component(.month, from: date)
-    let dd = cal.component(.day, from: date)
-    return String(format: "%02d-%02d-%02d", yy, mm, dd)
+    JournalPathCodec.journalDayKey(for: date, calendar: deviceCalendar)
   }
 
-  /// Keeps calendar day (`d`) when advancing months, clamped to destination month length (e.g. May 31 → Jun 30).
   static func constrainDayToMonth(dayFrom selected: Date, monthStart anchor: Date) -> Date {
     let cal = deviceCalendar
     guard let dayRange = cal.range(of: .day, in: .month, for: anchor) else { return anchor }
@@ -54,7 +48,7 @@ private enum ShapeTreeJournalLocalFormatting {
 
 @Observable
 @MainActor
-private final class ShapeTreeJournalCalendarModel {
+final class ShapeTreeJournalCalendarModel {
   let journalModel: ShapeTreeViewModel
   var currentMonth: Date = Date()
   private(set) var entriesByDay: [String: Components.Schemas.JournalEntrySummary] = [:]
@@ -170,9 +164,13 @@ struct ShapeTreeJournalContainerView: View {
         guard let newStatus,
           newStatus.localizedCaseInsensitiveContains("saved markdown")
         else { return }
-        entryRefreshToken = UUID()
-        calendarReloadNonce += 1
-        dismissTodayComposer()
+        // Defer: mutating several @State values in one onChange pass trips
+        // “tried to update multiple times per frame” for Optional<String> observers.
+        Task { @MainActor in
+          entryRefreshToken = UUID()
+          calendarReloadNonce += 1
+          dismissTodayComposer()
+        }
       }
   }
 
@@ -473,375 +471,5 @@ private struct ShapeTreeJournalFloatingEditButton: View {
         .shadow(color: Color.black.opacity(0.45), radius: 10, y: 4)
     }
     .buttonStyle(.plain)
-  }
-}
-
-// MARK: - Month calendar grid
-
-private struct CalendarLoadIdentity: Equatable {
-  var monthStart: TimeInterval
-  var nonce: Int
-}
-
-private struct ShapeTreeJournalCalendarSection: View {
-  @Bindable var calendarModel: ShapeTreeJournalCalendarModel
-  @Binding var selectedDate: Date
-  var journalModel: ShapeTreeViewModel
-  var calendarReloadNonce: Int
-  var deepChrome: Bool
-
-  private static let monthYearFormatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.locale = .autoupdatingCurrent
-    formatter.setLocalizedDateFormatFromTemplate("MMMM yyyy")
-    return formatter
-  }()
-
-  private var weekdayColumnLabels: [String] {
-    let cal = ShapeTreeJournalLocalFormatting.deviceCalendar
-    let symbols = cal.shortWeekdaySymbols
-    return (0..<7).map { i in
-      let idx = (cal.firstWeekday - 1 + i) % 7
-      return symbols[idx]
-    }
-  }
-
-  private var gridDays: [Date?] {
-    let calendar = ShapeTreeJournalLocalFormatting.deviceCalendar
-    guard let monthInterval = calendar.dateInterval(of: .month, for: calendarModel.currentMonth) else { return [] }
-    let firstWeekday = calendar.component(.weekday, from: monthInterval.start)
-    let leadingPadding = (firstWeekday - calendar.firstWeekday + 7) % 7
-
-    var days: [Date?] = Array(repeating: nil, count: leadingPadding)
-    var d = monthInterval.start
-    while d < monthInterval.end {
-      days.append(d)
-      guard let next = calendar.date(byAdding: .day, value: 1, to: d) else { break }
-      d = next
-    }
-    return days
-  }
-
-  private var sidebarBg: Color {
-    deepChrome ? ShapeTreeJournalPalette.sidebar : Color.secondary.opacity(0.04)
-  }
-
-  private let gridColumns = Array(repeating: GridItem(.flexible(minimum: 28), spacing: 6), count: 7)
-
-  var body: some View {
-    VStack(spacing: 0) {
-      HStack(spacing: 6) {
-        Button(action: previousMonth) {
-          Image(systemName: "chevron.left")
-            .font(.caption.weight(.bold))
-            .foregroundStyle(deepChrome ? ShapeTreeJournalPalette.accentBlue : Color.accentColor)
-        }
-        .buttonStyle(.plain)
-
-        Text(Self.monthYearFormatter.string(from: calendarModel.currentMonth))
-          .font(.headline.weight(.semibold))
-          .foregroundStyle(deepChrome ? Color.white.opacity(0.92) : Color.primary)
-          .multilineTextAlignment(.center)
-          .frame(maxWidth: .infinity)
-
-        Button(action: nextMonth) {
-          Image(systemName: "chevron.right")
-            .font(.caption.weight(.bold))
-            .foregroundStyle(deepChrome ? ShapeTreeJournalPalette.accentBlue : Color.accentColor)
-        }
-        .buttonStyle(.plain)
-      }
-      .padding(.horizontal, 4)
-      .padding(.vertical, 8)
-
-      if let calErr = journalModel.journalCalendarError, !calErr.isEmpty {
-        Text(calErr)
-          .font(.caption2)
-          .foregroundStyle(.orange)
-          .multilineTextAlignment(.center)
-          .padding(.horizontal, 6)
-          .padding(.bottom, 6)
-      }
-
-      LazyVGrid(columns: gridColumns, spacing: 6) {
-        ForEach(Array(weekdayColumnLabels.enumerated()), id: \.offset) { _, symbol in
-          Text(symbol)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(deepChrome ? Color.white.opacity(0.42) : Color.secondary)
-            .frame(maxWidth: .infinity)
-        }
-      }
-      .padding(.horizontal, 2)
-      .padding(.bottom, 4)
-
-      LazyVGrid(columns: gridColumns, spacing: 6) {
-        ForEach(Array(gridDays.enumerated()), id: \.offset) { _, day in
-          if let day {
-            ShapeTreeJournalDayCell(
-              date: day,
-              isSelected: ShapeTreeJournalLocalFormatting.deviceCalendar.isDate(day, inSameDayAs: selectedDate),
-              isToday: ShapeTreeJournalLocalFormatting.deviceCalendar.isDateInToday(day),
-              hasEntry: calendarModel.entry(for: day) != nil,
-              deepChrome: deepChrome
-            ) {
-              withAnimation(.easeInOut(duration: 0.15)) {
-                selectedDate = day
-              }
-            }
-          } else {
-            Color.clear
-              .frame(height: ShapeTreeJournalDayCell.cellHeight)
-          }
-        }
-      }
-      .padding(.horizontal, 2)
-      .padding(.bottom, 4)
-    }
-    .padding(.horizontal, 4)
-    .background(sidebarBg)
-    .task(
-      id: CalendarLoadIdentity(
-        monthStart:
-          ShapeTreeJournalLocalFormatting.deviceCalendar.dateInterval(of: .month, for: calendarModel.currentMonth)?
-          .start
-          .timeIntervalSince1970 ?? 0,
-        nonce: calendarReloadNonce)
-    ) {
-      await calendarModel.loadEntries()
-    }
-  }
-
-  private func previousMonth() {
-    withAnimation(.easeInOut(duration: 0.18)) {
-      calendarModel.previousMonth()
-      selectedDate = ShapeTreeJournalLocalFormatting.constrainDayToMonth(
-        dayFrom: selectedDate,
-        monthStart: calendarModel.currentMonth)
-    }
-  }
-
-  private func nextMonth() {
-    withAnimation(.easeInOut(duration: 0.18)) {
-      calendarModel.nextMonth()
-      selectedDate = ShapeTreeJournalLocalFormatting.constrainDayToMonth(
-        dayFrom: selectedDate,
-        monthStart: calendarModel.currentMonth)
-    }
-  }
-}
-
-private struct ShapeTreeJournalDayCell: View {
-  static let cellHeight: CGFloat = 42
-
-  let date: Date
-  let isSelected: Bool
-  let isToday: Bool
-  let hasEntry: Bool
-  let deepChrome: Bool
-  let action: () -> Void
-
-  private var dayNumber: String {
-    String(ShapeTreeJournalLocalFormatting.deviceCalendar.component(.day, from: date))
-  }
-
-  var body: some View {
-    Button(action: action) {
-      ZStack {
-        if isSelected {
-          RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .fill(
-              deepChrome
-                ? ShapeTreeJournalPalette.accentBlue.opacity(0.92)
-                : Color.accentColor.opacity(0.28))
-        } else if isToday {
-          RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .stroke(ShapeTreeJournalPalette.accentBlue, lineWidth: 1.5)
-        } else if deepChrome {
-          RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        } else {
-          RoundedRectangle(cornerRadius: 8, style: .continuous)
-            .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
-        }
-
-        VStack(spacing: 3) {
-          Text(dayNumber)
-            .font(.system(size: 15, weight: isSelected ? .bold : .medium))
-            .foregroundStyle(dayNumberColor)
-
-          Circle()
-            .fill(dotColor)
-            .frame(width: 4, height: 4)
-        }
-      }
-      .frame(maxWidth: .infinity)
-      .frame(height: Self.cellHeight)
-    }
-    #if os(macOS)
-    .buttonStyle(.borderless)
-    #else
-    .buttonStyle(.plain)
-    #endif
-  }
-
-  private var dayNumberColor: Color {
-    if isSelected {
-      return deepChrome ? Color.white : Color.primary
-    }
-    return deepChrome ? Color.white.opacity(0.93) : Color.primary
-  }
-
-  private var dotColor: Color {
-    guard hasEntry else { return .clear }
-    if isSelected {
-      return deepChrome ? Color.white.opacity(0.9) : Color.accentColor
-    }
-    return ShapeTreeJournalPalette.accentBlue.opacity(deepChrome ? 0.9 : 0.85)
-  }
-}
-
-// MARK: - Entry preview
-
-private struct ShapeTreeJournalEntryPreviewView: View {
-  let journalModel: ShapeTreeViewModel
-  let date: Date
-  let entryRefreshToken: UUID
-  let deepChrome: Bool
-  let onWriteToday: () -> Void
-
-  @State private var isLoading = false
-  @State private var detail: Components.Schemas.JournalEntryDetailResponse?
-  @State private var loadError: String?
-
-  private var entryLoadTaskId: String {
-    "\(ShapeTreeJournalLocalFormatting.dayKey(for: date))-\(entryRefreshToken.uuidString)"
-  }
-
-  private var previewSectionFont: Font {
-    #if os(macOS)
-    .system(size: 17)
-    #elseif os(iOS)
-    .body
-    #else
-    .body
-    #endif
-  }
-
-  private var entryPreviewEmptyMinHeight: CGFloat {
-    #if os(iOS)
-    120
-    #else
-    200
-    #endif
-  }
-
-  var body: some View {
-    Group {
-      if isLoading {
-        loadingBlock
-      } else if let loadError {
-        errorBlock(error: loadError)
-      } else if let detail {
-        entryDetailBlock(detail: detail)
-      } else {
-        emptyBlock
-      }
-    }
-    .task(id: entryLoadTaskId) {
-      await load()
-    }
-  }
-
-  private var loadingBlock: some View {
-    VStack(spacing: 12) {
-      ProgressView()
-      Text("Loading entry...")
-        .font(.caption)
-        .foregroundStyle(deepChrome ? Color.white.opacity(0.5) : Color.secondary)
-    }
-    .frame(maxWidth: .infinity, minHeight: entryPreviewEmptyMinHeight)
-  }
-
-  private func errorBlock(error: String) -> some View {
-    VStack(spacing: 12) {
-      Image(systemName: "exclamationmark.triangle")
-        .font(.largeTitle)
-        .foregroundStyle(.orange)
-      Text(error)
-        .font(.caption)
-        .multilineTextAlignment(.center)
-        .foregroundStyle(deepChrome ? Color.white.opacity(0.55) : Color.secondary)
-    }
-    .frame(maxWidth: .infinity, minHeight: entryPreviewEmptyMinHeight)
-  }
-
-  private func entryDetailBlock(detail: Components.Schemas.JournalEntryDetailResponse) -> some View {
-    let wordText = detail.word_count == 1 ? "word" : "words"
-    let lineText = detail.line_count == 1 ? "line" : "lines"
-
-    return VStack(alignment: .leading, spacing: 16) {
-      Text("\(detail.word_count) \(wordText) — \(detail.line_count) \(lineText)")
-        #if os(iOS)
-      .font(.caption)
-        #else
-      .font(.subheadline)
-        #endif
-        .foregroundStyle(deepChrome ? Color.white.opacity(0.45) : Color.secondary)
-
-      JournalEntrySectionedBody(
-        sections: JournalEntrySectioning.sections(from: detail.content),
-        textFont: previewSectionFont,
-        lineSpacing: 5,
-        sectionSeparator: .scribeSpacing
-      )
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .tint(ShapeTreeJournalPalette.accentBlue)
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-  }
-
-  private var emptyBlock: some View {
-    VStack(spacing: 12) {
-      Image(systemName: "doc.text")
-        #if os(iOS)
-      .font(.title2)
-        #else
-      .font(.largeTitle)
-        #endif
-        .foregroundStyle(deepChrome ? Color.white.opacity(0.38) : Color.secondary)
-      Text("No entry for this date")
-        .font(.subheadline)
-        .foregroundStyle(deepChrome ? Color.white.opacity(0.5) : Color.secondary)
-
-      if ShapeTreeJournalLocalFormatting.deviceCalendar.isDateInToday(date) {
-        Button("Write today's entry") {
-          onWriteToday()
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(ShapeTreeJournalPalette.accentBlue)
-        .controlSize(.small)
-      }
-    }
-    .frame(maxWidth: .infinity, minHeight: entryPreviewEmptyMinHeight)
-  }
-
-  private func load() async {
-    isLoading = true
-    loadError = nil
-    detail = nil
-    defer { isLoading = false }
-
-    let key = ShapeTreeJournalLocalFormatting.dayKey(for: date)
-
-    guard !journalModel.serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-      loadError = "Enter a ShapeTree server URL in Chat first."
-      return
-    }
-
-    do {
-      detail = try await journalModel.fetchJournalEntryDetailIfPresent(dayKey: key)
-    } catch {
-      loadError = error.localizedDescription
-    }
   }
 }

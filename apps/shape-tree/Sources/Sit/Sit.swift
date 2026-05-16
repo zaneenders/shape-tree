@@ -19,6 +19,10 @@ public enum SitError: Error, Sendable, CustomStringConvertible {
   }
 }
 
+extension SitError: LocalizedError {
+  public var errorDescription: String? { description }
+}
+
 /// Async [`git`(1)](https://git-scm.com/docs/git) helper using [swift-subprocess](https://github.com/swiftlang/swift-subprocess).
 public struct Sit: Sendable {
   private let executable: Executable
@@ -33,6 +37,44 @@ public struct Sit: Sendable {
       return
     }
     try await invokeExpectingSuccess(arguments: ["init"], cwd: cwd, commandLabel: "init", log: log)
+  }
+
+  /// Writes repo-local `user.name` / `user.email` only when Git's effective identity is unset (typical for
+  /// detached daemons with no `HOME` gitconfig), so ``addCommitPush``'s `commit` step cannot fail for that reason.
+  ///
+  /// When a value must be supplied, ``fallbackCommitName`` / ``fallbackCommitEmail`` are written (typically
+  /// mirrored from ``shape-tree-config.json`` optional `journal.commitAuthor` keys).
+  public func ensureCommitAuthorIfUnset(
+    cwd: FilePath,
+    log: Logger,
+    fallbackCommitName: String = "ShapeTree",
+    fallbackCommitEmail: String = "shape-tree@localhost"
+  ) async throws {
+    let nameLookup = try await run(
+      arguments: ["config", "--get", "user.name"],
+      cwd: cwd,
+      log: log)
+    let name = nameLookup.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !nameLookup.status.isSuccess || name.isEmpty {
+      try await invokeExpectingSuccess(
+        arguments: ["config", "--local", "user.name", fallbackCommitName],
+        cwd: cwd,
+        commandLabel: "config user.name",
+        log: log)
+    }
+
+    let emailLookup = try await run(
+      arguments: ["config", "--get", "user.email"],
+      cwd: cwd,
+      log: log)
+    let email = emailLookup.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !emailLookup.status.isSuccess || email.isEmpty {
+      try await invokeExpectingSuccess(
+        arguments: ["config", "--local", "user.email", fallbackCommitEmail],
+        cwd: cwd,
+        commandLabel: "config user.email",
+        log: log)
+    }
   }
 
   /// No unstaged tracked changes **and** no staged changes versus `HEAD`. Used to gate `pull --rebase`.

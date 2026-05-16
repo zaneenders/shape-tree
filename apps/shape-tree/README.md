@@ -4,11 +4,13 @@ Hummingbird server wrapping ScribeAgent.
 
 ## Configuration
 
-All values are **required**. Create `shape-tree-config.json` in the working directory:
+All non-`server.host` values are **required**. Create `shape-tree-config.json` in the working
+directory:
 
 ```json
 {
   "server": {
+    "host": "127.0.0.1",
     "port": 42069
   },
   "data": {
@@ -18,65 +20,100 @@ All values are **required**. Create `shape-tree-config.json` in the working dire
     "url": "http://127.0.0.1:11434",
     "token": ""
   },
-  "jwt": {
-    "secret": "change-me-use-a-long-random-string"
-  },
   "agent": {
     "model": "gemma4:e2b",
     "systemPrompt": "You are a helpful coding assistant.",
     "contextWindow": 131072,
     "contextWindowThreshold": 0.85
+  },
+  "journal": {
+    "commitAuthor": {
+      "name": "ShapeTree",
+      "email": "shape-tree@localhost"
+    }
   }
 }
 ```
 
-Use `server.port` for the listener. `data.path` is the **absolute or relative directory `R`** for all mutable ShapeTree files; relative paths (including `"."`) resolve against the server process working directory when it reads the config. Journal git state, `journal-subjects.json`, and device-token JSON live under `R/.shape-tree/`. For local development, set `data.path` to the repository root and ignore `.shape-tree/` via git (see repo `.gitignore`).
+`server.port` is the listener port. `server.host` is the bind address — **defaults to `127.0.0.1`
+(loopback only)** when omitted. Set it to a specific LAN IP only when you intend to expose the
+server to other devices, and only behind TLS (the server speaks plain HTTP). Setting it to
+`0.0.0.0` logs a warning at startup. `data.path` is the **absolute or relative directory `R`** for
+all mutable ShapeTree files; relative paths (including `"."`) resolve against the server process
+working directory. Journal git state, `journal-subjects.json`, **and the ES256 trust store** live
+under `R/.shape-tree/`. For local development, set `data.path` to the repository root and ignore
+`.shape-tree/` via git (see repo `.gitignore`). `ollama.token` may be empty when no bearer token is
+required (e.g. local Ollama).
 
-`jwt.secret` is used for **HS256** JWT verification on every HTTP route (`Authorization: Bearer`). The middleware is registered on the router **before** any OpenAPI handlers are added, so **all** paths require a valid Bearer token once the server starts with a non-empty secret.
+## Authentication: per-device ES256 keys
 
-**Cryptography:** JWT signing and verification go through Vapor’s **[JWTKit](https://github.com/vapor/jwt-kit)**. JWTKit builds on Apple’s **[swift-crypto](https://github.com/apple/swift-crypto)** (`Crypto`, `CryptoExtras`) for HMAC and related primitives—this repo does not ship custom crypto.
+ShapeTree uses an SSH-`authorized_keys`-style trust model. Each frontend (iOS app, Mac app)
+owns a P-256 private key; the server only knows public keys.
 
-Clients must send a valid token whose signature matches this secret (claims include `sub`, `iat`, `exp`; typical lifetime up to one hour). Prefer **`ShapeTreeClientCLI --mint-token`** (below): it reads `jwt.secret` from `./shape-tree-config.json` in the current directory, mints a **1-hour** JWT with a random `sub`, and prints only the token—no secret on the command line. Alternatively use **`--print-hs256-jwt`** or any HS256 tool that matches this claims shape.
+### Trust store
 
-**Important:** `jwt.secret` is only for the server's JSON config and for **signing**. Clients (ShapeTree app, `ShapeTreeClientCLI`) must receive the **minted JWT** string (`eyJ…` with **two dots**). Do **not** paste `jwt.secret`, the raw `"jwt": { … }` block, or other config JSON into the app—that will always yield **401**.
+The server reads public keys from:
 
-### Minting a client JWT (Swift CLI)
-
-From `apps/shape-tree` (so `./shape-tree-config.json` is present), use JWTKit via the bundled CLI (**same claims shape as the server**: `sub`, `iat`, `exp`; HS256):
-
-```bash
-swift run ShapeTreeClientCLI --mint-token
+```
+R/.shape-tree/authorized_keys/<thumbprint>.jwk
 ```
 
-This prints one line (JWT starting with `eyJ`). Paste it into the app's Connection field, or pass it as `--token` / `-t` when starting the interactive CLI.
+One JWK per enrolled device. The basename **must** equal the RFC 7638 thumbprint of the contained
+public key (`^[A-Za-z0-9_-]{43}$`); the server independently recomputes the thumbprint on every
+request and 401s on any mismatch. Adding or revoking a key is a file operation — `cp` or `rm` —
+nothing more.
 
-Advanced—put the secret on the command line (avoid shell history on shared machines):
+### Cryptography
+
+All signing and verification go through Vapor's [JWTKit](https://github.com/vapor/jwt-kit), which
+is built on Apple's [swift-crypto](https://github.com/apple/swift-crypto) (and CryptoKit on Apple
+platforms). The server only ever accepts `alg: ES256`; HS256 is gone.
+
+JWTs carry:
+
+- `kid` (header) — RFC 7638 thumbprint of the device's public key. The **only** field used to
+  locate the verifier.
+- `dev` (header) — human-readable device label, e.g. `zane-macbook`. Logged for breadcrumbs only;
+  never used for authorization or path construction.
+- `sub == kid`, plus `iat`, `exp`, and a random `jti`. TTL is short (5–15 minutes); clients mint
+  fresh tokens per request.
+
+The middleware enforces three claim-level pins on top of the signature check:
+
+- `iat` must fall inside `[now − 30 min, now + 60 s]`. Bounds the effective lifetime of any single
+  token regardless of what `exp` the issuer chose, and tolerates small positive clock skew.
+- `jti` is **mandatory** and must be non-empty. The server records every admitted `(kid, jti)` in
+  the in-process ``JWTReplayCache`` until that token's `exp`, so a captured token cannot be
+  replayed inside its TTL. The cache is per-process; if you run the server as multiple replicas
+  in front of a single trust store you must replace it with a shared store.
+- `sub` must equal `kid`, so a token signed by enrolled key A cannot impersonate enrolled key B.
+
+### Bootstrapping an iOS / macOS app device
+
+The first launch generates a P-256 keypair via the Security framework — Secure Enclave on real
+devices and Apple silicon Macs, plain Keychain on Simulator and Intel Macs. Tap the network icon in
+the chat header → "Device public key" → "Copy public JWK", then save the JSON on the server as
+`R/.shape-tree/authorized_keys/<kid>.jwk`. The thumbprint is shown in 8-char groups beside the
+JWK so it can be eyeballed against the filename.
+
+"Regenerate device key" wipes and re-creates the on-device keypair; the operator must re-enroll
+the new public JWK before the device can call the server.
+
+There is no shared secret: nothing in the config file or in any client image authorizes a request.
+The trust anchor is the `<thumbprint>.jwk` file on the server.
+
+### Revocation
 
 ```bash
-swift run ShapeTreeClientCLI --print-hs256-jwt 'YOUR_JWT_SECRET_FROM_CONFIG'
+# Find the kid by label:
+grep -l '"label": *"zane-iphone"' "$DATA_ROOT/.shape-tree/authorized_keys/"*.jwk
+
+# Revoke:
+rm "$DATA_ROOT/.shape-tree/authorized_keys/<thumbprint>.jwk"
 ```
 
-Optional with `--print-hs256-jwt` only: `--mint-subject shape-tree-cli` (default) and `--mint-ttl-seconds 3600` (default). **`--mint-token` is always 3600 seconds** with a random `sub` (`shape-tree-<uuid>`).
-
-### Generating `jwt.secret`
-
-Use a long, random string and treat it like a password: store it only in config or your secrets manager, not in git.
-
-**Recommended (OpenSSL)** — 32 random bytes as URL-safe base64 (fits cleanly in JSON):
-
-```bash
-openssl rand -base64 32
-```
-
-**Hex alternative** (64 hex characters ≈ 32 bytes):
-
-```bash
-openssl rand -hex 32
-```
-
-Paste the output into `jwt.secret` as a JSON string (escape any `"` if you paste quoted shell output). Avoid short or guessable values; rotating the secret invalidates all outstanding JWTs until clients mint new tokens.
-
-`ollama.token` can be empty when no bearer token is required (e.g. local Ollama).
+The next request from that device 401s. Outstanding tokens stay valid only inside their `exp`
+window — same posture as SSH session tickets.
 
 ## Testing
 

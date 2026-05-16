@@ -17,14 +17,12 @@ struct RouterTests {
   @Test func rejectsMissingAuthorization() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.jwt-missing")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
-    let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: store,
-      journalService: journal,
-      journalQuery: journalQuery,
-      jwtKeys: jwtKeys,
+      journalStore: journal,
+      authorizedKeys: fixture.store,
       log: log
     )
     let app = Application(router: router)
@@ -44,14 +42,12 @@ struct RouterTests {
   @Test func listJournalSubjectsIncludesDefaultCatalog() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.journal-subjects")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
-    let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: store,
-      journalService: journal,
-      journalQuery: journalQuery,
-      jwtKeys: jwtKeys,
+      journalStore: journal,
+      authorizedKeys: fixture.store,
       log: log
     )
     let app = Application(router: router)
@@ -60,7 +56,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/subjects",
         method: .get,
-        headers: try await JWTTestSupport.bearerHeaders()
+        headers: try JWTTestSupport.bearerHeaders(fixture)
       ) { response in
         #expect(response.status == .ok)
         let decoded = try JSONDecoder().decode(
@@ -75,14 +71,12 @@ struct RouterTests {
   @Test func appendJournalSubjectAddsLabelAndPersistsRoundTrip() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.journal-subject-append")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
-    let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: store,
-      journalService: journal,
-      journalQuery: journalQuery,
-      jwtKeys: jwtKeys,
+      journalStore: journal,
+      authorizedKeys: fixture.store,
       log: log
     )
     let app = Application(router: router)
@@ -92,7 +86,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/subjects",
         method: .post,
-        headers: try await JWTTestSupport.bearerHeaders(),
+        headers: try JWTTestSupport.bearerHeaders(fixture),
         body: ByteBuffer(string: bodyPayload)
       ) { response in
         #expect(response.status == .ok)
@@ -106,7 +100,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/subjects",
         method: .get,
-        headers: try await JWTTestSupport.bearerHeaders()
+        headers: try JWTTestSupport.bearerHeaders(fixture)
       ) { response in
         #expect(response.status == .ok)
         let decoded = try JSONDecoder().decode(
@@ -121,14 +115,12 @@ struct RouterTests {
   @Test func appendJournalSubjectRejectsEmptyLabel() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.journal-subject-empty")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
-    let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: store,
-      journalService: journal,
-      journalQuery: journalQuery,
-      jwtKeys: jwtKeys,
+      journalStore: journal,
+      authorizedKeys: fixture.store,
       log: log
     )
     let app = Application(router: router)
@@ -138,7 +130,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/subjects",
         method: .post,
-        headers: try await JWTTestSupport.bearerHeaders(),
+        headers: try JWTTestSupport.bearerHeaders(fixture),
         body: ByteBuffer(string: bodyPayload)
       ) { response in
         #expect(response.status == .badRequest)
@@ -150,13 +142,11 @@ struct RouterTests {
     let store = SessionStore()
     let log = Logger(label: "test.journal-append")
     let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
-    let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+    let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: store,
-      journalService: journal,
-      journalQuery: journalQuery,
-      jwtKeys: jwtKeys,
+      journalStore: journal,
+      authorizedKeys: fixture.store,
       log: log
     )
     let app = Application(router: router)
@@ -168,7 +158,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/entries",
         method: .post,
-        headers: try await JWTTestSupport.bearerHeaders(),
+        headers: try JWTTestSupport.bearerHeaders(fixture),
         body: ByteBuffer(string: bodyPayload)
       ) { response in
         #expect(response.status == .created)
@@ -191,14 +181,12 @@ struct RouterTests {
   @Test func listJournalEntrySummariesAfterAppend() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.journal-list")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
-    let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: store,
-      journalService: journal,
-      journalQuery: journalQuery,
-      jwtKeys: jwtKeys,
+      journalStore: journal,
+      authorizedKeys: fixture.store,
       log: log
     )
     let app = Application(router: router)
@@ -209,7 +197,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/entries",
         method: .post,
-        headers: try await JWTTestSupport.bearerHeaders(),
+        headers: try JWTTestSupport.bearerHeaders(fixture),
         body: ByteBuffer(string: appendBody)
       ) { response in
         #expect(response.status == .created)
@@ -218,7 +206,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/entries?start_date=26-05-01&end_date=26-05-31",
         method: .get,
-        headers: try await JWTTestSupport.bearerHeaders()
+        headers: try JWTTestSupport.bearerHeaders(fixture)
       ) { response in
         #expect(response.status == .ok)
         let decoded = try JSONDecoder().decode(
@@ -235,14 +223,12 @@ struct RouterTests {
   @Test func getJournalEntryDetailAfterAppend() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.journal-detail")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
-    let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: store,
-      journalService: journal,
-      journalQuery: journalQuery,
-      jwtKeys: jwtKeys,
+      journalStore: journal,
+      authorizedKeys: fixture.store,
       log: log
     )
     let app = Application(router: router)
@@ -255,7 +241,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/entries",
         method: .post,
-        headers: try await JWTTestSupport.bearerHeaders(),
+        headers: try JWTTestSupport.bearerHeaders(fixture),
         body: ByteBuffer(string: appendBody)
       ) { response in
         #expect(response.status == .created)
@@ -264,7 +250,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/entries/\(filingDayKey)",
         method: .get,
-        headers: try await JWTTestSupport.bearerHeaders()
+        headers: try JWTTestSupport.bearerHeaders(fixture)
       ) { response in
         #expect(response.status == .ok)
         let decoded = try JSONDecoder().decode(
@@ -280,14 +266,12 @@ struct RouterTests {
   @Test func getJournalEntryDetailNotFound() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.journal-detail-missing")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
-    let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: store,
-      journalService: journal,
-      journalQuery: journalQuery,
-      jwtKeys: jwtKeys,
+      journalStore: journal,
+      authorizedKeys: fixture.store,
       log: log
     )
     let app = Application(router: router)
@@ -296,7 +280,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/entries/77-07-07",
         method: .get,
-        headers: try await JWTTestSupport.bearerHeaders()
+        headers: try JWTTestSupport.bearerHeaders(fixture)
       ) { response in
         #expect(response.status == .notFound)
       }
@@ -306,14 +290,12 @@ struct RouterTests {
   @Test func listJournalEntrySummariesRejectsBadRange() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.journal-list-bad")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
-    let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: store,
-      journalService: journal,
-      journalQuery: journalQuery,
-      jwtKeys: jwtKeys,
+      journalStore: journal,
+      authorizedKeys: fixture.store,
       log: log
     )
     let app = Application(router: router)
@@ -322,7 +304,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/entries?start_date=26-05-10&end_date=26-05-01",
         method: .get,
-        headers: try await JWTTestSupport.bearerHeaders()
+        headers: try JWTTestSupport.bearerHeaders(fixture)
       ) { response in
         #expect(response.status == .badRequest)
       }
@@ -334,14 +316,12 @@ struct RouterTests {
   @Test func createSession() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.create-session")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
-    let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: store,
-      journalService: journal,
-      journalQuery: journalQuery,
-      jwtKeys: jwtKeys,
+      journalStore: journal,
+      authorizedKeys: fixture.store,
       log: log
     )
     let app = Application(router: router)
@@ -357,7 +337,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/sessions",
         method: .post,
-        headers: try await JWTTestSupport.bearerHeaders(),
+        headers: try JWTTestSupport.bearerHeaders(fixture),
         body: ByteBuffer(string: body)
       ) { response in
         #expect(response.status == .ok)
@@ -379,14 +359,12 @@ struct RouterTests {
   @Test func completionStreamWithMalformedSessionId() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.completion-bad-id")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
-    let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: store,
-      journalService: journal,
-      journalQuery: journalQuery,
-      jwtKeys: jwtKeys,
+      journalStore: journal,
+      authorizedKeys: fixture.store,
       log: log
     )
     let app = Application(router: router)
@@ -396,7 +374,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/sessions/not-a-uuid/completions/stream",
         method: .post,
-        headers: try await JWTTestSupport.bearerHeaders(),
+        headers: try JWTTestSupport.bearerHeaders(fixture),
         body: ByteBuffer(string: body)
       ) { response in
         #expect(response.status == .badRequest)
@@ -407,14 +385,12 @@ struct RouterTests {
   @Test func completionStreamWithNonexistentSession() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.completion-not-found")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
-    let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: store,
-      journalService: journal,
-      journalQuery: journalQuery,
-      jwtKeys: jwtKeys,
+      journalStore: journal,
+      authorizedKeys: fixture.store,
       log: log
     )
     let app = Application(router: router)
@@ -425,7 +401,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/sessions/\(bogusId.uuidString)/completions/stream",
         method: .post,
-        headers: try await JWTTestSupport.bearerHeaders(),
+        headers: try JWTTestSupport.bearerHeaders(fixture),
         body: ByteBuffer(string: body)
       ) { response in
         #expect(response.status == .notFound)

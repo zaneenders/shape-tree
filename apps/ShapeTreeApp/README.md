@@ -37,20 +37,33 @@ XcodeGen **requires `project.local.yml` to exist** (even stubbed); copy from the
 
 Default base URL: `http://127.0.0.1:42069` (see `ShapeTreeViewModel.serverURL`).
 
-## API authentication (JWT)
+## API authentication (per-device ES256 keys)
 
-The ShapeTree server signs requests with **`jwt.secret`** in `shape-tree-config.json` ([server README](../shape-tree/README.md)). **Never ship that secret in the client app.** It must stay on the machine running the server (or in your deployment secrets).
+The app generates a **P-256 keypair on the device** the first time it runs — Secure Enclave on real
+iPhones and Apple silicon Macs, plain Keychain elsewhere — and signs every request as a short-lived
+**ES256 JWT**. There is no shared secret; the server only trusts public keys it has been told about
+out of band.
 
-The app only needs a **minted JWT** (HS256, valid `sub` / `iat` / `exp` claims) and sends it as `Authorization: Bearer <token>` on every OpenAPI call. The token looks like **`eyJ…` with two dots**—**not** the `jwt.secret` string and **not** the `"jwt": { … }` JSON copied from `shape-tree-config.json`.
+- **In the UI**: tap the **network** button in the chat header. The "Device public key" section
+  shows the public JWK and the 43-char thumbprint (in 8-char groups). Hit **Copy public JWK** and
+  drop the JSON onto the server as `R/.shape-tree/authorized_keys/<kid>.jwk`. **Regenerate device
+  key** wipes the on-device key and creates a new one — you then have to re-enroll the new public
+  JWK before the device can call the server.
+- **In code**: `ShapeTreeViewModel.keyStore` exposes `publicJWKJSON()` / `kid()` /
+  `regenerateDeviceKey()`. The OpenAPI client middleware (`ShapeTreeAutoMintBearer`) mints a fresh
+  ES256 JWT for every outbound call.
 
-- **In the UI**: tap the **network** button in the chat header, then paste the JWT into **API access token** and set **Server URL** if needed. Values persist in **UserDefaults** (`shape_tree_server_url`, `shape_tree_api_bearer_token`). The sheet rejects obvious JSON / wrong-shape pastes before saving.
-- **In code**: set `ShapeTreeViewModel.apiBearerToken` before making requests (same persistence applies when changed).
+The `dev` JWT header carries the device label (defaults to the host name; editable in the
+Connection sheet). It's logged for breadcrumbs only — identity is the public key thumbprint.
 
-Mint tokens with **`swift run ShapeTreeClientCLI --mint-token`** from `apps/shape-tree` ([details](../shape-tree/README.md)), then pass that token to `--token` / `-t`. Use **`--print-hs256-jwt`** only if you prefer supplying the secret explicitly.
+See the [server README](../shape-tree/README.md) for auth and trust-store details.
 
-**Rebuild Xcode after changing ATS**: run `xcodegen generate` under `apps/ShapeTreeApp` whenever `project.yml` changes so the Info.plist picks up local-network HTTP allowances.
+**Rebuild Xcode after changing ATS**: run `xcodegen generate` under `apps/ShapeTreeApp` whenever
+`project.yml` changes so the Info.plist picks up local-network HTTP allowances.
 
-The server's router installs JWT middleware **before** all generated handlers, so **every HTTP route** (sessions, journal, device registration, etc.) requires a valid Bearer token once `jwt.secret` is configured. Successful TCP hits appear in the server log as `event=http.request`.
+The server's router installs the ES256 middleware **before** all generated handlers, so **every
+HTTP route** requires a valid bearer JWT signed by an enrolled key. Successful TCP hits appear in
+the server log as `event=http.request` followed by `event=auth.ok kid=… dev=…`.
 
 ## Structure
 

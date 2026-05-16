@@ -13,19 +13,16 @@ import Testing
 @Test func liveCompletion() async throws {
   let store = SessionStore()
   let log = Logger(label: "test.live-completion")
-  let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-  let journalQuery = JournalQueryService(layout: layout, log: log)
-  let jwtKeys = await JWTTestSupport.makeVerifierKeys()
+  let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+  let fixture = try await JWTTestSupport.makeFixture()
   let router = buildRoutes(
     store: store,
-    journalService: journal,
-    journalQuery: journalQuery,
-    jwtKeys: jwtKeys,
+    journalStore: journal,
+    authorizedKeys: fixture.store,
     log: log)
   let app = Application(router: router)
 
   try await app.test(.router) { client in
-    // 1. Create a session pointing at the local Ollama instance.
     let createBody = #"""
       {
           "model": "gemma4:e2b",
@@ -36,7 +33,7 @@ import Testing
     let sessionId: String = try await client.execute(
       uri: "/sessions",
       method: .post,
-      headers: try await JWTTestSupport.bearerHeaders(),
+      headers: try JWTTestSupport.bearerHeaders(fixture),
       body: ByteBuffer(string: createBody)
     ) { response in
       #expect(response.status == .ok)
@@ -49,12 +46,11 @@ import Testing
       return json.id
     }
 
-    // 2. Stream a completion.
     let completionBody = #"{"message": "Say hello in exactly one word."}"#
     try await client.execute(
       uri: "/sessions/\(sessionId)/completions/stream",
       method: .post,
-      headers: try await JWTTestSupport.bearerHeaders(),
+      headers: try JWTTestSupport.bearerHeaders(fixture),
       body: ByteBuffer(string: completionBody)
     ) { response in
       #expect(response.status == .ok)

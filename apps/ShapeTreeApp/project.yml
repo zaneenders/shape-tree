@@ -35,13 +35,15 @@ targets:
       INFOPLIST_KEY_CFBundleDisplayName: ShapeTree
       INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.developer-tools"
       GENERATE_INFOPLIST_FILE: YES
+      INFOPLIST_FILE: AppTransportSecurity.plist
       GENERATE_ASSET_SYMBOLS: YES
       INFOPLIST_KEY_UILaunchScreen_Generation: YES
       INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
       INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
       INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
-      INFOPLIST_KEY_NSAppTransportSecurity:
-        NSAllowsLocalNetworking: YES
+      DEAD_CODE_STRIPPING: YES
+      STRIP_INSTALLED_PRODUCT: YES
+      STRIP_STYLE: debugging
     dependencies:
       - package: ShapeTreeClient
         product: ShapeTreeClient
@@ -67,8 +69,10 @@ targets:
       INFOPLIST_KEY_CFBundleDisplayName: ShapeTree
       INFOPLIST_KEY_LSApplicationCategoryType: "public.app-category.developer-tools"
       GENERATE_INFOPLIST_FILE: YES
-      INFOPLIST_KEY_NSAppTransportSecurity: 
-        NSAllowsLocalNetworking: YES
+      INFOPLIST_FILE: AppTransportSecurity.plist
+      DEAD_CODE_STRIPPING: YES
+      STRIP_INSTALLED_PRODUCT: YES
+      STRIP_STYLE: debugging
     entitlements:
       path: ShapeTree-Mac-Only/ShapeTree.entitlements
       properties:
@@ -84,9 +88,53 @@ schemes:
         ShapeTreeClient-iOS: all
     run:
       config: Debug
+    test:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+  ShapeTreeClient-iOS-Release:
+    build:
+      targets:
+        ShapeTreeClient-iOS: all
+    run:
+      config: Release
+    test:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
   ShapeTreeClient-Mac:
     build:
       targets:
         ShapeTreeClient-Mac: all
     run:
       config: Debug
+    test:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+  ShapeTreeClient-Mac-Release:
+    build:
+      targets:
+        ShapeTreeClient-Mac: all
+    run:
+      config: Release
+    test:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

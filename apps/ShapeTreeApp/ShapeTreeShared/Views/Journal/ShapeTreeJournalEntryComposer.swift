@@ -1,7 +1,6 @@
 import SwiftUI
 
 private enum ComposerPalette {
-  static let accentBlue = Color(red: 0, green: 122 / 255, blue: 1)
   static let composerCard = Color(red: 42 / 255, green: 42 / 255, blue: 46 / 255)
   static let editorWell = Color(red: 26 / 255, green: 26 / 255, blue: 28 / 255)
 }
@@ -17,14 +16,14 @@ private struct JournalContextChipButton: View {
 
   private var fill: Color {
     if isOn {
-      return ComposerPalette.accentBlue.opacity(deepChrome ? 0.45 : 0.32)
+      return ShapeTreeJournalPalette.accentBlue.opacity(deepChrome ? 0.45 : 0.32)
     }
     return deepChrome ? Color.white.opacity(0.09) : Color.secondary.opacity(0.12)
   }
 
   private var fg: Color {
     if isOn {
-      return deepChrome ? Color.white : ComposerPalette.accentBlue
+      return deepChrome ? Color.white : ShapeTreeJournalPalette.accentBlue
     }
     return deepChrome ? Color.white.opacity(0.88) : Color.primary
   }
@@ -43,13 +42,10 @@ private struct JournalContextChipButton: View {
   }
 }
 
-/// ShapeTree adaptation of Scribe’s journal composer (chip tray + editor chrome + OpenAPI).
 struct ShapeTreeJournalEntryComposer: View {
   @Bindable var viewModel: ShapeTreeViewModel
   var deepChrome: Bool = false
-  /// Calendar day bucket for append (`journal_day`); use the sidebar `selectedDate` when inline.
   var journalFilingDate: Date = Date()
-  /// When set (typically inline “today” composer), shows Cancel to match Scribe-style chrome.
   var onComposerCancel: (() -> Void)?
 
   init(
@@ -155,7 +151,7 @@ struct ShapeTreeJournalEntryComposer: View {
       if let onComposerCancel {
         Button("Cancel", action: onComposerCancel)
           .font(.subheadline.weight(.medium))
-          .foregroundStyle(ComposerPalette.accentBlue)
+          .foregroundStyle(ShapeTreeJournalPalette.accentBlue)
           .buttonStyle(.plain)
           .keyboardShortcut(.cancelAction)
       }
@@ -293,7 +289,7 @@ struct ShapeTreeJournalEntryComposer: View {
         .padding(.vertical, 12)
         .background(
           RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .fill(saveDisabled ? Color.gray.opacity(0.45) : ComposerPalette.accentBlue)
+            .fill(saveDisabled ? Color.gray.opacity(0.45) : ShapeTreeJournalPalette.accentBlue)
         )
     }
     .buttonStyle(.plain)
@@ -487,6 +483,30 @@ struct ShapeTreeJournalEntryComposer: View {
 private struct ShapeTreeJournalInlineComposerChromeModifier: ViewModifier {
   let deepChrome: Bool
 
+  private var deepChromeRadius: CGFloat {
+    #if os(iOS)
+    14
+    #else
+    16
+    #endif
+  }
+
+  private var lightChromeRadius: CGFloat {
+    #if os(iOS)
+    8
+    #else
+    12
+    #endif
+  }
+
+  private var lightChromeStrokeOpacity: Double {
+    #if os(iOS)
+    0.2
+    #else
+    0.22
+    #endif
+  }
+
   @ViewBuilder
   func body(content: Content) -> some View {
     if deepChrome {
@@ -496,69 +516,37 @@ private struct ShapeTreeJournalInlineComposerChromeModifier: ViewModifier {
     }
   }
 
-  @ViewBuilder
   private func deepChromeChrome(_ content: Content) -> some View {
-    #if os(iOS)
     content
       .padding(.horizontal, 4)
       .padding(.vertical, 8)
       .background(
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
+        RoundedRectangle(cornerRadius: deepChromeRadius, style: .continuous)
           .fill(ComposerPalette.composerCard)
       )
       .overlay(
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
+        RoundedRectangle(cornerRadius: deepChromeRadius, style: .continuous)
           .stroke(Color.white.opacity(0.06), lineWidth: 1)
       )
       .shadow(color: Color.black.opacity(0.45), radius: 28, y: 14)
-    #else
-    content
-      .padding(.horizontal, 4)
-      .padding(.vertical, 8)
-      .background(
-        RoundedRectangle(cornerRadius: 16, style: .continuous)
-          .fill(ComposerPalette.composerCard)
-      )
-      .overlay(
-        RoundedRectangle(cornerRadius: 16, style: .continuous)
-          .stroke(Color.white.opacity(0.06), lineWidth: 1)
-      )
-      .shadow(color: Color.black.opacity(0.45), radius: 28, y: 14)
-    #endif
   }
 
-  @ViewBuilder
   private func lightChrome(_ content: Content) -> some View {
-    #if os(iOS)
     content
-      .padding(.horizontal, 8)
-      .padding(.vertical, 6)
+      .padding(.horizontal, lightChromeRadius)
+      .padding(.vertical, lightChromeRadius - 2)
       .background(
-        RoundedRectangle(cornerRadius: 8)
+        RoundedRectangle(cornerRadius: lightChromeRadius)
           .fill(Color.secondary.opacity(0.05))
       )
       .overlay(
-        RoundedRectangle(cornerRadius: 8)
-          .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+        RoundedRectangle(cornerRadius: lightChromeRadius)
+          .stroke(Color.secondary.opacity(lightChromeStrokeOpacity), lineWidth: 1)
       )
-    #else
-    content
-      .padding(.horizontal, 12)
-      .padding(.vertical, 10)
-      .background(
-        RoundedRectangle(cornerRadius: 12)
-          .fill(Color.secondary.opacity(0.05))
-      )
-      .overlay(
-        RoundedRectangle(cornerRadius: 12)
-          .stroke(Color.secondary.opacity(0.22), lineWidth: 1)
-      )
-    #endif
   }
 }
 
 extension View {
-  /// Raised card chrome for inline “today” composer (Scribe-style in dark journal).
   func shapeTreeJournalInlineComposerChrome(deepChrome: Bool = false) -> some View {
     modifier(ShapeTreeJournalInlineComposerChromeModifier(deepChrome: deepChrome))
   }
