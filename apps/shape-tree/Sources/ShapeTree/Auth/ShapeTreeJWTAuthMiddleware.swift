@@ -51,7 +51,7 @@ struct ShapeTreeJWTAuthMiddleware: MiddlewareProtocol {
       payload = try await keys.verify(token, as: ShapeTreeJWTPayload.self)
     } catch let jwtError as JWTError
       where jwtError.errorType == .claimVerificationFailure
-        && jwtError.failedClaim is ExpirationClaim
+      && jwtError.failedClaim is ExpirationClaim
     {
       throw HTTPError(.unauthorized, message: "JWT token expired")
     } catch {

@@ -266,7 +266,8 @@ public actor JournalStore {
 
   nonisolated private static func wordAndLineCounts(_ content: String) -> (words: Int, lines: Int) {
     let lineCount = content.components(separatedBy: .newlines).count
-    let wordCount = content
+    let wordCount =
+      content
       .components(separatedBy: .whitespacesAndNewlines)
       .filter { !$0.isEmpty }
       .count

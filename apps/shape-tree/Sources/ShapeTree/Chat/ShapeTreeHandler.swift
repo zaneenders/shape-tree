@@ -49,11 +49,13 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
       let response = Components.Schemas.JournalSubjectsResponse(subjects: Self.schemaSubjects(file))
       return .ok(.init(body: .json(response)))
     } catch {
-      return .internalServerError(.init(body: .json(
-        internalErrorBody(
-          event: "journal.subjects.failure",
-          error,
-          public: "Could not load journal subjects."))))
+      return .internalServerError(
+        .init(
+          body: .json(
+            internalErrorBody(
+              event: "journal.subjects.failure",
+              error,
+              public: "Could not load journal subjects."))))
     }
   }
 
@@ -73,11 +75,13 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
     } catch JournalServiceError.emptySubjectLabel {
       return .badRequest(.init(body: .json(Self.errorBody(JournalServiceError.emptySubjectLabel.description))))
     } catch {
-      return .internalServerError(.init(body: .json(
-        internalErrorBody(
-          event: "journal.subjects.append.failure",
-          error,
-          public: "Failed to append journal subject."))))
+      return .internalServerError(
+        .init(
+          body: .json(
+            internalErrorBody(
+              event: "journal.subjects.append.failure",
+              error,
+              public: "Failed to append journal subject."))))
     }
   }
 
@@ -99,17 +103,23 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
       }
       return .ok(.init(body: .json(.init(entries: entries))))
     } catch JournalQueryError.invalidJournalDayKey {
-      return .badRequest(.init(body: .json(
-        Self.errorBody("start_date and end_date must be formatted yy-MM-dd."))))
+      return .badRequest(
+        .init(
+          body: .json(
+            Self.errorBody("start_date and end_date must be formatted yy-MM-dd."))))
     } catch JournalQueryError.invalidRange {
-      return .badRequest(.init(body: .json(
-        Self.errorBody("start_date must be on or before end_date."))))
+      return .badRequest(
+        .init(
+          body: .json(
+            Self.errorBody("start_date must be on or before end_date."))))
     } catch {
-      return .internalServerError(.init(body: .json(
-        internalErrorBody(
-          event: "journal.summaries.failure",
-          error,
-          public: "Failed to list journal entries."))))
+      return .internalServerError(
+        .init(
+          body: .json(
+            internalErrorBody(
+              event: "journal.summaries.failure",
+              error,
+              public: "Failed to list journal entries."))))
     }
   }
 
@@ -131,14 +141,18 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
         line_count: detail.lineCount)
       return .ok(.init(body: .json(response)))
     } catch JournalQueryError.invalidJournalDayKey {
-      return .badRequest(.init(body: .json(
-        Self.errorBody("journal_day must be formatted yy-MM-dd."))))
+      return .badRequest(
+        .init(
+          body: .json(
+            Self.errorBody("journal_day must be formatted yy-MM-dd."))))
     } catch {
-      return .internalServerError(.init(body: .json(
-        internalErrorBody(
-          event: "journal.detail.failure",
-          error,
-          public: "Failed to read journal entry."))))
+      return .internalServerError(
+        .init(
+          body: .json(
+            internalErrorBody(
+              event: "journal.detail.failure",
+              error,
+              public: "Failed to read journal entry."))))
     }
   }
 
@@ -164,11 +178,13 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
     } catch let error as JournalServiceError {
       return .badRequest(.init(body: .json(Self.errorBody(error.description))))
     } catch {
-      return .internalServerError(.init(body: .json(
-        internalErrorBody(
-          event: "journal.append.failure",
-          error,
-          public: "Failed to persist journal entry."))))
+      return .internalServerError(
+        .init(
+          body: .json(
+            internalErrorBody(
+              event: "journal.append.failure",
+              error,
+              public: "Failed to persist journal entry."))))
     }
   }
 
@@ -243,11 +259,12 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
           log.info(
             "event=completion.stream.end session=\(sessionId) assistant_chars=\(assistantText.count)")
 
-          continuation.yield(.init(
-            kind: .done,
-            outcome: CompletionStreamTranscriptMapping.outcome(result.outcome),
-            tool_round_limit_rounds: CompletionStreamTranscriptMapping.toolRoundLimitRounds(result.outcome),
-            assistant_full_text: assistantText))
+          continuation.yield(
+            .init(
+              kind: .done,
+              outcome: CompletionStreamTranscriptMapping.outcome(result.outcome),
+              tool_round_limit_rounds: CompletionStreamTranscriptMapping.toolRoundLimitRounds(result.outcome),
+              assistant_full_text: assistantText))
           continuation.finish()
         } catch {
           continuation.yield(.init(kind: .harness_error, harness_error_message: error.localizedDescription))

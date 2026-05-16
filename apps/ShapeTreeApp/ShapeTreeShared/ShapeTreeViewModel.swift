@@ -258,10 +258,11 @@ public final class ShapeTreeViewModel {
 
         case .tool_invocation:
           blocks.append(
-            .init(kind: .toolCall(
-              toolName: event.tool_name ?? "",
-              arguments: event.tool_arguments ?? "",
-              output: event.tool_output ?? "")))
+            .init(
+              kind: .toolCall(
+                toolName: event.tool_name ?? "",
+                arguments: event.tool_arguments ?? "",
+                output: event.tool_output ?? "")))
           updateAssistantPlaceholder(id: placeholderID, blocks: blocks)
 
         case .done:
