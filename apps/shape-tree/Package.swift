@@ -13,9 +13,16 @@ let package = Package(
     .executable(name: "ShapeTree", targets: ["ShapeTree"]),
   ],
   dependencies: [
-    .package(url: "https://github.com/zaneenders/scribe.git", revision: "a132415"),
+    // Pinned by full 40-char commit hash so the dependency cannot silently move
+    // (a short revision is resolved as a *branch* by SwiftPM if a same-named
+    // branch exists upstream — see audit finding M4).
+    .package(
+      url: "https://github.com/zaneenders/scribe.git",
+      revision: "a13241595eaa55b343b268fb8a78a1d90bf9dd8a"),
     .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.0.0"),
-    .package(url: "https://github.com/hummingbird-project/swift-openapi-hummingbird.git", revision: "c464db1"),
+    .package(
+      url: "https://github.com/hummingbird-project/swift-openapi-hummingbird.git",
+      revision: "c464db1afe2c886083fd60e38f281150ac7e73e5"),
     .package(url: "https://github.com/apple/swift-openapi-generator.git", from: "1.0.0"),
     .package(url: "https://github.com/apple/swift-openapi-runtime.git", from: "1.0.0"),
     .package(url: "https://github.com/swift-server/swift-openapi-async-http-client.git", from: "1.0.0"),

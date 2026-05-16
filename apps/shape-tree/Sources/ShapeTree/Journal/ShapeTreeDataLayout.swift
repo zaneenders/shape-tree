@@ -29,7 +29,7 @@ public struct ShapeTreeDataLayout: Sendable {
     dotFolder.appendingPathComponent(Self.subjectsFileName, isDirectory: false)
   }
 
-  /// SSH-`authorized_keys`-style trust store: `R/.shape-tree/authorized_keys/<thumbprint>.jwk` (auth.md).
+  /// Trust store: `R/.shape-tree/authorized_keys/<thumbprint>.jwk`.
   public var authorizedKeysDirectory: URL {
     dotFolder.appendingPathComponent(Self.authorizedKeysDirectoryName, isDirectory: true)
   }

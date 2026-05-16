@@ -6,6 +6,7 @@ import Logging
 let log = Logger(label: "shape-tree.server")
 
 enum Key {
+  static let serverHost: ConfigKey = "server.host"
   static let serverPort: ConfigKey = "server.port"
   static let dataPath: ConfigKey = "data.path"
   static let ollamaURL: ConfigKey = "ollama.url"
@@ -24,6 +25,7 @@ let fileProvider = try await FileProvider<JSONSnapshot>(filePath: .init(configPa
 let reader = ConfigReader(providers: [fileProvider])
 
 let port = try await reader.fetchRequiredInt(forKey: Key.serverPort)
+let host = try await reader.fetchRequiredString(forKey: Key.serverHost)
 let ollamaURL = try await reader.fetchRequiredString(forKey: Key.ollamaURL)
 let ollamaToken = try await reader.fetchRequiredString(forKey: Key.ollamaToken)
 let agentModel = try await reader.fetchRequiredString(forKey: Key.agentModel)
@@ -48,8 +50,7 @@ let journalStore = JournalStore(
 try await journalStore.initializeJournalGitRepoIfNeeded()
 
 let authorizedKeys = AuthorizedKeysStore(directory: layout.authorizedKeysDirectory)
-
-// MARK: - Start server
+let replayCache = JWTReplayCache()
 
 let bearerToken: String? = ollamaToken.isEmpty ? nil : ollamaToken
 
@@ -58,6 +59,7 @@ let router = buildRoutes(
   store: store,
   journalStore: journalStore,
   authorizedKeys: authorizedKeys,
+  replayCache: replayCache,
   log: log,
   defaultOllamaURL: ollamaURL,
   agentModel: agentModel,
@@ -67,7 +69,6 @@ let router = buildRoutes(
   contextWindowThreshold: contextWindowThreshold,
   workingDirectory: resolvedDataRoot.path
 )
-let host = "0.0.0.0"
 
 let app = Application(
   router: router,
@@ -86,4 +87,17 @@ log.info(
   model=\(agentModel)
   """)
 
+if host == "0.0.0.0" {
+  log.warning(
+    """
+    event=server.lan_bind_warning \
+    message="server.host=0.0.0.0 exposes the listener on every interface; \
+    pair with TLS and a network ACL or restrict to 127.0.0.1"
+    """)
+}
+
 try await app.run()
+
+extension String {
+  fileprivate var nilIfEmpty: String? { isEmpty ? nil : self }
+}

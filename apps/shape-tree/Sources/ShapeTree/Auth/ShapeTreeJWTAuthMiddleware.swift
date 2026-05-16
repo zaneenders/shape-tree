@@ -4,31 +4,25 @@ import Hummingbird
 import JWTKit
 import ShapeTreeClient
 
-/// Validates `Authorization: Bearer <jwt>` against the SSH-`authorized_keys`-style
-/// trust store described in `.dev/auth.md`. The middleware is the *only* place that
-/// decides whether a request is authenticated; everything else trusts that a request
-/// which reaches it has been verified.
-///
-/// ES256-only with a deliberate two-pin against the alg-confusion family
-/// (`alg: none`, HS/ES mix-ups, key-substitution):
-///
-/// 1. **Outer pin** — JWTKit's parser splits and JSON-decodes the token *without*
-///    verifying the signature; we then pin `alg == "ES256"`, `typ == "JWT"`, and
-///    `kid` shape *before* the filesystem is touched.
-/// 2. **Inner pin** — build a single-key, ES256-only `JWTKeyCollection` rooted at
-///    exactly the public key the (validated) `kid` points at, and hand that to JWTKit.
-///
-/// Step 5 in the auth.md flow — recompute the RFC 7638 thumbprint of the loaded public
-/// key and require `thumbprint == kid == filename basename` — is enforced inside
-/// ``AuthorizedKeysStore``.
+/// Bearer JWT auth: ES256 only, outer parse pins alg/typ/kid before disk;
+/// single-key verify via ``AuthorizedKeysStore`` (thumbprint must match filename).
+/// Enforces `iat` skew window, mandatory `jti`, and ``JWTReplayCache`` replay defense.
 struct ShapeTreeJWTAuthMiddleware: MiddlewareProtocol {
   typealias Input = Request
   typealias Output = Response
   typealias Context = BasicRequestContext
 
-  private let store: AuthorizedKeysStore
+  static let maxIATBackdate: TimeInterval = 30 * 60
 
-  init(store: AuthorizedKeysStore) { self.store = store }
+  static let maxIATSkewFuture: TimeInterval = 60
+
+  private let store: AuthorizedKeysStore
+  private let replayCache: JWTReplayCache
+
+  init(store: AuthorizedKeysStore, replayCache: JWTReplayCache) {
+    self.store = store
+    self.replayCache = replayCache
+  }
 
   func handle(
     _ request: Input,
@@ -41,7 +35,6 @@ struct ShapeTreeJWTAuthMiddleware: MiddlewareProtocol {
     let token = try Self.extractBearerToken(from: request)
     let outer = try Self.validateOuterHeader(token: token)
 
-    // ---- Authorized-keys lookup (filesystem touched only after the outer pin).
     let stored: AuthorizedKeysStore.StoredKey
     do {
       stored = try store.load(kid: outer.kid)
@@ -50,7 +43,6 @@ struct ShapeTreeJWTAuthMiddleware: MiddlewareProtocol {
       throw HTTPError(.unauthorized, message: "Unknown or invalid kid")
     }
 
-    // ---- Inner pin: single-key, ES256-only verifier built fresh per request.
     let keys = JWTKeyCollection()
     await keys.add(ecdsa: stored.publicKey)
 
@@ -67,12 +59,40 @@ struct ShapeTreeJWTAuthMiddleware: MiddlewareProtocol {
       throw HTTPError(.unauthorized, message: "Invalid or expired JWT")
     }
 
-    // ---- Bind sub to kid: prevents a token signed by one enrolled key from claiming
-    //      the identity of a different key (kid == filename == thumbprint, enforced by
-    //      AuthorizedKeysStore).
     guard payload.sub.value == outer.kid else {
       context.logger.warning("event=auth.sub_mismatch kid=\(outer.kid) sub=\(payload.sub.value)")
       throw HTTPError(.unauthorized, message: "Invalid or expired JWT")
+    }
+
+    let now = Date()
+    let iat = payload.iat.value
+    if iat < now.addingTimeInterval(-Self.maxIATBackdate) {
+      context.logger.warning(
+        "event=auth.iat_too_old kid=\(outer.kid) iat=\(iat.timeIntervalSince1970)")
+      throw HTTPError(.unauthorized, message: "Token iat outside accepted skew window")
+    }
+    if iat > now.addingTimeInterval(Self.maxIATSkewFuture) {
+      context.logger.warning(
+        "event=auth.iat_in_future kid=\(outer.kid) iat=\(iat.timeIntervalSince1970)")
+      throw HTTPError(.unauthorized, message: "Token iat outside accepted skew window")
+    }
+
+    guard let jti = payload.jti?.value, !jti.isEmpty else {
+      context.logger.warning("event=auth.missing_jti kid=\(outer.kid)")
+      throw HTTPError(.unauthorized, message: "Token missing jti")
+    }
+
+    let admission: JWTReplayCache.Decision
+    do {
+      admission = try await replayCache.admit(
+        kid: outer.kid, jti: jti, exp: payload.exp.value, now: now)
+    } catch JWTReplayCache.AdmissionError.capacityExceeded {
+      context.logger.error("event=auth.replay_cache_full kid=\(outer.kid)")
+      throw HTTPError(.serviceUnavailable, message: "Auth cache saturated; retry shortly")
+    }
+    if case .replay = admission {
+      context.logger.warning("event=auth.replay kid=\(outer.kid) jti=\(jti)")
+      throw HTTPError(.unauthorized, message: "Token already used")
     }
 
     context.logger.info(
@@ -80,8 +100,6 @@ struct ShapeTreeJWTAuthMiddleware: MiddlewareProtocol {
 
     return try await next(request, context)
   }
-
-  // MARK: - Internals
 
   private static func extractBearerToken(from request: Request) throws -> String {
     guard let authHeader = request.headers[.authorization] else {
@@ -93,8 +111,6 @@ struct ShapeTreeJWTAuthMiddleware: MiddlewareProtocol {
     return String(authHeader.dropFirst(7))
   }
 
-  /// Outer pin: structural parse only — pins alg/typ/kid before disk or signature verify.
-  /// Returns the validated `kid` and the (untrusted, log-only) `dev` label.
   private static func validateOuterHeader(token: String) throws -> (kid: String, dev: String) {
     let header: JWTHeader
     do {
@@ -116,7 +132,6 @@ struct ShapeTreeJWTAuthMiddleware: MiddlewareProtocol {
   }
 }
 
-/// Drives ``DefaultJWTParser`` for segment split + JSON decode without signature verification.
 private struct UnverifiedJWTPayload: JWTPayload {
   func verify(using _: some JWTAlgorithm) throws {}
 }

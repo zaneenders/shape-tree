@@ -56,8 +56,7 @@ out of band.
 The `dev` JWT header carries the device label (defaults to the host name; editable in the
 Connection sheet). It's logged for breadcrumbs only — identity is the public key thumbprint.
 
-For the full auth design and the matching CLI flow, see [`.dev/auth.md`](../../.dev/auth.md) and
-the [server README](../shape-tree/README.md).
+See the [server README](../shape-tree/README.md) for auth and trust-store details.
 
 **Rebuild Xcode after changing ATS**: run `xcodegen generate` under `apps/ShapeTreeApp` whenever
 `project.yml` changes so the Info.plist picks up local-network HTTP allowances.

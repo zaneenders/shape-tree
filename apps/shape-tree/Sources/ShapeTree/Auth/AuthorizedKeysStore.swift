@@ -86,11 +86,7 @@ struct AuthorizedKeysStore: Sendable {
   }
 }
 
-/// Minimal on-disk JWK schema we accept inside `authorized_keys/`.
-///
-/// Only the four RFC 7638 thumbprint fields participate in identity; `label`
-/// is a non-standard convenience field that the operator can use to map a
-/// `kid` back to a device when running `rm` (auth.md, "Revocation").
+/// On-disk JWK in `authorized_keys/`. Identity comes from thumbprint fields; `label` is optional metadata.
 private struct JWKFile: Decodable {
   let kty: String
   let crv: String

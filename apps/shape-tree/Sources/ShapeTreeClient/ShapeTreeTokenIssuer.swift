@@ -2,22 +2,10 @@ import Crypto
 import Foundation
 import JWTKit
 
-/// ES256 JWT minting for the SSH-style `authorized_keys` trust model (see `.dev/auth.md`).
-///
-/// **`mintES256(kid:deviceLabel:ttl:sign:)`** is the canonical JWS compose path — fixed header/payload JSON
-/// (sorted keys), base64url segments, ES256 SHA-256-over-signing-input as implemented by CryptoKit's
-/// `P256.Signing.PrivateKey.signature(for:)`.
-///
-/// - **Apps (Secure Enclave / CryptoKit)** — ``ShapeTreeKeyStore/mintES256JWT(ttl:)`` supplies `kid` and a closure
-///   over CryptoKit-held keys.
-/// - **Tests / tooling with JWTKit keys** — ``mintES256(privateKey:deviceLabel:ttl:)`` bridges the JWTKit wrapper to
-///   CryptoKit via PEM so it delegates to the same compose + sign pipeline.
-///
-/// The server verifies using ``ShapeTreeJWTPayload``; keep claim fields aligned with that type only.
+/// ES256 JWT minting for the `authorized_keys` trust model. Claims must match ``ShapeTreeJWTPayload``.
 public enum ShapeTreeTokenIssuer {
 
-  /// Signs with a JWTKit `ECDSA.PrivateKey` (fixtures / tooling). PEM-round-trips into CryptoKit so signatures match
-  /// device minting and server verification.
+  /// JWTKit private key path for tests/tooling (PEM round-trip to CryptoKit).
   public static func mintES256(
     privateKey: ECDSA.PrivateKey<P256>,
     deviceLabel: String? = nil,
@@ -46,10 +34,7 @@ public enum ShapeTreeTokenIssuer {
     )
   }
 
-  /// Builds a compact JWS and signs `header.payload` UTF-8 (ES256 — SHA-256 digest of the signing input, then ECDSA).
-  ///
-  /// The caller supplies RFC 7638 `kid`; ``ShapeTreeKeyStore`` wraps a Secure Enclave signing key as the typical
-  /// closure implementation.
+  /// Canonical mint: sorted JSON header/payload, base64url, ES256 over signing input. Caller supplies `kid` + `sign`.
   public static func mintES256(
     kid: String,
     deviceLabel: String? = nil,
