@@ -76,8 +76,11 @@ enum JWTTestSupport {
     guard let params = publicKey.parameters else {
       throw NSError(domain: "JWTTestSupport", code: 1)
     }
-    let xRaw = Data(base64Encoded: params.x) ?? Data()
-    let yRaw = Data(base64Encoded: params.y) ?? Data()
+    guard let xRaw = Data.jwkCoordinateBytes(from: params.x),
+      let yRaw = Data.jwkCoordinateBytes(from: params.y)
+    else {
+      throw NSError(domain: "JWTTestSupport", code: 1)
+    }
     return Coords(
       x: xRaw.base64URLEncodedStringNoPadding(),
       y: yRaw.base64URLEncodedStringNoPadding()

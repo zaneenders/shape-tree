@@ -27,8 +27,12 @@ public enum ShapeTreeTokenIssuer {
       throw ShapeTreeTokenIssuerError.unableToReadPublicCoordinates
     }
 
-    let xRaw = Data(base64Encoded: params.x) ?? Data()
-    let yRaw = Data(base64Encoded: params.y) ?? Data()
+    guard let xRaw = Data.jwkCoordinateBytes(from: params.x),
+      let yRaw = Data.jwkCoordinateBytes(from: params.y)
+    else {
+      throw ShapeTreeTokenIssuerError.unableToReadPublicCoordinates
+    }
+
     let xB64URL = xRaw.base64URLEncodedStringNoPadding()
     let yB64URL = yRaw.base64URLEncodedStringNoPadding()
     let kid = JWKThumbprint.thumbprint(crv: "P-256", x: xB64URL, y: yB64URL)

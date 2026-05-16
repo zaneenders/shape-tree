@@ -79,4 +79,11 @@ extension Data {
     s.append(String(repeating: "=", count: pad))
     return Data(base64Encoded: s)
   }
+
+  /// Decodes a JWK EC `x`/`y` string: **base64url** first (RFC 7518), then standard base64 (some JWTKit paths).
+  public static func jwkCoordinateBytes(from string: String) -> Data? {
+    if let d = Data.fromBase64URLNoPadding(string), !d.isEmpty { return d }
+    if let d = Data(base64Encoded: string), !d.isEmpty { return d }
+    return nil
+  }
 }
