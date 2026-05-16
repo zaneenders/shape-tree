@@ -11,8 +11,6 @@ public final class ShapeTreeViewModel {
   fileprivate static let unauthorizedMessage =
     "Unauthorized (401). This device's public key isn't enrolled on the server. Tap the network icon to copy the public JWK, then drop it into the server's authorized_keys/<kid>.jwk."
 
-  private static let serverURLDefaultsKey = "shape_tree_server_url"
-
   public static let serverURL = "http://localhost:42069"
 
   public var messages: [ChatMessage] = []
@@ -40,7 +38,6 @@ public final class ShapeTreeViewModel {
 
   public var serverURL: String {
     didSet {
-      UserDefaults.standard.set(serverURL, forKey: Self.serverURLDefaultsKey)
       resetSession()
       journalSubjects.removeAll()
       journalStatus = nil
