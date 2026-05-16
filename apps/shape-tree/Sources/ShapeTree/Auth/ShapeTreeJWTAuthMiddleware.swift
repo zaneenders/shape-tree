@@ -41,7 +41,7 @@ struct ShapeTreeJWTAuthMiddleware: MiddlewareProtocol {
     context: Context,
     next: @concurrent (Input, Context) async throws -> Output
   ) async throws -> Output {
-    context.logger.info(
+    context.logger.debug(
       "event=http.request method=\(request.method) path=\(request.head.path ?? "")"
     )
 

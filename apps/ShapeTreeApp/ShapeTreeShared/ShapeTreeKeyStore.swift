@@ -138,6 +138,7 @@ public final class ShapeTreeKeyStore {
 
   // MARK: - Signing
 
+  /// Preferred app entry point for auth headers; signs via ``ShapeTreeTokenIssuer``.
   public func mintES256JWT(ttl: TimeInterval = 900) throws -> String {
     let kid = try kid()
     let label = deviceLabel

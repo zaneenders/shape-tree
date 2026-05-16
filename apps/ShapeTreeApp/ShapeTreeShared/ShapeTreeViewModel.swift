@@ -11,6 +11,19 @@ public final class ShapeTreeViewModel {
   fileprivate static let unauthorizedMessage =
     "Unauthorized (401). This device's public key isn't enrolled on the server. Tap the network icon to copy the public JWK, then drop it into the server's authorized_keys/<kid>.jwk."
 
+  /// `.undocumented` from OpenAPI often carries auth failures as raw 401 without a typed case.
+  private static func messageForUndocumentedHTTPStatus(_ code: Int, unexpected: String) -> String {
+    code == 401 ? unauthorizedMessage : unexpected
+  }
+
+  private static func errorForUndocumentedHTTPStatus(_ code: Int, unexpected: String) -> Error {
+    AppError.server(messageForUndocumentedHTTPStatus(code, unexpected: unexpected))
+  }
+
+  private static func undocumentedChatStatusPhrase(_ code: Int) -> String {
+    "Server returned status \(code)"
+  }
+
   public static let serverURL = "http://localhost:42069"
 
   public var messages: [ChatMessage] = []
@@ -174,10 +187,9 @@ public final class ShapeTreeViewModel {
       throw AppError.server(body.error.message)
 
     case .undocumented(let statusCode, _):
-      if statusCode == 401 {
-        throw AppError.server(Self.unauthorizedMessage)
-      }
-      throw AppError.server("Server returned status \(statusCode)")
+      throw Self.errorForUndocumentedHTTPStatus(
+        statusCode,
+        unexpected: Self.undocumentedChatStatusPhrase(statusCode))
     }
   }
 
@@ -285,10 +297,9 @@ public final class ShapeTreeViewModel {
       let body = try err.body.json
       throw AppError.server(body.error.message)
     case .undocumented(let statusCode, _):
-      if statusCode == 401 {
-        throw AppError.server(Self.unauthorizedMessage)
-      }
-      throw AppError.server("Server returned status \(statusCode)")
+      throw Self.errorForUndocumentedHTTPStatus(
+        statusCode,
+        unexpected: Self.undocumentedChatStatusPhrase(statusCode))
     }
   }
 
@@ -348,11 +359,9 @@ public final class ShapeTreeViewModel {
         journalError = body.error.message
 
       case .undocumented(let statusCode, _):
-        if statusCode == 401 {
-          journalError = Self.unauthorizedMessage
-        } else {
-          journalError = "Unexpected status \(statusCode) while fetching subjects."
-        }
+        journalError = Self.messageForUndocumentedHTTPStatus(
+          statusCode,
+          unexpected: "Unexpected status \(statusCode) while fetching subjects.")
       }
     } catch {
       journalError = error.localizedDescription
@@ -414,11 +423,9 @@ public final class ShapeTreeViewModel {
         journalError = Self.unauthorizedMessage
 
       case .undocumented(let code, _):
-        if code == 401 {
-          journalError = Self.unauthorizedMessage
-        } else {
-          journalError = "Unexpected status \(code) while adding subject."
-        }
+        journalError = Self.messageForUndocumentedHTTPStatus(
+          code,
+          unexpected: "Unexpected status \(code) while adding subject.")
       }
     } catch {
       journalError = error.localizedDescription
@@ -472,11 +479,9 @@ public final class ShapeTreeViewModel {
         journalError = body.error.message
 
       case .undocumented(let code, _):
-        if code == 401 {
-          journalError = Self.unauthorizedMessage
-        } else {
-          journalError = "Unexpected status \(code) while appending."
-        }
+        journalError = Self.messageForUndocumentedHTTPStatus(
+          code,
+          unexpected: "Unexpected status \(code) while appending.")
       }
     } catch {
       journalError = error.localizedDescription
@@ -503,10 +508,9 @@ public final class ShapeTreeViewModel {
       let body = try err.body.json
       throw AppError.server(body.error.message)
     case .undocumented(let code, _):
-      if code == 401 {
-        throw AppError.server(Self.unauthorizedMessage)
-      }
-      throw AppError.server("Unexpected status \(code) while listing journal entries.")
+      throw Self.errorForUndocumentedHTTPStatus(
+        code,
+        unexpected: "Unexpected status \(code) while listing journal entries.")
     }
   }
 
@@ -529,10 +533,9 @@ public final class ShapeTreeViewModel {
       let body = try err.body.json
       throw AppError.server(body.error.message)
     case .undocumented(let code, _):
-      if code == 401 {
-        throw AppError.server(Self.unauthorizedMessage)
-      }
-      throw AppError.server("Unexpected status \(code) while loading journal entry.")
+      throw Self.errorForUndocumentedHTTPStatus(
+        code,
+        unexpected: "Unexpected status \(code) while loading journal entry.")
     }
   }
 }

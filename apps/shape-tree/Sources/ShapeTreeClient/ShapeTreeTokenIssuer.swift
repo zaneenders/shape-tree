@@ -2,16 +2,22 @@ import Crypto
 import Foundation
 import JWTKit
 
-/// Mints ES256 JWTs against the SSH-`authorized_keys`-style trust store
-/// (auth.md, "JWT shape").
+/// ES256 JWT minting for the SSH-style `authorized_keys` trust model (see `.dev/auth.md`).
 ///
-/// Lives in ``ShapeTreeClient`` because every frontend (CLI, iOS app, macOS
-/// app) needs to sign tokens with its on-device private key, and the test
-/// suite of the server target re-uses the same helper for fixture tokens.
+/// **Which API to use**
+///
+/// - **Apps (Secure Enclave / CryptoKit)** — Call ``ShapeTreeKeyStore/mintES256JWT(ttl:)``, which wraps
+///   ``mintES256(kid:deviceLabel:ttl:sign:)`` with the correct `kid` and a signing closure over the raw JWS input.
+/// - **Tests / tooling with JWTKit keys** — Use ``mintES256(privateKey:deviceLabel:ttl:)``, which builds the same
+///   header + payload shape via JWTKit's signer.
+///
+/// The server verifies tokens using the same ``ShapeTreeJWTPayload`` claim set and its authorized-keys middleware;
+/// keep fields aligned with that type only.
 public enum ShapeTreeTokenIssuer {
 
-  // MARK: - JWTKit path (used by tests with JWTKit keys)
+  // MARK: - JWTKit path
 
+  /// Signs with a JWTKit-owned P-256 private key (typical for tests and headless fixtures).
   public static func mintES256(
     privateKey: ECDSA.PrivateKey<P256>,
     deviceLabel: String? = nil,
@@ -30,7 +36,7 @@ public enum ShapeTreeTokenIssuer {
     let kid = JWKThumbprint.thumbprint(crv: "P-256", x: xB64URL, y: yB64URL)
 
     let now = Date()
-    let payload = ShapeTreeAuthJWTPayload(
+    let payload = ShapeTreeJWTPayload(
       sub: SubjectClaim(value: kid),
       iat: IssuedAtClaim(value: now),
       exp: ExpirationClaim(value: now.addingTimeInterval(ttl)),
@@ -48,14 +54,11 @@ public enum ShapeTreeTokenIssuer {
     return try await keys.sign(payload, header: header)
   }
 
-  // MARK: - Signing-closure path (used by apps with native CryptoKit keys)
+  // MARK: - Signing-closure path (CryptoKit / Secure Enclave)
 
-  /// Mints an ES256 JWT whose signing input is signed by `sign`.
+  /// Builds a JWS and signs the `header.payload` input with `sign` (raw P-256 ECDSA, `r || s`, 64 bytes).
   ///
-  /// The caller is responsible for providing the correct `kid` (RFC 7638
-  /// thumbprint of the public key) and a `sign` closure that produces a raw
-  /// P-256 ECDSA signature (`r || s`, 64 bytes) over the SHA-256 hash of the
-  /// signing input.
+  /// The caller supplies `kid` (thumbprint of the public key); ``ShapeTreeKeyStore`` is the typical entry point.
   public static func mintES256(
     kid: String,
     deviceLabel: String? = nil,
@@ -95,31 +98,4 @@ public enum ShapeTreeTokenIssuer {
 
 public enum ShapeTreeTokenIssuerError: Error, Equatable, Sendable {
   case unableToReadPublicCoordinates
-}
-
-/// Lightweight payload type used by ``ShapeTreeTokenIssuer`` for signing.
-///
-/// Mirrors the server's `ShapeTreeJWTPayload` claim set; kept as a separate
-/// type so the public client SDK doesn't depend on the server target.
-public struct ShapeTreeAuthJWTPayload: JWTPayload {
-  public var sub: SubjectClaim
-  public var iat: IssuedAtClaim
-  public var exp: ExpirationClaim
-  public var jti: IDClaim?
-
-  public init(
-    sub: SubjectClaim,
-    iat: IssuedAtClaim,
-    exp: ExpirationClaim,
-    jti: IDClaim? = nil
-  ) {
-    self.sub = sub
-    self.iat = iat
-    self.exp = exp
-    self.jti = jti
-  }
-
-  public func verify(using _: some JWTAlgorithm) throws {
-    try exp.verifyNotExpired()
-  }
 }
