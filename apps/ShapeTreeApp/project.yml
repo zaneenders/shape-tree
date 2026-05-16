@@ -1,4 +1,4 @@
-name: ShapeTreeClient
+name: ShapeTreeApp
 
 include:
   - path: project.local.yml
@@ -11,7 +11,7 @@ packages:
     path: ../shape-tree
 
 targets:
-  ShapeTreeClient-iOS:
+  ShapeTreeApp-iOS:
     type: application
     platform: iOS
     deploymentTarget: "26.0"
@@ -50,7 +50,7 @@ targets:
       - package: ShapeTreeClient
         product: ShapeTreeClient
 
-  ShapeTreeClient-Mac:
+  ShapeTreeApp-Mac:
     type: application
     platform: macOS
     deploymentTarget: "26.0"
@@ -87,10 +87,10 @@ targets:
         product: ShapeTreeClient
 
 schemes:
-  ShapeTreeClient-iOS:
+  ShapeTreeApp-iOS:
     build:
       targets:
-        ShapeTreeClient-iOS: all
+        ShapeTreeApp-iOS: all
     run:
       config: Debug
     test:
@@ -101,10 +101,10 @@ schemes:
       config: Debug
     archive:
       config: Release
-  ShapeTreeClient-iOS-Release:
+  ShapeTreeApp-iOS-Release:
     build:
       targets:
-        ShapeTreeClient-iOS: all
+        ShapeTreeApp-iOS: all
     run:
       config: Release
     test:
@@ -115,10 +115,10 @@ schemes:
       config: Debug
     archive:
       config: Release
-  ShapeTreeClient-Mac:
+  ShapeTreeApp-Mac:
     build:
       targets:
-        ShapeTreeClient-Mac: all
+        ShapeTreeApp-Mac: all
     run:
       config: Debug
     test:
@@ -129,10 +129,10 @@ schemes:
       config: Debug
     archive:
       config: Release
-  ShapeTreeClient-Mac-Release:
+  ShapeTreeApp-Mac-Release:
     build:
       targets:
-        ShapeTreeClient-Mac: all
+        ShapeTreeApp-Mac: all
     run:
       config: Release
     test:
