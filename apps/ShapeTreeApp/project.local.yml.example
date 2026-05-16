@@ -6,9 +6,9 @@ settings:
   DEVELOPMENT_TEAM: XXXXXXXXXX
 
 targets:
-  ShapeTreeClient-iOS:
+  ShapeTreeApp-iOS:
     settings:
       DEVELOPMENT_TEAM: XXXXXXXXXX
-  ShapeTreeClient-Mac:
+  ShapeTreeApp-Mac:
     settings:
       DEVELOPMENT_TEAM: XXXXXXXXXX

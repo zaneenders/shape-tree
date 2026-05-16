@@ -23,7 +23,7 @@ Physical devices / notarization require a valid `DEVELOPMENT_TEAM`.
 
 ```bash
 xcodegen generate
-open ShapeTreeClient.xcodeproj
+open ShapeTreeApp.xcodeproj
 ```
 
 XcodeGen **requires `project.local.yml` to exist** (even stubbed); copy from the example first.
