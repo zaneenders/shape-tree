@@ -342,11 +342,13 @@ struct ShapeTreeChatView: View {
           }
           .padding(.vertical, 8)
         }
-        .onChange(of: ChatScrollDriver(
-          messageCount: viewModel.messages.count,
-          lastScrollFingerprint: viewModel.messages.last?.scrollFingerprint,
-          isLoading: viewModel.isLoading
-        )) { _, _ in
+        .onChange(
+          of: ChatScrollDriver(
+            messageCount: viewModel.messages.count,
+            lastScrollFingerprint: viewModel.messages.last?.scrollFingerprint,
+            isLoading: viewModel.isLoading
+          )
+        ) { _, _ in
           Task { @MainActor in
             scrollToBottom(using: proxy)
           }

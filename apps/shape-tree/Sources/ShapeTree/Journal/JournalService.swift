@@ -1,11 +1,12 @@
+import Foundation
+import Logging
+import Sit
+
 #if canImport(CryptoKit)
 import CryptoKit
 #else
 import Crypto
 #endif
-import Foundation
-import Logging
-import Sit
 
 #if canImport(System)
 import System
