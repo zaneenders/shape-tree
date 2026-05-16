@@ -14,10 +14,9 @@ import ShapeTreeClient
 /// Verification is ES256-only with a deliberate two-pin against the classic
 /// JWT alg-confusion family (`alg: none`, HS/ES mix-ups, key-substitution):
 ///
-/// 1. **Outer pin** — base64url-decode the JOSE header ourselves and string-
-///    compare `alg == "ES256"`, `typ == "JWT"`, `kid` against the
-///    `^[A-Za-z0-9_-]{43}$` thumbprint shape *before* the filesystem is
-///    touched. A bad token never causes a key to be loaded.
+/// 1. **Outer pin** — JWTKit's parser splits and JSON-decodes the token *without*
+///    verifying the signature; we then **pin** `alg == "ES256"`, `typ == "JWT"`,
+///    and `kid` shape *before* the filesystem is touched.
 /// 2. **Inner pin** — build a single-key, ES256-only `JWTKeyCollection`
 ///    rooted at exactly the public key the (validated) `kid` points at, and
 ///    hand that to JWTKit. The key is registered with no algorithm metadata
@@ -54,20 +53,14 @@ struct ShapeTreeJWTAuthMiddleware: MiddlewareProtocol {
     }
     let token = String(authHeader.dropFirst(7))
 
-    // ---- Outer pin: parse the JOSE header ourselves, never let JWTKit pick the alg.
+    // ---- Outer pin: structural parse only — pins alg/typ/kid before disk or verify.
 
-    let segments = token.split(separator: ".", omittingEmptySubsequences: false)
-    guard segments.count == 3 else {
-      throw HTTPError(.unauthorized, message: "Malformed JWT")
-    }
-    guard let headerData = Data.fromBase64URLNoPadding(String(segments[0])) else {
-      throw HTTPError(.unauthorized, message: "Malformed JWT header encoding")
-    }
-    let header: RawJOSEHeader
+    let header: JWTHeader
     do {
-      header = try JSONDecoder().decode(RawJOSEHeader.self, from: headerData)
+      header = try DefaultJWTParser().parse([UInt8](token.utf8), as: UnverifiedJWTPayload.self).header
     } catch {
-      throw HTTPError(.unauthorized, message: "Malformed JWT header")
+      context.logger.debug("JWT parse failed: \(String(describing: error))")
+      throw HTTPError(.unauthorized, message: "Malformed JWT")
     }
 
     guard header.typ == "JWT" else {
@@ -113,13 +106,13 @@ struct ShapeTreeJWTAuthMiddleware: MiddlewareProtocol {
     let payload: ShapeTreeJWTPayload
     do {
       payload = try await keys.verify(token, as: ShapeTreeJWTPayload.self)
-    } catch let error as JWTError {
-      if error.errorType == JWTError.ErrorType.claimVerificationFailure,
-        error.failedClaim is ExpirationClaim
+    } catch let jwtError as JWTError {
+      if jwtError.errorType == JWTError.ErrorType.claimVerificationFailure,
+        jwtError.failedClaim is ExpirationClaim
       {
         throw HTTPError(.unauthorized, message: "JWT token expired")
       }
-      context.logger.debug("JWT verification failed: \(String(describing: error))")
+      context.logger.debug("JWT verification failed: \(String(describing: jwtError))")
       throw HTTPError(.unauthorized, message: "Invalid or expired JWT")
     } catch {
       context.logger.debug("JWT verification failed: \(String(describing: error))")
@@ -137,7 +130,7 @@ struct ShapeTreeJWTAuthMiddleware: MiddlewareProtocol {
       throw HTTPError(.unauthorized, message: "Invalid or expired JWT")
     }
 
-    let dev = header.dev?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    let dev = header.fields["dev"]?.asString?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     context.logger.info(
       "event=auth.ok kid=\(stored.thumbprint) sub=\(payload.sub.value) dev=\(dev.isEmpty ? "-" : dev)"
     )
@@ -146,9 +139,7 @@ struct ShapeTreeJWTAuthMiddleware: MiddlewareProtocol {
   }
 }
 
-private struct RawJOSEHeader: Decodable {
-  let alg: String?
-  let typ: String?
-  let kid: String?
-  let dev: String?
+/// Drives ``DefaultJWTParser`` for segment split + JSON decode without signature verification.
+private struct UnverifiedJWTPayload: JWTPayload {
+  func verify(using _: some JWTAlgorithm) throws {}
 }
