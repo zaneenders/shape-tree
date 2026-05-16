@@ -4,24 +4,21 @@ import OpenAPIRuntime
 import ShapeTreeClient
 import SwiftUI
 
-/// Hosts chat + ShapeTree-specific OpenAPI calls (sessions, streamed completions, journal).
 @Observable
 @MainActor
 public final class ShapeTreeViewModel {
 
-  fileprivate nonisolated static let unauthorizedMessage =
+  fileprivate static let unauthorizedMessage =
     "Unauthorized (401). This device's public key isn't enrolled on the server. Tap the network icon to copy the public JWK, then drop it into the server's authorized_keys/<kid>.jwk."
 
   private static let serverURLDefaultsKey = "shape_tree_server_url"
 
-  // MARK: - Chat UI
+  public static let serverURL = "http://localhost:42069"
 
   public var messages: [ChatMessage] = []
   public var inputText: String = ""
   public var isLoading: Bool = false
   public var errorMessage: String? = nil
-
-  // MARK: - Journal UI
 
   public struct JournalSubjectRow: Identifiable, Hashable, Sendable {
     public let id: String
@@ -42,8 +39,6 @@ public final class ShapeTreeViewModel {
   public var journalCalendarError: String? = nil
   public var isJournalWorking: Bool = false
 
-  // MARK: - Runtime configuration
-
   public var serverURL: String {
     didSet {
       UserDefaults.standard.set(serverURL, forKey: Self.serverURLDefaultsKey)
@@ -56,15 +51,11 @@ public final class ShapeTreeViewModel {
     }
   }
 
-  /// On-device ES256 keypair used to mint short-lived bearer JWTs (auth.md).
-  /// The view layer reads its public JWK to surface the trust-bootstrap blob.
   public let keyStore: ShapeTreeKeyStore
 
   private var client: Client?
   private var sessionId: String?
   private let transport: AsyncHTTPClientTransport
-
-  public static let serverURL = "http://localhost:42069"
 
   public init(
     serverURL: String,
@@ -74,9 +65,6 @@ public final class ShapeTreeViewModel {
     self.keyStore = keyStore
     self.serverURL = serverURL
 
-    // Best-effort generation: if Keychain access is restricted (locked
-    // device, etc.) we surface the failure on first network call instead
-    // of crashing at init.
     _ = try? keyStore.loadOrGenerate()
   }
 
@@ -90,9 +78,6 @@ public final class ShapeTreeViewModel {
     return Client(serverURL: endpoint, transport: transport, middlewares: middlewares)
   }
 
-  // MARK: - Identity surface for Settings
-
-  /// The trust-bootstrap blob the operator drops into `authorized_keys/<kid>.jwk`.
   public func currentPublicJWKJSON() -> String? {
     try? keyStore.publicJWKJSON()
   }
@@ -107,8 +92,6 @@ public final class ShapeTreeViewModel {
     try keyStore.regenerate()
     resetSession()
   }
-
-  // MARK: - Chat
 
   public func sendMessage() {
     let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -155,7 +138,6 @@ public final class ShapeTreeViewModel {
     self.isLoading = isLoading
   }
 
-  /// Clears the chat transcript and rotates outbound session state.
   public func reset() {
     messages.removeAll()
     inputText = ""
@@ -316,8 +298,6 @@ public final class ShapeTreeViewModel {
     }
   }
 
-  // MARK: - Journal endpoints
-
   /// Two-digit journal day key `yy-MM-dd` for the device's local civil day (sent as `journal_day` on append).
   private static func localJournalDayKey(for date: Date) -> String {
     let calendar = Calendar.autoupdatingCurrent
@@ -393,7 +373,6 @@ public final class ShapeTreeViewModel {
     }
   }
 
-  /// Creates a subject label on the server when new; updates local chip list (Scribe ``appendJournalSubject`` parity).
   @discardableResult
   public func appendJournalSubjectAndRefresh(_ rawName: String) async -> Bool {
     let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
