@@ -1,5 +1,5 @@
 {
-  "originHash" : "0d9e1104198bc4b85c1e32d3c0985cad4bd665fd7439a6d9d54008a065dfdcde",
+  "originHash" : "30c833cf38a137ca01a9ddfbfe6be976d58b7fa202c480d0cc44573c1950f46a",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -42,6 +42,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/zaneenders/scribe.git",
       "state" : {
+        "branch" : "a132415",
         "revision" : "a13241595eaa55b343b268fb8a78a1d90bf9dd8a"
       }
     },
@@ -275,13 +276,14 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/hummingbird-project/swift-openapi-hummingbird.git",
       "state" : {
-        "revision" : "c464db1afe2c886083fd60e38f281150ac7e73e5"
+        "revision" : "026b50b17e9afe74d4d82c883d9c37154a8b30bf",
+        "version" : "2.0.1"
       }
     },
     {
       "identity" : "swift-openapi-runtime",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-openapi-runtime.git",
+      "location" : "https://github.com/apple/swift-openapi-runtime",
       "state" : {
         "revision" : "f039fa6d6338aab5164f3d1be16281524c9a8f89",
         "version" : "1.11.0"
