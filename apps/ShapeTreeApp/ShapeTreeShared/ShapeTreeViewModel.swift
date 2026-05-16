@@ -11,27 +11,17 @@ public final class ShapeTreeViewModel {
   fileprivate static let unauthorizedMessage =
     "Unauthorized (401). This device's public key isn't enrolled on the server. Tap the network icon to copy the public JWK, then drop it into the server's authorized_keys/<kid>.jwk."
 
-  /// `.undocumented` from OpenAPI often carries auth failures as raw 401 without a typed case.
-  private static func messageForUndocumentedHTTPStatus(_ code: Int, unexpected: String) -> String {
-    code == 401 ? unauthorizedMessage : unexpected
+  /// The single mapping for HTTP statuses without a typed `case`. 401 always means
+  /// "device not enrolled" because this API requires bearer auth on every route.
+  private static func messageForStatus(_ code: Int, fallback: String) -> String {
+    code == 401 ? unauthorizedMessage : fallback
   }
 
-  private static func errorForUndocumentedHTTPStatus(_ code: Int, unexpected: String) -> Error {
-    AppError.server(messageForUndocumentedHTTPStatus(code, unexpected: unexpected))
-  }
-
-  private static func undocumentedChatStatusPhrase(_ code: Int) -> String {
-    "Server returned status \(code)"
-  }
-
+  /// Pulls the operator-facing message off an `HTTPErrorResponse` body decoder.
   private static func httpErrorLine(
     _ decode: () throws -> Components.Schemas.HTTPErrorResponse
   ) rethrows -> String {
     try decode().error.message
-  }
-
-  private static func undocumentedJournalLine(_ statusCode: Int, context: String) -> String {
-    messageForUndocumentedHTTPStatus(statusCode, unexpected: context)
   }
 
   public static let serverURL = "http://localhost:42069"
@@ -92,8 +82,11 @@ public final class ShapeTreeViewModel {
     guard let endpoint = URL(string: serverURL) else {
       throw AppError.invalidURL(serverURL)
     }
+    let store = keyStore
     let middlewares: [any ClientMiddleware] = [
-      ShapeTreeAutoMintBearer(keyStore: keyStore)
+      BearerAuthClientMiddleware(tokenProvider: { @Sendable in
+        try await MainActor.run { try store.mintES256JWT(ttl: 900) }
+      })
     ]
     return Client(serverURL: endpoint, transport: transport, middlewares: middlewares)
   }
@@ -121,9 +114,7 @@ public final class ShapeTreeViewModel {
     errorMessage = nil
 
     let placeholderID = UUID()
-    messages.append(
-      ChatMessage(id: placeholderID, assistantBlocks: [])
-    )
+    messages.append(ChatMessage(id: placeholderID, assistantBlocks: []))
 
     Task { @MainActor in
       do {
@@ -190,9 +181,7 @@ public final class ShapeTreeViewModel {
 
   private func ensureSession() async throws -> Client {
     let api = try openAPIClient()
-    if sessionId != nil {
-      return api
-    }
+    if sessionId != nil { return api }
 
     let response = try await api.createSession(
       Operations.createSession.Input(body: .json(.init(systemPrompt: nil)))
@@ -200,17 +189,12 @@ public final class ShapeTreeViewModel {
 
     switch response {
     case .ok(let ok):
-      let payload = try ok.body.json
-      sessionId = payload.id
+      sessionId = try ok.body.json.id
       return api
-
     case .badRequest(let err):
       throw AppError.server(try Self.httpErrorLine { try err.body.json })
-
     case .undocumented(let statusCode, _):
-      throw Self.errorForUndocumentedHTTPStatus(
-        statusCode,
-        unexpected: Self.undocumentedChatStatusPhrase(statusCode))
+      throw AppError.server(Self.messageForStatus(statusCode, fallback: "Server returned status \(statusCode)"))
     }
   }
 
@@ -230,25 +214,26 @@ public final class ShapeTreeViewModel {
       let stream = try ok.decodedCompletionEvents()
       var blocks: [AssistantTimelineBlock] = []
 
-      func appendReasoning(_ fragment: String) {
+      /// Merge `fragment` into the last block when it matches `kind`; otherwise append a new block
+      /// of the same shape. Replaces the previous duplicate appendReasoning/appendAnswer closures.
+      func appendStreamFragment(_ fragment: String, section: Components.Schemas.CompletionStreamSection) {
         guard !fragment.isEmpty else { return }
-        if let last = blocks.last, case .reasoning(let prior) = last.kind {
-          blocks.removeLast()
-          blocks.append(
-            AssistantTimelineBlock(id: last.id, kind: .reasoning(prior + fragment)))
-        } else {
-          blocks.append(AssistantTimelineBlock(kind: .reasoning(fragment)))
+        if let last = blocks.last {
+          switch (last.kind, section) {
+          case (.reasoning(let prior), .reasoning):
+            blocks.removeLast()
+            blocks.append(.init(id: last.id, kind: .reasoning(prior + fragment)))
+            return
+          case (.answer(let prior), .answer):
+            blocks.removeLast()
+            blocks.append(.init(id: last.id, kind: .answer(prior + fragment)))
+            return
+          default:
+            break
+          }
         }
-      }
-
-      func appendAnswer(_ fragment: String) {
-        guard !fragment.isEmpty else { return }
-        if let last = blocks.last, case .answer(let prior) = last.kind {
-          blocks.removeLast()
-          blocks.append(AssistantTimelineBlock(id: last.id, kind: .answer(prior + fragment)))
-        } else {
-          blocks.append(AssistantTimelineBlock(kind: .answer(fragment)))
-        }
+        blocks.append(
+          .init(kind: section == .reasoning ? .reasoning(fragment) : .answer(fragment)))
       }
 
       func hasNonemptyAnswerBlock() -> Bool {
@@ -262,30 +247,21 @@ public final class ShapeTreeViewModel {
         switch event.kind {
         case .assistant_delta:
           guard let fragment = event.text, !fragment.isEmpty else { continue }
-          switch event.stream_section {
-          case .some(.reasoning):
-            appendReasoning(fragment)
-          case .some(.answer), .none:
-            appendAnswer(fragment)
-          }
+          appendStreamFragment(fragment, section: event.stream_section ?? .answer)
           updateAssistantPlaceholder(id: placeholderID, blocks: blocks)
 
         case .tool_round:
           let round = event.round ?? 0
           blocks.append(
-            AssistantTimelineBlock(kind: .toolRound(round: round, toolNames: event.tool_names ?? []))
-          )
+            .init(kind: .toolRound(round: round, toolNames: event.tool_names ?? [])))
           updateAssistantPlaceholder(id: placeholderID, blocks: blocks)
 
         case .tool_invocation:
           blocks.append(
-            AssistantTimelineBlock(
-              kind: .toolCall(
-                toolName: event.tool_name ?? "",
-                arguments: event.tool_arguments ?? "",
-                output: event.tool_output ?? ""
-              ))
-          )
+            .init(kind: .toolCall(
+              toolName: event.tool_name ?? "",
+              arguments: event.tool_arguments ?? "",
+              output: event.tool_output ?? "")))
           updateAssistantPlaceholder(id: placeholderID, blocks: blocks)
 
         case .done:
@@ -293,14 +269,13 @@ public final class ShapeTreeViewModel {
             !hasNonemptyAnswerBlock(),
             !full.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
           {
-            appendAnswer(full)
+            appendStreamFragment(full, section: .answer)
           }
           replaceAssistantPlaceholder(id: placeholderID, blocks: blocks, isLoading: false)
           return
 
         case .harness_error:
-          let msg = event.harness_error_message ?? "Agent error."
-          throw AppError.server(msg)
+          throw AppError.server(event.harness_error_message ?? "Agent error.")
 
         default:
           continue
@@ -316,19 +291,8 @@ public final class ShapeTreeViewModel {
     case .internalServerError(let err):
       throw AppError.server(try Self.httpErrorLine { try err.body.json })
     case .undocumented(let statusCode, _):
-      throw Self.errorForUndocumentedHTTPStatus(
-        statusCode,
-        unexpected: Self.undocumentedChatStatusPhrase(statusCode))
+      throw AppError.server(Self.messageForStatus(statusCode, fallback: "Server returned status \(statusCode)"))
     }
-  }
-
-  /// Two-digit journal day key `yy-MM-dd` for the device's local civil day (sent as `journal_day` on append).
-  private static func localJournalDayKey(for date: Date) -> String {
-    let calendar = Calendar.autoupdatingCurrent
-    let yy = calendar.component(.year, from: date) % 100
-    let mm = calendar.component(.month, from: date)
-    let dd = calendar.component(.day, from: date)
-    return String(format: "%02d-%02d-%02d", yy, mm, dd)
   }
 
   public func reportJournalCalendarLoadFailure(_ error: Error) {
@@ -359,7 +323,6 @@ public final class ShapeTreeViewModel {
         journalSubjects = payload.subjects.map { JournalSubjectRow(id: $0.id, label: $0.label) }
 
         let validIds = Set(journalSubjects.map(\.id))
-
         journalSelectedSubjectIDs.formIntersection(validIds)
 
         if journalSelectedSubjectIDs.isEmpty {
@@ -377,8 +340,8 @@ public final class ShapeTreeViewModel {
         journalError = try Self.httpErrorLine { try err.body.json }
 
       case .undocumented(let statusCode, _):
-        journalError = Self.undocumentedJournalLine(
-          statusCode, context: "Unexpected status \(statusCode) while fetching subjects.")
+        journalError = Self.messageForStatus(
+          statusCode, fallback: "Unexpected status \(statusCode) while fetching subjects.")
       }
     } catch {
       journalError = error.localizedDescription
@@ -397,11 +360,9 @@ public final class ShapeTreeViewModel {
   public func appendJournalSubjectAndRefresh(_ rawName: String) async -> Bool {
     let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !name.isEmpty else {
-      journalError =
-        "Enter a subject name before adding."
+      journalError = "Enter a subject name before adding."
       return false
     }
-
     guard !serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
       journalError = "Enter a ShapeTree server URL first."
       return false
@@ -438,8 +399,7 @@ public final class ShapeTreeViewModel {
         journalError = Self.unauthorizedMessage
 
       case .undocumented(let code, _):
-        journalError =
-          Self.undocumentedJournalLine(code, context: "Unexpected status \(code) while adding subject.")
+        journalError = Self.messageForStatus(code, fallback: "Unexpected status \(code) while adding subject.")
       }
     } catch {
       journalError = error.localizedDescription
@@ -454,8 +414,7 @@ public final class ShapeTreeViewModel {
       return
     }
     guard !journalSelectedSubjectIDs.isEmpty else {
-      journalError =
-        "Select at least one subject (tap + to create one if the list is empty)."
+      journalError = "Select at least one subject (tap + to create one if the list is empty)."
       return
     }
 
@@ -469,9 +428,8 @@ public final class ShapeTreeViewModel {
       let payload = Components.Schemas.AppendJournalEntryRequest(
         subject_ids: Array(journalSelectedSubjectIDs).sorted(),
         body: bodyText,
-        journal_day: Self.localJournalDayKey(for: filingDate),
-        created_at: nil
-      )
+        journal_day: JournalPathCodec.journalDayKey(for: filingDate, calendar: .autoupdatingCurrent),
+        created_at: nil)
 
       let response = try await remote.appendJournalEntry(
         Operations.appendJournalEntry.Input(body: .json(payload))
@@ -481,8 +439,7 @@ public final class ShapeTreeViewModel {
       case .created(let packet):
         let summary = try packet.body.json
         journalDraft = ""
-        journalStatus =
-          "Saved Markdown at repo path \(summary.journal_relative_path)."
+        journalStatus = "Saved Markdown at repo path \(summary.journal_relative_path)."
 
       case .badRequest(let err):
         journalError = try Self.httpErrorLine { try err.body.json }
@@ -491,7 +448,7 @@ public final class ShapeTreeViewModel {
         journalError = try Self.httpErrorLine { try err.body.json }
 
       case .undocumented(let code, _):
-        journalError = Self.undocumentedJournalLine(code, context: "Unexpected status \(code) while appending.")
+        journalError = Self.messageForStatus(code, fallback: "Unexpected status \(code) while appending.")
       }
     } catch {
       journalError = error.localizedDescription
@@ -504,21 +461,18 @@ public final class ShapeTreeViewModel {
     let remote = try openAPIClient()
     let response = try await remote.listJournalEntrySummaries(
       Operations.listJournalEntrySummaries.Input(
-        query: .init(start_date: startDayKey, end_date: endDayKey)
-      ))
+        query: .init(start_date: startDayKey, end_date: endDayKey)))
 
     switch response {
     case .ok(let packet):
-      let payload = try packet.body.json
-      return payload.entries
+      return try packet.body.json.entries
     case .badRequest(let err):
       throw AppError.server(try Self.httpErrorLine { try err.body.json })
     case .internalServerError(let err):
       throw AppError.server(try Self.httpErrorLine { try err.body.json })
     case .undocumented(let code, _):
-      throw Self.errorForUndocumentedHTTPStatus(
-        code,
-        unexpected: "Unexpected status \(code) while listing journal entries.")
+      throw AppError.server(
+        Self.messageForStatus(code, fallback: "Unexpected status \(code) while listing journal entries."))
     }
   }
 
@@ -539,97 +493,8 @@ public final class ShapeTreeViewModel {
     case .internalServerError(let err):
       throw AppError.server(try Self.httpErrorLine { try err.body.json })
     case .undocumented(let code, _):
-      throw Self.errorForUndocumentedHTTPStatus(
-        code,
-        unexpected: "Unexpected status \(code) while loading journal entry.")
-    }
-  }
-}
-
-// MARK: - Chat models
-
-public struct AssistantTimelineBlock: Identifiable, Equatable, Sendable {
-  public let id: UUID
-  public let kind: Kind
-
-  public enum Kind: Equatable, Sendable {
-    case reasoning(String)
-    case toolRound(round: Int, toolNames: [String])
-    case toolCall(toolName: String, arguments: String, output: String)
-    case answer(String)
-  }
-
-  public init(id: UUID = UUID(), kind: Kind) {
-    self.id = id
-    self.kind = kind
-  }
-
-  fileprivate var scrollFingerprintPiece: String {
-    switch kind {
-    case .reasoning(let s): return "r:\(s)"
-    case .answer(let s): return "a:\(s)"
-    case .toolRound(let r, let names): return "tr:\(r):\(names.joined(separator: "|"))"
-    case .toolCall(let name, let args, let output):
-      return "tc:\(name)|\(args)|\(output)"
-    }
-  }
-
-  fileprivate var isVisuallyEmpty: Bool {
-    switch kind {
-    case .reasoning(let s), .answer(let s):
-      return s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    case .toolRound(_, let names):
-      return names.isEmpty
-    case .toolCall(let name, let args, let output):
-      return name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        && args.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        && output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-  }
-}
-
-public struct ChatMessage: Identifiable, Equatable {
-  public let id: UUID
-  public let isUser: Bool
-  public let content: String
-  public let assistantBlocks: [AssistantTimelineBlock]
-
-  public init(id: UUID = UUID(), content: String, isUser: Bool) {
-    self.id = id
-    self.isUser = isUser
-    self.content = content
-    self.assistantBlocks = []
-  }
-
-  public init(id: UUID, assistantBlocks: [AssistantTimelineBlock]) {
-    self.id = id
-    self.isUser = false
-    self.content = ""
-    self.assistantBlocks = assistantBlocks
-  }
-
-  public var scrollFingerprint: String {
-    if isUser { return content }
-    return assistantBlocks.map(\.scrollFingerprintPiece).joined(separator: "\u{1e}")
-  }
-
-  fileprivate var isAssistantPlaceholderVisuallyEmpty: Bool {
-    assistantBlocks.isEmpty || assistantBlocks.allSatisfy(\.isVisuallyEmpty)
-  }
-}
-
-// MARK: - Errors
-
-enum AppError: LocalizedError {
-  case invalidURL(String)
-  case server(String)
-
-  var errorDescription: String? {
-    switch self {
-    case .invalidURL(let url):
-      return "Invalid server URL: \(url)"
-    case .server(let message):
-      return message
+      throw AppError.server(
+        Self.messageForStatus(code, fallback: "Unexpected status \(code) while loading journal entry."))
     }
   }
 }

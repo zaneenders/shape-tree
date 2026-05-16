@@ -40,13 +40,12 @@ let resolvedDataRoot = ShapeTreeDataLayout.resolveDataRoot(rawPath: dataPathRaw,
 let layout = ShapeTreeDataLayout(dataRoot: resolvedDataRoot)
 try ShapeTreeDataLayout.bootstrapIfNeeded(layout: layout)
 
-let journalService = JournalService(
+let journalStore = JournalStore(
   layout: layout,
   log: log,
   fallbackCommitAuthorName: journalCommitFallbackName,
   fallbackCommitAuthorEmail: journalCommitFallbackEmail)
-try await journalService.initializeJournalGitRepoIfNeeded()
-let journalQuery = JournalQueryService(layout: layout, log: log)
+try await journalStore.initializeJournalGitRepoIfNeeded()
 
 let authorizedKeys = AuthorizedKeysStore(directory: layout.authorizedKeysDirectory)
 
@@ -57,8 +56,7 @@ let bearerToken: String? = ollamaToken.isEmpty ? nil : ollamaToken
 let store = SessionStore()
 let router = buildRoutes(
   store: store,
-  journalService: journalService,
-  journalQuery: journalQuery,
+  journalStore: journalStore,
   authorizedKeys: authorizedKeys,
   log: log,
   defaultOllamaURL: ollamaURL,

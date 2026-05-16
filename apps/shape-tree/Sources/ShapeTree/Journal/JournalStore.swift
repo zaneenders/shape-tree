@@ -1,5 +1,6 @@
 import Foundation
 import Logging
+import ShapeTreeClient
 import Sit
 
 #if canImport(CryptoKit)
@@ -22,20 +23,38 @@ public enum JournalServiceError: Error, Sendable, CustomStringConvertible {
 
   public var description: String {
     switch self {
-    case .emptySubjects:
-      "At least one subject id is required."
-    case .utf8EncodingFailed:
-      "Journal text is not valid UTF-8."
-    case .emptySubjectLabel:
-      "Subject label cannot be empty."
-    case .invalidJournalDayKey:
-      "journal_day must be a valid yy-MM-dd key."
+    case .emptySubjects: "At least one subject id is required."
+    case .utf8EncodingFailed: "Journal text is not valid UTF-8."
+    case .emptySubjectLabel: "Subject label cannot be empty."
+    case .invalidJournalDayKey: "journal_day must be a valid yy-MM-dd key."
     }
   }
 }
 
-/// Local journal append + subject listing; git operations go through ``Sit`` at the journal repo root.
-public actor JournalService {
+public enum JournalQueryError: Error, Sendable, Equatable {
+  case invalidJournalDayKey
+  case invalidRange
+}
+
+/// Sole owner of the on-disk journal: subjects catalogue, append (git-managed),
+/// per-day summaries, and per-day detail. Merges the previous `JournalService`
+/// and `JournalQueryService` so callers wire one type instead of two.
+public actor JournalStore {
+
+  public struct Summary: Sendable {
+    public let dateKey: String
+    public let journalRelativePath: String
+    public let wordCount: Int
+    public let lineCount: Int
+  }
+
+  public struct Detail: Sendable {
+    public let dateKey: String
+    public let journalRelativePath: String
+    public let content: String
+    public let wordCount: Int
+    public let lineCount: Int
+  }
 
   private let layout: ShapeTreeDataLayout
   private let sit: Sit
@@ -60,9 +79,9 @@ public actor JournalService {
     self.fallbackCommitAuthorEmail = fallbackCommitAuthorEmail
   }
 
-  /// Runs ``git init`` inside `Journal/` when `.git` is missing.
-  ///
-  /// The initial commit happens on the **first appended entry** (Scribe-aligned); there is no placeholder file.
+  // MARK: - Git bootstrap
+
+  /// Runs ``git init`` inside `Journal/` when `.git` is missing; the initial commit happens on first append.
   public func initializeJournalGitRepoIfNeeded() async throws {
     let cwd = FilePath(layout.journalRepoRoot.path)
     try await sit.initializeRepoIfNeeded(cwd: cwd, log: log)
@@ -72,6 +91,8 @@ public actor JournalService {
       fallbackCommitName: fallbackCommitAuthorName,
       fallbackCommitEmail: fallbackCommitAuthorEmail)
   }
+
+  // MARK: - Subjects
 
   public func loadSubjects() throws -> JournalSubjectsFile {
     let data = try Data(contentsOf: layout.journalSubjectsFile)
@@ -98,6 +119,8 @@ public actor JournalService {
     return file
   }
 
+  // MARK: - Append
+
   public func appendEntry(
     subjectIds: [String],
     body: String,
@@ -118,15 +141,14 @@ public actor JournalService {
     // Never persist a stamp or filing day in the future (bad clients / clock skew).
     let created = rawCreated <= now ? rawCreated : now
 
-    let blockLines = [
+    let block = [
       "# \(heading)",
       "",
       body.trimmingCharacters(in: .whitespacesAndNewlines),
       "",
       "-----",
       "",
-    ]
-    let block = blockLines.joined(separator: "\n")
+    ].joined(separator: "\n")
 
     let filingDate: Date
     if let journalDayKey {
@@ -141,8 +163,7 @@ public actor JournalService {
 
     let relativePath = JournalPathCodec.relativeMarkdownPath(for: filingDate)
     let entryURL = layout.journalRepoRoot.appendingPathComponent(relativePath, isDirectory: false)
-    let parent = entryURL.deletingLastPathComponent()
-    try fileManager.createDirectory(at: parent, withIntermediateDirectories: true)
+    try fileManager.createDirectory(at: entryURL.deletingLastPathComponent(), withIntermediateDirectories: true)
 
     let cwd = FilePath(layout.journalRepoRoot.path)
     try await sit.pullRebaseIfClean(cwd: cwd, log: log)
@@ -152,9 +173,7 @@ public actor JournalService {
       let existing = try? String(contentsOf: entryURL, encoding: .utf8)
     {
       combined = existing
-      if !combined.hasSuffix("\n") {
-        combined.append("\n")
-      }
+      if !combined.hasSuffix("\n") { combined.append("\n") }
       combined.append("\n")
       combined.append(block)
     } else {
@@ -174,11 +193,87 @@ public actor JournalService {
 
     log.info(
       "event=journal.append path=\(relativePath) subjects=\(subjectIds.joined(separator: ","))")
-
     return relativePath
   }
 
-  private static func writeSubjectsFile(
+  // MARK: - Read (formerly JournalQueryService)
+
+  /// Lists summaries for every calendar day in `[startDayKey, endDayKey]` (inclusive) that has an on-disk entry.
+  public func listSummaries(startDayKey: String, endDayKey: String) throws -> [Summary] {
+    guard
+      let start = JournalPathCodec.date(fromJournalDayKey: startDayKey),
+      let end = JournalPathCodec.date(fromJournalDayKey: endDayKey)
+    else { throw JournalQueryError.invalidJournalDayKey }
+    guard start <= end else { throw JournalQueryError.invalidRange }
+
+    let calendar = JournalPathCodec.utcCalendar
+    var out: [Summary] = []
+    var cursor = start
+
+    while cursor <= end {
+      let dayKey = JournalPathCodec.journalDayKey(for: cursor, calendar: calendar)
+      let relativePath = JournalPathCodec.relativeMarkdownPath(for: cursor, calendar: calendar)
+      let url = layout.journalRepoRoot.appendingPathComponent(relativePath, isDirectory: false)
+
+      if fileManager.fileExists(atPath: url.path),
+        let raw = try? String(contentsOf: url, encoding: .utf8)
+      {
+        let counts = Self.wordAndLineCounts(raw)
+        out.append(
+          Summary(
+            dateKey: dayKey,
+            journalRelativePath: relativePath,
+            wordCount: counts.words,
+            lineCount: counts.lines))
+      }
+
+      guard let next = calendar.date(byAdding: .day, value: 1, to: cursor) else { break }
+      cursor = next
+    }
+
+    log.debug(
+      "event=journal.query.list",
+      metadata: [
+        "start": .string(startDayKey),
+        "end": .string(endDayKey),
+        "hits": .stringConvertible(out.count),
+      ])
+
+    return out.sorted { $0.dateKey > $1.dateKey }
+  }
+
+  /// Loads full Markdown for `yy-MM-dd`, or nil when missing.
+  public func entryDetail(dayKey: String) throws -> Detail? {
+    guard let date = JournalPathCodec.date(fromJournalDayKey: dayKey) else {
+      throw JournalQueryError.invalidJournalDayKey
+    }
+
+    let relativePath = JournalPathCodec.relativeMarkdownPath(for: date)
+    let url = layout.journalRepoRoot.appendingPathComponent(relativePath, isDirectory: false)
+    guard fileManager.fileExists(atPath: url.path) else { return nil }
+
+    let raw = try String(contentsOf: url, encoding: .utf8)
+    let counts = Self.wordAndLineCounts(raw)
+    return Detail(
+      dateKey: dayKey,
+      journalRelativePath: relativePath,
+      content: raw,
+      wordCount: counts.words,
+      lineCount: counts.lines)
+  }
+
+  // MARK: - Internals
+
+  nonisolated private static func wordAndLineCounts(_ content: String) -> (words: Int, lines: Int) {
+    let lineCount = content.components(separatedBy: .newlines).count
+    let wordCount = content
+      .components(separatedBy: .whitespacesAndNewlines)
+      .filter { !$0.isEmpty }
+      .count
+    return (wordCount, lineCount)
+  }
+
+  nonisolated private static func writeSubjectsFile(
     _ file: JournalSubjectsFile,
     to url: URL,
     fileManager: FileManager
@@ -186,29 +281,21 @@ public actor JournalService {
     let data = try file.encodedForSubjectsFile()
     try fileManager.createDirectory(
       at: url.deletingLastPathComponent(),
-      withIntermediateDirectories: true
-    )
+      withIntermediateDirectories: true)
     try data.write(to: url, options: .atomic)
   }
 
-  private static func makeUniqueSubjectId(for label: String, existingIds: Set<String>) -> String {
+  nonisolated private static func makeUniqueSubjectId(for label: String, existingIds: Set<String>) -> String {
     var base = deriveBaseId(from: label)
-    if base.isEmpty {
-      base = "subject"
-    }
-    if !existingIds.contains(base) {
-      return base
-    }
+    if base.isEmpty { base = "subject" }
+    if !existingIds.contains(base) { return base }
     var n = 2
-    while existingIds.contains("\(base)-\(n)") {
-      n += 1
-    }
+    while existingIds.contains("\(base)-\(n)") { n += 1 }
     return "\(base)-\(n)"
   }
 
-  private static func deriveBaseId(from label: String) -> String {
-    let normalized =
-      label
+  nonisolated private static func deriveBaseId(from label: String) -> String {
+    let normalized = label
       .precomposedStringWithCanonicalMapping
       .trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -227,9 +314,8 @@ public actor JournalService {
       slug = slug.replacingOccurrences(of: "--", with: "-")
     }
     slug = slug.trimmingCharacters(in: CharacterSet(charactersIn: "-"))
-    if slug.isEmpty {
-      return fallbackSubjectIdDigest(normalized)
-    }
+    if slug.isEmpty { return fallbackSubjectIdDigest(normalized) }
+
     let sanitized = JournalPathCodec.sanitizeFilenameComponent(slug).lowercased()
     if sanitized.isEmpty || sanitized == "unknown-device" {
       return fallbackSubjectIdDigest(normalized)
@@ -238,7 +324,7 @@ public actor JournalService {
   }
 
   /// Stable, filename-safe token when the label does not slugify (e.g. emoji-only).
-  private static func fallbackSubjectIdDigest(_ normalizedLabel: String) -> String {
+  nonisolated private static func fallbackSubjectIdDigest(_ normalizedLabel: String) -> String {
     let hash = SHA256.hash(data: Data(normalizedLabel.utf8))
     let hex = hash.prefix(6).map { String(format: "%02x", $0) }.joined()
     return "s-\(hex)"

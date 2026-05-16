@@ -34,13 +34,11 @@ struct AuthorizedKeysTests {
 
   @Test func rejectsHS256TokenSignedWithSharedSecret() async throws {
     let log = Logger(label: "test.auth.alg-pin")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: SessionStore(),
-      journalService: journal,
-      journalQuery: journalQuery,
+      journalStore: journal,
       authorizedKeys: fixture.store,
       log: log
     )
@@ -70,13 +68,11 @@ struct AuthorizedKeysTests {
 
   @Test func rejectsAlgNoneToken() async throws {
     let log = Logger(label: "test.auth.alg-none")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: SessionStore(),
-      journalService: journal,
-      journalQuery: journalQuery,
+      journalStore: journal,
       authorizedKeys: fixture.store,
       log: log
     )
@@ -101,13 +97,11 @@ struct AuthorizedKeysTests {
 
   @Test func rejectsKidWithBadShape() async throws {
     let log = Logger(label: "test.auth.bad-kid")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: SessionStore(),
-      journalService: journal,
-      journalQuery: journalQuery,
+      journalStore: journal,
       authorizedKeys: fixture.store,
       log: log
     )
@@ -137,13 +131,11 @@ struct AuthorizedKeysTests {
 
   @Test func rejectsUnknownButWellFormedKid() async throws {
     let log = Logger(label: "test.auth.unknown-kid")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: SessionStore(),
-      journalService: journal,
-      journalQuery: journalQuery,
+      journalStore: journal,
       authorizedKeys: fixture.store,
       log: log
     )
@@ -173,8 +165,7 @@ struct AuthorizedKeysTests {
 
   @Test func rejectsKeyfileSwappedUnderExistingFilename() async throws {
     let log = Logger(label: "test.auth.tampered-store")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
 
     // Replace the contents of `<kid>.jwk` with a *different* P-256 public key
@@ -197,8 +188,7 @@ struct AuthorizedKeysTests {
 
     let router = buildRoutes(
       store: SessionStore(),
-      journalService: journal,
-      journalQuery: journalQuery,
+      journalStore: journal,
       authorizedKeys: fixture.store,
       log: log
     )
@@ -217,13 +207,11 @@ struct AuthorizedKeysTests {
 
   @Test func revokingKeyfileImmediatelyDeniesAccess() async throws {
     let log = Logger(label: "test.auth.revocation")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: SessionStore(),
-      journalService: journal,
-      journalQuery: journalQuery,
+      journalStore: journal,
       authorizedKeys: fixture.store,
       log: log
     )
@@ -253,8 +241,7 @@ struct AuthorizedKeysTests {
 
   @Test func rejectsTokenWhereSubDoesNotMatchKid() async throws {
     let log = Logger(label: "test.auth.sub-binding")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
 
     // Enroll key A in the trust store.
     let fixtureA = try await JWTTestSupport.makeFixture()
@@ -264,8 +251,7 @@ struct AuthorizedKeysTests {
 
     let router = buildRoutes(
       store: SessionStore(),
-      journalService: journal,
-      journalQuery: journalQuery,
+      journalStore: journal,
       authorizedKeys: fixtureA.store,
       log: log
     )

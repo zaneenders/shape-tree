@@ -44,7 +44,6 @@ let package = Package(
         "ShapeTreeClient",
         "Sit",
         .product(name: "ScribeCore", package: "scribe"),
-        .product(name: "ScribeLLM", package: "scribe"),
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "OpenAPIHummingbird", package: "swift-openapi-hummingbird"),
         .product(name: "Configuration", package: "swift-configuration"),

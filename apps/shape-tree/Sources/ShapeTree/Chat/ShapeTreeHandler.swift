@@ -13,8 +13,7 @@ import ShapeTreeClient
 struct ShapeTreeHandler: APIProtocol, Sendable {
 
   let store: SessionStore
-  let journalService: JournalService
-  let journalQuery: JournalQueryService
+  let journalStore: JournalStore
   let log: Logger
   let defaultOllamaURL: String
   let agentModel: String
@@ -24,24 +23,37 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
   let contextWindowThreshold: Double
   let workingDirectory: String
 
+  // MARK: - Error envelope helpers
+
+  /// Single source of truth for the JSON body of every error response.
+  private static func errorBody(_ message: String) -> Components.Schemas.HTTPErrorResponse {
+    .init(error: .init(message: message))
+  }
+
+  /// Logs `event` and the underlying error, then returns the public 500 body. All non-domain
+  /// failures funnel through this so the operator sees a structured log line for every 500.
+  private func internalErrorBody(event: String, _ error: Error, public publicMessage: String)
+    -> Components.Schemas.HTTPErrorResponse
+  {
+    log.error("event=\(event) error=\(error.localizedDescription)")
+    return Self.errorBody(publicMessage)
+  }
+
   // MARK: GET /journal/subjects
 
   func listJournalSubjects(
     _ input: Operations.listJournalSubjects.Input
   ) async throws -> Operations.listJournalSubjects.Output {
     do {
-      let file = try await journalService.loadSubjects()
-      let subjects = file.subjects.map {
-        Components.Schemas.JournalSubject(id: $0.id, label: $0.label)
-      }
-      let response = Components.Schemas.JournalSubjectsResponse(subjects: subjects)
+      let file = try await journalStore.loadSubjects()
+      let response = Components.Schemas.JournalSubjectsResponse(subjects: Self.schemaSubjects(file))
       return .ok(.init(body: .json(response)))
     } catch {
-      log.error("event=journal.subjects.failure error=\(error.localizedDescription)")
-      let payload = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "Could not load journal subjects.")
-      )
-      return .internalServerError(.init(body: .json(payload)))
+      return .internalServerError(.init(body: .json(
+        internalErrorBody(
+          event: "journal.subjects.failure",
+          error,
+          public: "Could not load journal subjects."))))
     }
   }
 
@@ -51,39 +63,21 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
     _ input: Operations.appendJournalSubject.Input
   ) async throws -> Operations.appendJournalSubject.Output {
     guard case .json(let body) = input.body else {
-      let payload = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "Request body must be JSON.")
-      )
-      return .badRequest(.init(body: .json(payload)))
+      return .badRequest(.init(body: .json(Self.errorBody("Request body must be JSON."))))
     }
 
     do {
-      let file = try await journalService.appendSubject(rawLabel: body.subject)
-      let subjects = file.subjects.map {
-        Components.Schemas.JournalSubject(id: $0.id, label: $0.label)
-      }
-      let response = Components.Schemas.JournalSubjectsResponse(subjects: subjects)
+      let file = try await journalStore.appendSubject(rawLabel: body.subject)
+      let response = Components.Schemas.JournalSubjectsResponse(subjects: Self.schemaSubjects(file))
       return .ok(.init(body: .json(response)))
-    } catch let error as JournalServiceError {
-      switch error {
-      case .emptySubjectLabel:
-        let payload = Components.Schemas.HTTPErrorResponse(
-          error: .init(message: error.description)
-        )
-        return .badRequest(.init(body: .json(payload)))
-      case .emptySubjects, .utf8EncodingFailed, .invalidJournalDayKey:
-        log.error("event=journal.subjects.append.unexpected_journal_error error=\(error.description)")
-        let payload = Components.Schemas.HTTPErrorResponse(
-          error: .init(message: "Failed to append journal subject.")
-        )
-        return .internalServerError(.init(body: .json(payload)))
-      }
+    } catch JournalServiceError.emptySubjectLabel {
+      return .badRequest(.init(body: .json(Self.errorBody(JournalServiceError.emptySubjectLabel.description))))
     } catch {
-      log.error("event=journal.subjects.append.failure error=\(error.localizedDescription)")
-      let payload = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "Failed to append journal subject.")
-      )
-      return .internalServerError(.init(body: .json(payload)))
+      return .internalServerError(.init(body: .json(
+        internalErrorBody(
+          event: "journal.subjects.append.failure",
+          error,
+          public: "Failed to append journal subject."))))
     }
   }
 
@@ -92,37 +86,30 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
   func listJournalEntrySummaries(
     _ input: Operations.listJournalEntrySummaries.Input
   ) async throws -> Operations.listJournalEntrySummaries.Output {
-    let start = input.query.start_date
-    let end = input.query.end_date
-
     do {
-      let rows = try journalQuery.listSummaries(startDayKey: start, endDayKey: end)
+      let rows = try await journalStore.listSummaries(
+        startDayKey: input.query.start_date,
+        endDayKey: input.query.end_date)
       let entries = rows.map {
         Components.Schemas.JournalEntrySummary(
           date: $0.dateKey,
           journal_relative_path: $0.journalRelativePath,
           word_count: $0.wordCount,
-          line_count: $0.lineCount
-        )
+          line_count: $0.lineCount)
       }
-      let response = Components.Schemas.JournalEntriesSummariesResponse(entries: entries)
-      return .ok(.init(body: .json(response)))
+      return .ok(.init(body: .json(.init(entries: entries))))
     } catch JournalQueryError.invalidJournalDayKey {
-      let payload = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "start_date and end_date must be formatted yy-MM-dd.")
-      )
-      return .badRequest(.init(body: .json(payload)))
+      return .badRequest(.init(body: .json(
+        Self.errorBody("start_date and end_date must be formatted yy-MM-dd."))))
     } catch JournalQueryError.invalidRange {
-      let payload = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "start_date must be on or before end_date.")
-      )
-      return .badRequest(.init(body: .json(payload)))
+      return .badRequest(.init(body: .json(
+        Self.errorBody("start_date must be on or before end_date."))))
     } catch {
-      log.error("event=journal.summaries.failure error=\(error.localizedDescription)")
-      let payload = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "Failed to list journal entries.")
-      )
-      return .internalServerError(.init(body: .json(payload)))
+      return .internalServerError(.init(body: .json(
+        internalErrorBody(
+          event: "journal.summaries.failure",
+          error,
+          public: "Failed to list journal entries."))))
     }
   }
 
@@ -132,34 +119,26 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
     _ input: Operations.getJournalEntryDetail.Input
   ) async throws -> Operations.getJournalEntryDetail.Output {
     let dayKey = input.path.journal_day
-
     do {
-      guard let detail = try journalQuery.entryDetail(dayKey: dayKey) else {
-        let payload = Components.Schemas.HTTPErrorResponse(
-          error: .init(message: "No journal entry for \(dayKey).")
-        )
-        return .notFound(.init(body: .json(payload)))
+      guard let detail = try await journalStore.entryDetail(dayKey: dayKey) else {
+        return .notFound(.init(body: .json(Self.errorBody("No journal entry for \(dayKey)."))))
       }
-
       let response = Components.Schemas.JournalEntryDetailResponse(
         date: detail.dateKey,
         journal_relative_path: detail.journalRelativePath,
         content: detail.content,
         word_count: detail.wordCount,
-        line_count: detail.lineCount
-      )
+        line_count: detail.lineCount)
       return .ok(.init(body: .json(response)))
     } catch JournalQueryError.invalidJournalDayKey {
-      let payload = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "journal_day must be formatted yy-MM-dd.")
-      )
-      return .badRequest(.init(body: .json(payload)))
+      return .badRequest(.init(body: .json(
+        Self.errorBody("journal_day must be formatted yy-MM-dd."))))
     } catch {
-      log.error("event=journal.detail.failure error=\(error.localizedDescription)")
-      let payload = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "Failed to read journal entry.")
-      )
-      return .internalServerError(.init(body: .json(payload)))
+      return .internalServerError(.init(body: .json(
+        internalErrorBody(
+          event: "journal.detail.failure",
+          error,
+          public: "Failed to read journal entry."))))
     }
   }
 
@@ -169,39 +148,27 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
     _ input: Operations.appendJournalEntry.Input
   ) async throws -> Operations.appendJournalEntry.Output {
     guard case .json(let body) = input.body else {
-      let payload = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "Request body must be JSON.")
-      )
-      return .badRequest(.init(body: .json(payload)))
+      return .badRequest(.init(body: .json(Self.errorBody("Request body must be JSON."))))
     }
-
     guard !body.subject_ids.isEmpty else {
-      let payload = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "subject_ids must not be empty.")
-      )
-      return .badRequest(.init(body: .json(payload)))
+      return .badRequest(.init(body: .json(Self.errorBody("subject_ids must not be empty."))))
     }
 
     do {
-      let path = try await journalService.appendEntry(
+      let path = try await journalStore.appendEntry(
         subjectIds: body.subject_ids,
         body: body.body,
         createdAt: body.created_at,
         journalDayKey: body.journal_day)
-
-      let response = Components.Schemas.AppendJournalEntryResponse(
-        journal_relative_path: path)
-      return .created(.init(body: .json(response)))
+      return .created(.init(body: .json(.init(journal_relative_path: path))))
     } catch let error as JournalServiceError {
-      let payload = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: error.description))
-      return .badRequest(.init(body: .json(payload)))
+      return .badRequest(.init(body: .json(Self.errorBody(error.description))))
     } catch {
-      log.error("event=journal.append.failure error=\(error.localizedDescription)")
-      let payload = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "Failed to persist journal entry.")
-      )
-      return .internalServerError(.init(body: .json(payload)))
+      return .internalServerError(.init(body: .json(
+        internalErrorBody(
+          event: "journal.append.failure",
+          error,
+          public: "Failed to persist journal entry."))))
     }
   }
 
@@ -211,21 +178,11 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
     _ input: Operations.createSession.Input
   ) async throws -> Operations.createSession.Output {
     guard case .json(let body) = input.body else {
-      let error = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "Request body must be JSON.")
-      )
-      return .badRequest(.init(body: .json(error)))
+      return .badRequest(.init(body: .json(Self.errorBody("Request body must be JSON."))))
     }
 
     let prompt = body.systemPrompt ?? systemPrompt
-
-    let tools: [any ScribeTool] = [
-      ShellTool(),
-      ReadFileTool(),
-      WriteFileTool(),
-      EditFileTool(),
-    ]
-
+    let tools: [any ScribeTool] = [ShellTool(), ReadFileTool(), WriteFileTool(), EditFileTool()]
     let config = ScribeConfig(
       agentModel: agentModel,
       contextWindow: contextWindow,
@@ -233,28 +190,17 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
       serverURL: defaultOllamaURL,
       apiKey: bearerToken,
       tools: tools,
-      workingDirectory: workingDirectory
-    )
+      workingDirectory: workingDirectory)
 
-    let agent = try ScribeAgent(
-      configuration: config,
-      systemPrompt: prompt
-    )
+    let agent = try ScribeAgent(configuration: config, systemPrompt: prompt)
+    let id = await store.create(agent: agent)
 
-    let id = await store.create(agent: agent, systemPrompt: prompt)
-
-    log.info(
-      """
-      event=session.create \
-      id=\(id) \
-      model=\(agentModel)
-      """)
+    log.info("event=session.create id=\(id) model=\(agentModel)")
 
     let session = await store.get(id)
     let response = Components.Schemas.CreateSessionResponse(
       id: id.uuidString,
-      createdAt: session?.createdAt ?? Date()
-    )
+      createdAt: session?.createdAt ?? Date())
     return .ok(.init(body: .json(response)))
   }
 
@@ -265,76 +211,46 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
   ) async throws -> Operations.runCompletionStream.Output {
 
     guard let sessionId = UUID(uuidString: input.path.id) else {
-      let error = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "Invalid or missing session id.")
-      )
-      return .badRequest(.init(body: .json(error)))
+      return .badRequest(.init(body: .json(Self.errorBody("Invalid or missing session id."))))
     }
-
     guard case .json(let body) = input.body else {
-      let error = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "Request body must be JSON.")
-      )
-      return .badRequest(.init(body: .json(error)))
+      return .badRequest(.init(body: .json(Self.errorBody("Request body must be JSON."))))
     }
-
     guard let session = await store.get(sessionId) else {
-      let error = Components.Schemas.HTTPErrorResponse(
-        error: .init(message: "Session not found.")
-      )
-      return .notFound(.init(body: .json(error)))
+      return .notFound(.init(body: .json(Self.errorBody("Session not found."))))
     }
 
     let turnLog = Logger(label: "scribe.agent.turn.stream.\(sessionId)")
     let turnStream = await session.agent.prompt(body.message, log: turnLog)
 
     let lineStream = AsyncStream<Components.Schemas.CompletionStreamEvent> { continuation in
-      Task { [sessionId, store, log] in
+      Task { [sessionId, log] in
         do {
           for await event in turnStream.events {
-            let schemaLine = CompletionStreamTranscriptMapping.line(for: event)
-            continuation.yield(schemaLine)
+            continuation.yield(CompletionStreamTranscriptMapping.line(for: event))
           }
 
           let result = try await turnStream.result.value
-          await store.setMessages(
-            sessionId, messages: result.messages.map { $0.toComponentsChatMessage() })
-
           let assistantText =
             result.messages.last(where: { $0.role == .assistant })?.content ?? ""
 
           if assistantText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            continuation.yield(
-              Components.Schemas.CompletionStreamEvent(
-                kind: .harness_error,
-                harness_error_message: "No assistant response."
-              ))
+            continuation.yield(.init(kind: .harness_error, harness_error_message: "No assistant response."))
             continuation.finish()
             return
           }
 
           log.info(
-            """
-            event=completion.stream.end \
-            session=\(sessionId) \
-            assistant_chars=\(assistantText.count)
-            """)
+            "event=completion.stream.end session=\(sessionId) assistant_chars=\(assistantText.count)")
 
-          continuation.yield(
-            Components.Schemas.CompletionStreamEvent(
-              kind: .done,
-              outcome: CompletionStreamTranscriptMapping.outcome(result.outcome),
-              tool_round_limit_rounds: CompletionStreamTranscriptMapping.toolRoundLimitRounds(
-                result.outcome),
-              assistant_full_text: assistantText
-            ))
+          continuation.yield(.init(
+            kind: .done,
+            outcome: CompletionStreamTranscriptMapping.outcome(result.outcome),
+            tool_round_limit_rounds: CompletionStreamTranscriptMapping.toolRoundLimitRounds(result.outcome),
+            assistant_full_text: assistantText))
           continuation.finish()
         } catch {
-          continuation.yield(
-            Components.Schemas.CompletionStreamEvent(
-              kind: .harness_error,
-              harness_error_message: error.localizedDescription
-            ))
+          continuation.yield(.init(kind: .harness_error, harness_error_message: error.localizedDescription))
           continuation.finish()
         }
       }
@@ -343,8 +259,13 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
     let httpBody = HTTPBody(
       lineStream.asEncodedJSONLines(),
       length: .unknown,
-      iterationBehavior: .single
-    )
+      iterationBehavior: .single)
     return .ok(.init(body: .application_jsonl(httpBody)))
+  }
+
+  // MARK: - Internals
+
+  private static func schemaSubjects(_ file: JournalSubjectsFile) -> [Components.Schemas.JournalSubject] {
+    file.subjects.map { .init(id: $0.id, label: $0.label) }
   }
 }

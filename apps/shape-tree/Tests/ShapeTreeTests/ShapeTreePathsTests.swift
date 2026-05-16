@@ -1,5 +1,6 @@
 import Foundation
 import ShapeTree
+import ShapeTreeClient
 import Testing
 
 @Suite struct ShapeTreePathsTests {

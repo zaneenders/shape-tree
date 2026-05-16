@@ -1,5 +1,6 @@
 import Foundation
 import Logging
+import ShapeTreeClient
 import Testing
 
 @testable import ShapeTree
@@ -11,8 +12,7 @@ struct JournalUTCGuardsTests {
   @Test
   func journalQueryListsDiskFilesForTomorrowKeyWhenPresent() async throws {
     let log = Logger(label: "test.journal-query-inclusive-day-keys")
-    let (_, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let query = JournalQueryService(layout: layout, log: log)
+    let (store, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let cal = JournalPathCodec.utcCalendar
     let tomorrow =
       try #require(cal.date(byAdding: .day, value: 1, to: Date()))
@@ -26,11 +26,11 @@ struct JournalUTCGuardsTests {
     try "bogus".write(to: url, atomically: true, encoding: .utf8)
 
     let key = JournalPathCodec.journalDayKey(for: tomorrow, calendar: cal)
-    let rows = try query.listSummaries(startDayKey: key, endDayKey: key)
+    let rows = try await store.listSummaries(startDayKey: key, endDayKey: key)
     #expect(rows.count == 1)
     #expect(rows[0].dateKey == key)
 
-    let detail = try query.entryDetail(dayKey: key)
+    let detail = try await store.entryDetail(dayKey: key)
     #expect(detail != nil)
     #expect(detail?.content == "bogus")
   }
@@ -39,9 +39,9 @@ struct JournalUTCGuardsTests {
   @Test
   func appendEntryClampsFutureCreatedAtWithoutJournalDay() async throws {
     let log = Logger(label: "test.journal-append-clamp-created-at")
-    let (svc, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let (store, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
 
-    let path = try await svc.appendEntry(
+    let path = try await store.appendEntry(
       subjectIds: ["general"],
       body: "hello",
       createdAt: Date().addingTimeInterval(86400 * 400),
@@ -54,9 +54,9 @@ struct JournalUTCGuardsTests {
   @Test
   func appendEntryUsesExplicitJournalDayKeyOverCreatedInstant() async throws {
     let log = Logger(label: "test.journal-append-explicit-day")
-    let (svc, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let (store, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
 
-    let path = try await svc.appendEntry(
+    let path = try await store.appendEntry(
       subjectIds: ["general"],
       body: "hello",
       createdAt: Date().addingTimeInterval(86400 * 400),
