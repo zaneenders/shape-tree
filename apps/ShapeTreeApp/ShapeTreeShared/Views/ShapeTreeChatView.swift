@@ -251,7 +251,7 @@ struct ShapeTreeChatView: View {
           Text("Device public key")
         } footer: {
           Text(
-            "Each request is signed with this device's on-device P-256 key (Secure Enclave when available). Enroll the device by copying the JWK above and saving it on the server as authorized_keys/<kid>.jwk."
+            "Each request is signed with this device's Secure Enclave P-256 key. Enroll the device by copying the JWK above and saving it on the server as authorized_keys/<kid>.jwk."
           )
         }
       }

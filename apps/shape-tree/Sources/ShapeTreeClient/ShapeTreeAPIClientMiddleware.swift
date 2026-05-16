@@ -1,9 +1,6 @@
 import OpenAPIRuntime
 
-/// Builds middleware stacks for apps that link only `ShapeTreeClient`.
 public enum ShapeTreeAPIClientMiddleware {
-
-  // MARK: - Bearer token normalization
 
   /// Returns the raw JWT suitable for `Authorization: Bearer …`.
   ///
@@ -30,7 +27,6 @@ public enum ShapeTreeAPIClientMiddleware {
     return s
   }
 
-  /// Wraps a static bearer JWT for generated ``Client`` stacks (typically integration tests).
   public static func bearerJWT(_ token: String?) -> [any ClientMiddleware] {
     let trimmed = token.map { normalizedBearerJWT($0) } ?? ""
     guard !trimmed.isEmpty else { return [] }

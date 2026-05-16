@@ -48,7 +48,7 @@ public enum ShapeTreeTokenIssuer {
 
   /// Builds a compact JWS and signs `header.payload` UTF-8 (ES256 — SHA-256 digest of the signing input, then ECDSA).
   ///
-  /// The caller supplies RFC 7638 `kid`; ``ShapeTreeKeyStore`` wires Secure Enclave / software keys as the typical
+  /// The caller supplies RFC 7638 `kid`; ``ShapeTreeKeyStore`` wraps a Secure Enclave signing key as the typical
   /// closure implementation.
   public static func mintES256(
     kid: String,

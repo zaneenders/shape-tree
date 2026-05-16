@@ -6,21 +6,20 @@ import ShapeTreeClient
 @MainActor
 public final class ShapeTreeKeyStore {
 
-  public enum Backing {
-    case secureEnclave(SecureEnclave.P256.Signing.PrivateKey)
-    case software(P256.Signing.PrivateKey)
-  }
-
   public enum KeyStoreError: Error, LocalizedError {
     case keychain(OSStatus)
     case missingMaterial
     case malformedKeyMaterial
+    case secureEnclaveUnavailable
 
     public var errorDescription: String? {
       switch self {
       case .keychain(let s): return "Keychain error: OSStatus \(s)"
       case .missingMaterial: return "Device key material missing — generate a key first."
-      case .malformedKeyMaterial: return "Stored key material is malformed; regenerate."
+      case .malformedKeyMaterial:
+        return "Stored key material is malformed — remove it under Connection settings, then regenerate."
+      case .secureEnclaveUnavailable:
+        return "The Secure Enclave is not available on this device."
       }
     }
   }
@@ -29,7 +28,7 @@ public final class ShapeTreeKeyStore {
   private static let keychainAccount = "device-p256-v1"
   private static let labelDefaultsKey = "shape_tree_device_label"
 
-  private var cached: Backing?
+  private var cached: SecureEnclave.P256.Signing.PrivateKey?
   private let labelOverride: String?
 
   public init(labelOverride: String? = nil) {
@@ -62,25 +61,25 @@ public final class ShapeTreeKeyStore {
   }
 
   @discardableResult
-  public func loadOrGenerate() throws -> Backing {
+  public func loadOrGenerate() throws -> SecureEnclave.P256.Signing.PrivateKey {
     if let cached { return cached }
     if let raw = try readKeychainBytes() {
-      let backing = try Self.deserialize(raw)
-      cached = backing
-      return backing
+      let key = try Self.deserialize(raw)
+      cached = key
+      return key
     }
-    let backing = try Self.generate()
-    try writeKeychainBytes(Self.serialize(backing))
-    cached = backing
-    return backing
+    let key = try Self.generate()
+    try writeKeychainBytes(Self.serialize(key))
+    cached = key
+    return key
   }
 
   @discardableResult
-  public func regenerate() throws -> Backing {
-    let backing = try Self.generate()
-    try writeKeychainBytes(Self.serialize(backing))
-    cached = backing
-    return backing
+  public func regenerate() throws -> SecureEnclave.P256.Signing.PrivateKey {
+    let key = try Self.generate()
+    try writeKeychainBytes(Self.serialize(key))
+    cached = key
+    return key
   }
 
   public func deleteKeyMaterial() throws {
@@ -99,11 +98,8 @@ public final class ShapeTreeKeyStore {
   // MARK: - Public key surface
 
   public func publicX963Representation() throws -> Data {
-    let backing = try loadOrGenerate()
-    switch backing {
-    case .secureEnclave(let key): return key.publicKey.x963Representation
-    case .software(let key): return key.publicKey.x963Representation
-    }
+    let key = try loadOrGenerate()
+    return key.publicKey.x963Representation
   }
 
   public func kid() throws -> String {
@@ -142,47 +138,36 @@ public final class ShapeTreeKeyStore {
   public func mintES256JWT(ttl: TimeInterval = 900) throws -> String {
     let kid = try kid()
     let label = deviceLabel
-    let backing = try loadOrGenerate()
+    let key = try loadOrGenerate()
     return try ShapeTreeTokenIssuer.mintES256(
       kid: kid,
       deviceLabel: label,
       ttl: ttl,
       sign: { data in
-        switch backing {
-        case .secureEnclave(let key): return try key.signature(for: data).rawRepresentation
-        case .software(let key): return try key.signature(for: data).rawRepresentation
-        }
+        try key.signature(for: data).rawRepresentation
       }
     )
   }
 
   // MARK: - Internals
 
-  private static func generate() throws -> Backing {
-    if SecureEnclave.isAvailable {
-      let key = try SecureEnclave.P256.Signing.PrivateKey()
-      return .secureEnclave(key)
-    } else {
-      let key = P256.Signing.PrivateKey()
-      return .software(key)
+  private static func generate() throws -> SecureEnclave.P256.Signing.PrivateKey {
+    guard SecureEnclave.isAvailable else {
+      throw KeyStoreError.secureEnclaveUnavailable
     }
+    return try SecureEnclave.P256.Signing.PrivateKey()
   }
 
-  private static func serialize(_ backing: Backing) -> Data {
-    switch backing {
-    case .secureEnclave(let key): return key.dataRepresentation
-    case .software(let key): return key.rawRepresentation
-    }
+  private static func serialize(_ key: SecureEnclave.P256.Signing.PrivateKey) -> Data {
+    key.dataRepresentation
   }
 
-  private static func deserialize(_ data: Data) throws -> Backing {
-    if SecureEnclave.isAvailable {
-      if let key = try? SecureEnclave.P256.Signing.PrivateKey(dataRepresentation: data) {
-        return .secureEnclave(key)
-      }
+  private static func deserialize(_ data: Data) throws -> SecureEnclave.P256.Signing.PrivateKey {
+    guard SecureEnclave.isAvailable else {
+      throw KeyStoreError.secureEnclaveUnavailable
     }
-    if let key = try? P256.Signing.PrivateKey(rawRepresentation: data) {
-      return .software(key)
+    if let key = try? SecureEnclave.P256.Signing.PrivateKey(dataRepresentation: data) {
+      return key
     }
     throw KeyStoreError.malformedKeyMaterial
   }
