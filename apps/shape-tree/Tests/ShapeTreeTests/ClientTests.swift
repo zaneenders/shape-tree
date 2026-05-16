@@ -32,7 +32,7 @@ struct ClientTests {
       let port = try #require(client.port, "Expected live server to have a port")
 
       let transport = AsyncHTTPClientTransport()
-      let token = try await JWTTestSupport.mintToken(fixture)
+      let token = try JWTTestSupport.mintToken(fixture)
       let api = Client(
         serverURL: URL(string: "http://localhost:\(port)")!,
         transport: transport,
@@ -72,7 +72,7 @@ struct ClientTests {
     try await app.test(.live) { client in
       let port = try #require(client.port)
       let transport = AsyncHTTPClientTransport()
-      let token = try await JWTTestSupport.mintToken(fixture)
+      let token = try JWTTestSupport.mintToken(fixture)
       let api = Client(
         serverURL: URL(string: "http://localhost:\(port)")!,
         transport: transport,
@@ -102,7 +102,7 @@ struct ClientTests {
     try await app.test(.live) { client in
       let port = try #require(client.port)
       let transport = AsyncHTTPClientTransport()
-      let token = try await JWTTestSupport.mintToken(fixture)
+      let token = try JWTTestSupport.mintToken(fixture)
       let api = Client(
         serverURL: URL(string: "http://localhost:\(port)")!,
         transport: transport,
@@ -135,7 +135,7 @@ struct ClientTests {
       let port = try #require(client.port)
 
       let transport = AsyncHTTPClientTransport()
-      let token = try await JWTTestSupport.mintToken(fixture)
+      let token = try JWTTestSupport.mintToken(fixture)
       let api = Client(
         serverURL: URL(string: "http://localhost:\(port)")!,
         transport: transport,
@@ -173,7 +173,7 @@ struct ClientTests {
       let port = try #require(client.port)
 
       let transport = AsyncHTTPClientTransport()
-      let token = try await JWTTestSupport.mintToken(fixture)
+      let token = try JWTTestSupport.mintToken(fixture)
       let api = Client(
         serverURL: URL(string: "http://localhost:\(port)")!,
         transport: transport,

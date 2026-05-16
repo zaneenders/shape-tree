@@ -60,7 +60,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/subjects",
         method: .get,
-        headers: try await JWTTestSupport.bearerHeaders(fixture)
+        headers: try JWTTestSupport.bearerHeaders(fixture)
       ) { response in
         #expect(response.status == .ok)
         let decoded = try JSONDecoder().decode(
@@ -92,7 +92,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/subjects",
         method: .post,
-        headers: try await JWTTestSupport.bearerHeaders(fixture),
+        headers: try JWTTestSupport.bearerHeaders(fixture),
         body: ByteBuffer(string: bodyPayload)
       ) { response in
         #expect(response.status == .ok)
@@ -106,7 +106,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/subjects",
         method: .get,
-        headers: try await JWTTestSupport.bearerHeaders(fixture)
+        headers: try JWTTestSupport.bearerHeaders(fixture)
       ) { response in
         #expect(response.status == .ok)
         let decoded = try JSONDecoder().decode(
@@ -138,7 +138,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/subjects",
         method: .post,
-        headers: try await JWTTestSupport.bearerHeaders(fixture),
+        headers: try JWTTestSupport.bearerHeaders(fixture),
         body: ByteBuffer(string: bodyPayload)
       ) { response in
         #expect(response.status == .badRequest)
@@ -168,7 +168,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/entries",
         method: .post,
-        headers: try await JWTTestSupport.bearerHeaders(fixture),
+        headers: try JWTTestSupport.bearerHeaders(fixture),
         body: ByteBuffer(string: bodyPayload)
       ) { response in
         #expect(response.status == .created)
@@ -209,7 +209,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/entries",
         method: .post,
-        headers: try await JWTTestSupport.bearerHeaders(fixture),
+        headers: try JWTTestSupport.bearerHeaders(fixture),
         body: ByteBuffer(string: appendBody)
       ) { response in
         #expect(response.status == .created)
@@ -218,7 +218,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/entries?start_date=26-05-01&end_date=26-05-31",
         method: .get,
-        headers: try await JWTTestSupport.bearerHeaders(fixture)
+        headers: try JWTTestSupport.bearerHeaders(fixture)
       ) { response in
         #expect(response.status == .ok)
         let decoded = try JSONDecoder().decode(
@@ -255,7 +255,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/entries",
         method: .post,
-        headers: try await JWTTestSupport.bearerHeaders(fixture),
+        headers: try JWTTestSupport.bearerHeaders(fixture),
         body: ByteBuffer(string: appendBody)
       ) { response in
         #expect(response.status == .created)
@@ -264,7 +264,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/entries/\(filingDayKey)",
         method: .get,
-        headers: try await JWTTestSupport.bearerHeaders(fixture)
+        headers: try JWTTestSupport.bearerHeaders(fixture)
       ) { response in
         #expect(response.status == .ok)
         let decoded = try JSONDecoder().decode(
@@ -296,7 +296,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/entries/77-07-07",
         method: .get,
-        headers: try await JWTTestSupport.bearerHeaders(fixture)
+        headers: try JWTTestSupport.bearerHeaders(fixture)
       ) { response in
         #expect(response.status == .notFound)
       }
@@ -322,7 +322,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/journal/entries?start_date=26-05-10&end_date=26-05-01",
         method: .get,
-        headers: try await JWTTestSupport.bearerHeaders(fixture)
+        headers: try JWTTestSupport.bearerHeaders(fixture)
       ) { response in
         #expect(response.status == .badRequest)
       }
@@ -357,7 +357,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/sessions",
         method: .post,
-        headers: try await JWTTestSupport.bearerHeaders(fixture),
+        headers: try JWTTestSupport.bearerHeaders(fixture),
         body: ByteBuffer(string: body)
       ) { response in
         #expect(response.status == .ok)
@@ -396,7 +396,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/sessions/not-a-uuid/completions/stream",
         method: .post,
-        headers: try await JWTTestSupport.bearerHeaders(fixture),
+        headers: try JWTTestSupport.bearerHeaders(fixture),
         body: ByteBuffer(string: body)
       ) { response in
         #expect(response.status == .badRequest)
@@ -425,7 +425,7 @@ struct RouterTests {
       try await client.execute(
         uri: "/sessions/\(bogusId.uuidString)/completions/stream",
         method: .post,
-        headers: try await JWTTestSupport.bearerHeaders(fixture),
+        headers: try JWTTestSupport.bearerHeaders(fixture),
         body: ByteBuffer(string: body)
       ) { response in
         #expect(response.status == .notFound)

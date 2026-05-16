@@ -4,61 +4,48 @@ import JWTKit
 
 /// ES256 JWT minting for the SSH-style `authorized_keys` trust model (see `.dev/auth.md`).
 ///
-/// **Which API to use**
+/// **`mintES256(kid:deviceLabel:ttl:sign:)`** is the canonical JWS compose path — fixed header/payload JSON
+/// (sorted keys), base64url segments, ES256 SHA-256-over-signing-input as implemented by CryptoKit's
+/// `P256.Signing.PrivateKey.signature(for:)`.
 ///
-/// - **Apps (Secure Enclave / CryptoKit)** — Call ``ShapeTreeKeyStore/mintES256JWT(ttl:)``, which wraps
-///   ``mintES256(kid:deviceLabel:ttl:sign:)`` with the correct `kid` and a signing closure over the raw JWS input.
-/// - **Tests / tooling with JWTKit keys** — Use ``mintES256(privateKey:deviceLabel:ttl:)``, which builds the same
-///   header + payload shape via JWTKit's signer.
+/// - **Apps (Secure Enclave / CryptoKit)** — ``ShapeTreeKeyStore/mintES256JWT(ttl:)`` supplies `kid` and a closure
+///   over CryptoKit-held keys.
+/// - **Tests / tooling with JWTKit keys** — ``mintES256(privateKey:deviceLabel:ttl:)`` bridges the JWTKit wrapper to
+///   CryptoKit via PEM so it delegates to the same compose + sign pipeline.
 ///
-/// The server verifies tokens using the same ``ShapeTreeJWTPayload`` claim set and its authorized-keys middleware;
-/// keep fields aligned with that type only.
+/// The server verifies using ``ShapeTreeJWTPayload``; keep claim fields aligned with that type only.
 public enum ShapeTreeTokenIssuer {
 
-  // MARK: - JWTKit path
-
-  /// Signs with a JWTKit-owned P-256 private key (typical for tests and headless fixtures).
+  /// Signs with a JWTKit `ECDSA.PrivateKey` (fixtures / tooling). PEM-round-trips into CryptoKit so signatures match
+  /// device minting and server verification.
   public static func mintES256(
     privateKey: ECDSA.PrivateKey<P256>,
     deviceLabel: String? = nil,
     ttl: TimeInterval = 900
-  ) async throws -> String {
+  ) throws -> String {
     guard let params = privateKey.parameters else {
       throw ShapeTreeTokenIssuerError.unableToReadPublicCoordinates
     }
 
-    // JWTKit hands back standard-base64 x/y; the JWK and the thumbprint live
-    // in base64url, so re-encode here.
     let xRaw = Data(base64Encoded: params.x) ?? Data()
     let yRaw = Data(base64Encoded: params.y) ?? Data()
     let xB64URL = xRaw.base64URLEncodedStringNoPadding()
     let yB64URL = yRaw.base64URLEncodedStringNoPadding()
     let kid = JWKThumbprint.thumbprint(crv: "P-256", x: xB64URL, y: yB64URL)
 
-    let now = Date()
-    let payload = ShapeTreeJWTPayload(
-      sub: SubjectClaim(value: kid),
-      iat: IssuedAtClaim(value: now),
-      exp: ExpirationClaim(value: now.addingTimeInterval(ttl)),
-      jti: IDClaim(value: UUID().uuidString)
+    let signingKey = try P256.Signing.PrivateKey(pemRepresentation: privateKey.pemRepresentation)
+    return try mintES256(
+      kid: kid,
+      deviceLabel: deviceLabel,
+      ttl: ttl,
+      sign: { data in try signingKey.signature(for: data).rawRepresentation }
     )
-
-    let keys = JWTKeyCollection()
-    await keys.add(ecdsa: privateKey)
-
-    var header: JWTHeader = ["typ": "JWT", "alg": "ES256", "kid": .string(kid)]
-    if let label = deviceLabel?.trimmingCharacters(in: .whitespacesAndNewlines), !label.isEmpty {
-      header.fields["dev"] = .string(label)
-    }
-
-    return try await keys.sign(payload, header: header)
   }
 
-  // MARK: - Signing-closure path (CryptoKit / Secure Enclave)
-
-  /// Builds a JWS and signs the `header.payload` input with `sign` (raw P-256 ECDSA, `r || s`, 64 bytes).
+  /// Builds a compact JWS and signs `header.payload` UTF-8 (ES256 — SHA-256 digest of the signing input, then ECDSA).
   ///
-  /// The caller supplies `kid` (thumbprint of the public key); ``ShapeTreeKeyStore`` is the typical entry point.
+  /// The caller supplies RFC 7638 `kid`; ``ShapeTreeKeyStore`` wires Secure Enclave / software keys as the typical
+  /// closure implementation.
   public static func mintES256(
     kid: String,
     deviceLabel: String? = nil,

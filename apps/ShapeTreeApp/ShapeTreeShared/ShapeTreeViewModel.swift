@@ -24,6 +24,16 @@ public final class ShapeTreeViewModel {
     "Server returned status \(code)"
   }
 
+  private static func httpErrorLine(
+    _ decode: () throws -> Components.Schemas.HTTPErrorResponse
+  ) rethrows -> String {
+    try decode().error.message
+  }
+
+  private static func undocumentedJournalLine(_ statusCode: Int, context: String) -> String {
+    messageForUndocumentedHTTPStatus(statusCode, unexpected: context)
+  }
+
   public static let serverURL = "http://localhost:42069"
 
   public var messages: [ChatMessage] = []
@@ -51,7 +61,7 @@ public final class ShapeTreeViewModel {
 
   public var serverURL: String {
     didSet {
-      resetSession()
+      invalidateOpenAPIClientAndAgentSession()
       journalSubjects.removeAll()
       journalStatus = nil
       journalError = nil
@@ -62,7 +72,8 @@ public final class ShapeTreeViewModel {
 
   public let keyStore: ShapeTreeKeyStore
 
-  private var client: Client?
+  /// Shared generated client — same bearer middleware stack for journal and chat paths.
+  private var sharedOpenAPIClient: Client?
   private var sessionId: String?
   private let transport: AsyncHTTPClientTransport
 
@@ -97,7 +108,7 @@ public final class ShapeTreeViewModel {
 
   public func regenerateDeviceKey() throws {
     try keyStore.regenerate()
-    resetSession()
+    invalidateOpenAPIClientAndAgentSession()
   }
 
   public func sendMessage() {
@@ -150,7 +161,7 @@ public final class ShapeTreeViewModel {
     inputText = ""
     isLoading = false
     errorMessage = nil
-    resetSession()
+    invalidateOpenAPIClientAndAgentSession()
 
     journalDraft = ""
     journalStatus = nil
@@ -159,19 +170,31 @@ public final class ShapeTreeViewModel {
     journalSubjects.removeAll()
   }
 
-  private func resetSession() {
+  private func openAPIClient() throws -> Client {
+    if let client = sharedOpenAPIClient {
+      return client
+    }
+    let built = try makeClient()
+    sharedOpenAPIClient = built
+    return built
+  }
+
+  private func invalidateOpenAPIClientAndAgentSession() {
+    sharedOpenAPIClient = nil
     sessionId = nil
-    client = nil
+  }
+
+  private func invalidateAgentSessionOnly() {
+    sessionId = nil
   }
 
   private func ensureSession() async throws -> Client {
-    if let client, sessionId != nil {
-      return client
+    let api = try openAPIClient()
+    if sessionId != nil {
+      return api
     }
 
-    let freshClient = try makeClient()
-
-    let response = try await freshClient.createSession(
+    let response = try await api.createSession(
       Operations.createSession.Input(body: .json(.init(systemPrompt: nil)))
     )
 
@@ -179,12 +202,10 @@ public final class ShapeTreeViewModel {
     case .ok(let ok):
       let payload = try ok.body.json
       sessionId = payload.id
-      client = freshClient
-      return freshClient
+      return api
 
     case .badRequest(let err):
-      let body = try err.body.json
-      throw AppError.server(body.error.message)
+      throw AppError.server(try Self.httpErrorLine { try err.body.json })
 
     case .undocumented(let statusCode, _):
       throw Self.errorForUndocumentedHTTPStatus(
@@ -288,14 +309,12 @@ public final class ShapeTreeViewModel {
       throw AppError.server("Stream ended unexpectedly.")
 
     case .badRequest(let err):
-      let body = try err.body.json
-      throw AppError.server(body.error.message)
+      throw AppError.server(try Self.httpErrorLine { try err.body.json })
     case .notFound:
-      resetSession()
+      invalidateAgentSessionOnly()
       throw AppError.server("Session expired. Please try again.")
     case .internalServerError(let err):
-      let body = try err.body.json
-      throw AppError.server(body.error.message)
+      throw AppError.server(try Self.httpErrorLine { try err.body.json })
     case .undocumented(let statusCode, _):
       throw Self.errorForUndocumentedHTTPStatus(
         statusCode,
@@ -331,7 +350,7 @@ public final class ShapeTreeViewModel {
     // Subject list refresh runs on tab load and from the composer; do not use the global
     // `isJournalWorking` overlay here — a slow or hung server would block the whole journal UI.
     do {
-      let remote = try makeClient()
+      let remote = try openAPIClient()
       let response = try await remote.listJournalSubjects(.init(headers: .init()))
 
       switch response {
@@ -355,13 +374,11 @@ public final class ShapeTreeViewModel {
           journalSubjects.isEmpty ? "Server returned zero subjects." : "\(journalSubjects.count) subjects loaded."
 
       case .internalServerError(let err):
-        let body = try err.body.json
-        journalError = body.error.message
+        journalError = try Self.httpErrorLine { try err.body.json }
 
       case .undocumented(let statusCode, _):
-        journalError = Self.messageForUndocumentedHTTPStatus(
-          statusCode,
-          unexpected: "Unexpected status \(statusCode) while fetching subjects.")
+        journalError = Self.undocumentedJournalLine(
+          statusCode, context: "Unexpected status \(statusCode) while fetching subjects.")
       }
     } catch {
       journalError = error.localizedDescription
@@ -396,7 +413,7 @@ public final class ShapeTreeViewModel {
     defer { isJournalWorking = false }
 
     do {
-      let remote = try makeClient()
+      let remote = try openAPIClient()
       let response = try await remote.appendJournalSubject(
         Operations.appendJournalSubject.Input(body: .json(.init(subject: name)))
       )
@@ -412,20 +429,17 @@ public final class ShapeTreeViewModel {
         return true
 
       case .badRequest(let err):
-        let body = try err.body.json
-        journalError = body.error.message
+        journalError = try Self.httpErrorLine { try err.body.json }
 
       case .internalServerError(let err):
-        let body = try err.body.json
-        journalError = body.error.message
+        journalError = try Self.httpErrorLine { try err.body.json }
 
       case .unauthorized:
         journalError = Self.unauthorizedMessage
 
       case .undocumented(let code, _):
-        journalError = Self.messageForUndocumentedHTTPStatus(
-          code,
-          unexpected: "Unexpected status \(code) while adding subject.")
+        journalError =
+          Self.undocumentedJournalLine(code, context: "Unexpected status \(code) while adding subject.")
       }
     } catch {
       journalError = error.localizedDescription
@@ -451,7 +465,7 @@ public final class ShapeTreeViewModel {
     defer { isJournalWorking = false }
 
     do {
-      let remote = try makeClient()
+      let remote = try openAPIClient()
       let payload = Components.Schemas.AppendJournalEntryRequest(
         subject_ids: Array(journalSelectedSubjectIDs).sorted(),
         body: bodyText,
@@ -471,17 +485,13 @@ public final class ShapeTreeViewModel {
           "Saved Markdown at repo path \(summary.journal_relative_path)."
 
       case .badRequest(let err):
-        let body = try err.body.json
-        journalError = body.error.message
+        journalError = try Self.httpErrorLine { try err.body.json }
 
       case .internalServerError(let err):
-        let body = try err.body.json
-        journalError = body.error.message
+        journalError = try Self.httpErrorLine { try err.body.json }
 
       case .undocumented(let code, _):
-        journalError = Self.messageForUndocumentedHTTPStatus(
-          code,
-          unexpected: "Unexpected status \(code) while appending.")
+        journalError = Self.undocumentedJournalLine(code, context: "Unexpected status \(code) while appending.")
       }
     } catch {
       journalError = error.localizedDescription
@@ -491,7 +501,7 @@ public final class ShapeTreeViewModel {
   public func fetchJournalEntrySummaries(startDayKey: String, endDayKey: String) async throws
     -> [Components.Schemas.JournalEntrySummary]
   {
-    let remote = try makeClient()
+    let remote = try openAPIClient()
     let response = try await remote.listJournalEntrySummaries(
       Operations.listJournalEntrySummaries.Input(
         query: .init(start_date: startDayKey, end_date: endDayKey)
@@ -502,11 +512,9 @@ public final class ShapeTreeViewModel {
       let payload = try packet.body.json
       return payload.entries
     case .badRequest(let err):
-      let body = try err.body.json
-      throw AppError.server(body.error.message)
+      throw AppError.server(try Self.httpErrorLine { try err.body.json })
     case .internalServerError(let err):
-      let body = try err.body.json
-      throw AppError.server(body.error.message)
+      throw AppError.server(try Self.httpErrorLine { try err.body.json })
     case .undocumented(let code, _):
       throw Self.errorForUndocumentedHTTPStatus(
         code,
@@ -517,7 +525,7 @@ public final class ShapeTreeViewModel {
   public func fetchJournalEntryDetailIfPresent(dayKey: String) async throws -> Components.Schemas
     .JournalEntryDetailResponse?
   {
-    let remote = try makeClient()
+    let remote = try openAPIClient()
     let response = try await remote.getJournalEntryDetail(
       Operations.getJournalEntryDetail.Input(path: .init(journal_day: dayKey)))
 
@@ -527,11 +535,9 @@ public final class ShapeTreeViewModel {
     case .notFound:
       return nil
     case .badRequest(let err):
-      let body = try err.body.json
-      throw AppError.server(body.error.message)
+      throw AppError.server(try Self.httpErrorLine { try err.body.json })
     case .internalServerError(let err):
-      let body = try err.body.json
-      throw AppError.server(body.error.message)
+      throw AppError.server(try Self.httpErrorLine { try err.body.json })
     case .undocumented(let code, _):
       throw Self.errorForUndocumentedHTTPStatus(
         code,

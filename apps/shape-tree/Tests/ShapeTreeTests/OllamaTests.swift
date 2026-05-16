@@ -35,7 +35,7 @@ import Testing
     let sessionId: String = try await client.execute(
       uri: "/sessions",
       method: .post,
-      headers: try await JWTTestSupport.bearerHeaders(fixture),
+      headers: try JWTTestSupport.bearerHeaders(fixture),
       body: ByteBuffer(string: createBody)
     ) { response in
       #expect(response.status == .ok)
@@ -52,7 +52,7 @@ import Testing
     try await client.execute(
       uri: "/sessions/\(sessionId)/completions/stream",
       method: .post,
-      headers: try await JWTTestSupport.bearerHeaders(fixture),
+      headers: try JWTTestSupport.bearerHeaders(fixture),
       body: ByteBuffer(string: completionBody)
     ) { response in
       #expect(response.status == .ok)

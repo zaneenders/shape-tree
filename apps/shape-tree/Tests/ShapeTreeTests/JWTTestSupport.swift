@@ -56,16 +56,13 @@ enum JWTTestSupport {
   }
 
   /// Minted bearer headers using the fixture's private key.
-  static func bearerHeaders(_ fixture: Fixture, label: String = "test-device") async throws -> HTTPFields {
-    let token = try await ShapeTreeTokenIssuer.mintES256(
-      privateKey: fixture.privateKey,
-      deviceLabel: label
-    )
+  static func bearerHeaders(_ fixture: Fixture, label: String = "test-device") throws -> HTTPFields {
+    let token = try ShapeTreeTokenIssuer.mintES256(privateKey: fixture.privateKey, deviceLabel: label)
     return [.authorization: "Bearer \(token)"]
   }
 
-  static func mintToken(_ fixture: Fixture, label: String = "test-device") async throws -> String {
-    try await ShapeTreeTokenIssuer.mintES256(privateKey: fixture.privateKey, deviceLabel: label)
+  static func mintToken(_ fixture: Fixture, label: String = "test-device") throws -> String {
+    try ShapeTreeTokenIssuer.mintES256(privateKey: fixture.privateKey, deviceLabel: label)
   }
 
   // MARK: - Helpers

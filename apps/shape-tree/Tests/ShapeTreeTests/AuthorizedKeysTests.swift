@@ -208,7 +208,7 @@ struct AuthorizedKeysTests {
       try await client.execute(
         uri: "/journal/subjects",
         method: .get,
-        headers: try await JWTTestSupport.bearerHeaders(fixture)
+        headers: try JWTTestSupport.bearerHeaders(fixture)
       ) { response in
         #expect(response.status == .unauthorized)
       }
@@ -233,7 +233,7 @@ struct AuthorizedKeysTests {
       try await client.execute(
         uri: "/journal/subjects",
         method: .get,
-        headers: try await JWTTestSupport.bearerHeaders(fixture)
+        headers: try JWTTestSupport.bearerHeaders(fixture)
       ) { response in
         #expect(response.status == .ok)
       }
@@ -244,7 +244,7 @@ struct AuthorizedKeysTests {
       try await client.execute(
         uri: "/journal/subjects",
         method: .get,
-        headers: try await JWTTestSupport.bearerHeaders(fixture)
+        headers: try JWTTestSupport.bearerHeaders(fixture)
       ) { response in
         #expect(response.status == .unauthorized)
       }
