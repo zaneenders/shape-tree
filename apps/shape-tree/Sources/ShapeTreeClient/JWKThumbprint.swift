@@ -1,12 +1,6 @@
 import Crypto
 import Foundation
 
-/// RFC 7638 JWK thumbprint helpers (P-256 only — see auth.md, "Why ES256 everywhere").
-///
-/// The thumbprint is the base64url-encoded SHA-256 of the canonical JWK JSON
-/// (members `crv`, `kty`, `x`, `y` in lexicographic order, no whitespace, no padding).
-/// Same value used as the `kid`, the `authorized_keys/<kid>.jwk` filename, and the
-/// JWT `sub` claim.
 public enum JWKThumbprint {
 
   /// Regex shape for a P-256 JWK thumbprint: 43 base64url chars (`[A-Za-z0-9_-]`), no padding.
@@ -78,5 +72,12 @@ extension Data {
     let pad = (4 - s.count % 4) % 4
     s.append(String(repeating: "=", count: pad))
     return Data(base64Encoded: s)
+  }
+
+  /// Decodes a JWK EC `x`/`y` string: **base64url** first (RFC 7518), then standard base64 (some JWTKit paths).
+  public static func jwkCoordinateBytes(from string: String) -> Data? {
+    if let d = Data.fromBase64URLNoPadding(string), !d.isEmpty { return d }
+    if let d = Data(base64Encoded: string), !d.isEmpty { return d }
+    return nil
   }
 }

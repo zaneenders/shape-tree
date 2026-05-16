@@ -2,78 +2,76 @@ import Crypto
 import Foundation
 import JWTKit
 
-/// Mints ES256 JWTs against the SSH-`authorized_keys`-style trust store
-/// (auth.md, "JWT shape").
-///
-/// Lives in ``ShapeTreeClient`` because every frontend (CLI, iOS app, macOS
-/// app) needs to sign tokens with its on-device private key, and the test
-/// suite of the server target re-uses the same helper for fixture tokens.
+/// ES256 JWT minting for the `authorized_keys` trust model. Claims must match ``ShapeTreeJWTPayload``.
 public enum ShapeTreeTokenIssuer {
 
+  /// JWTKit private key path for tests/tooling (PEM round-trip to CryptoKit).
   public static func mintES256(
     privateKey: ECDSA.PrivateKey<P256>,
     deviceLabel: String? = nil,
     ttl: TimeInterval = 900
-  ) async throws -> String {
+  ) throws -> String {
     guard let params = privateKey.parameters else {
       throw ShapeTreeTokenIssuerError.unableToReadPublicCoordinates
     }
 
-    // JWTKit hands back standard-base64 x/y; the JWK and the thumbprint live
-    // in base64url, so re-encode here.
-    let xRaw = Data(base64Encoded: params.x) ?? Data()
-    let yRaw = Data(base64Encoded: params.y) ?? Data()
+    guard let xRaw = Data.jwkCoordinateBytes(from: params.x),
+      let yRaw = Data.jwkCoordinateBytes(from: params.y)
+    else {
+      throw ShapeTreeTokenIssuerError.unableToReadPublicCoordinates
+    }
+
     let xB64URL = xRaw.base64URLEncodedStringNoPadding()
     let yB64URL = yRaw.base64URLEncodedStringNoPadding()
     let kid = JWKThumbprint.thumbprint(crv: "P-256", x: xB64URL, y: yB64URL)
 
-    let now = Date()
-    let payload = ShapeTreeAuthJWTPayload(
-      sub: SubjectClaim(value: kid),
-      iat: IssuedAtClaim(value: now),
-      exp: ExpirationClaim(value: now.addingTimeInterval(ttl)),
-      jti: IDClaim(value: UUID().uuidString)
+    let signingKey = try P256.Signing.PrivateKey(pemRepresentation: privateKey.pemRepresentation)
+    return try mintES256(
+      kid: kid,
+      deviceLabel: deviceLabel,
+      ttl: ttl,
+      sign: { data in try signingKey.signature(for: data).rawRepresentation }
     )
+  }
 
-    let keys = JWTKeyCollection()
-    await keys.add(ecdsa: privateKey)
+  /// Canonical mint: sorted JSON header/payload, base64url, ES256 over signing input. Caller supplies `kid` + `sign`.
+  public static func mintES256(
+    kid: String,
+    deviceLabel: String? = nil,
+    ttl: TimeInterval = 900,
+    sign: (Data) throws -> Data
+  ) throws -> String {
+    let label = deviceLabel?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    let now = Int(Date().timeIntervalSince1970)
 
-    var header: JWTHeader = ["typ": "JWT", "alg": "ES256", "kid": .string(kid)]
-    if let label = deviceLabel?.trimmingCharacters(in: .whitespacesAndNewlines), !label.isEmpty {
-      header.fields["dev"] = .string(label)
+    var headerFields: [String: String] = [
+      "typ": "JWT",
+      "alg": "ES256",
+      "kid": kid,
+    ]
+    if !label.isEmpty {
+      headerFields["dev"] = label
     }
 
-    return try await keys.sign(payload, header: header)
+    let payloadFields: [String: Any] = [
+      "sub": kid,
+      "iat": now,
+      "exp": now + Int(ttl),
+      "jti": UUID().uuidString,
+    ]
+
+    let headerJSON = try JSONSerialization.data(withJSONObject: headerFields, options: [.sortedKeys])
+    let payloadJSON = try JSONSerialization.data(withJSONObject: payloadFields, options: [.sortedKeys])
+
+    let h = headerJSON.base64URLEncodedStringNoPadding()
+    let p = payloadJSON.base64URLEncodedStringNoPadding()
+    let signingInput = Data("\(h).\(p)".utf8)
+    let signature = try sign(signingInput)
+    let s = signature.base64URLEncodedStringNoPadding()
+    return "\(h).\(p).\(s)"
   }
 }
 
 public enum ShapeTreeTokenIssuerError: Error, Equatable, Sendable {
   case unableToReadPublicCoordinates
-}
-
-/// Lightweight payload type used by ``ShapeTreeTokenIssuer`` for signing.
-///
-/// Mirrors the server's `ShapeTreeJWTPayload` claim set; kept as a separate
-/// type so the public client SDK doesn't depend on the server target.
-public struct ShapeTreeAuthJWTPayload: JWTPayload {
-  public var sub: SubjectClaim
-  public var iat: IssuedAtClaim
-  public var exp: ExpirationClaim
-  public var jti: IDClaim?
-
-  public init(
-    sub: SubjectClaim,
-    iat: IssuedAtClaim,
-    exp: ExpirationClaim,
-    jti: IDClaim? = nil
-  ) {
-    self.sub = sub
-    self.iat = iat
-    self.exp = exp
-    self.jti = jti
-  }
-
-  public func verify(using _: some JWTAlgorithm) throws {
-    try exp.verifyNotExpired()
-  }
 }

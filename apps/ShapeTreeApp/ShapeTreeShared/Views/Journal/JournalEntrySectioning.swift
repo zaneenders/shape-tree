@@ -2,9 +2,6 @@ import SwiftUI
 
 enum JournalEntrySectioning {
 
-  /// Strips per-block ISO‑8601 instant lines ShapeTree may persist between `# heading` and the body
-  /// (Scribe-shaped journals have no timestamp in the prose). Requires a flex gap after the instant so
-  /// we still match when the body follows on the next line or after a blank line.
   private static func strippingLegacyHeadingTimestamps(_ raw: String) -> String {
     guard
       let regex = try? NSRegularExpression(
@@ -16,9 +13,6 @@ enum JournalEntrySectioning {
     return regex.stringByReplacingMatches(in: raw, options: [], range: range, withTemplate: "$1\n")
   }
 
-  /// Splits raw journal markdown on lines that are thematic breaks (three or more `-` after trimming whitespace).
-  ///
-  /// **Note:** A line of only dashes inside entry *body* becomes a visible section boundary (unlike the older reader that stripped `-----`). Prefer prose or headings if you need a horizontal rule without splitting.
   static func sections(from raw: String) -> [String] {
     let unified = strippingLegacyHeadingTimestamps(raw.replacingOccurrences(of: "\r\n", with: "\n"))
     var result: [String] = []
@@ -70,7 +64,6 @@ struct JournalEntrySectionedBody: View {
   let sections: [String]
   var textFont: Font
   var lineSpacing: CGFloat
-  /// Scribe journals read as continuous markdown; ornate dividers suit internal tooling previews.
   var sectionSeparator: SectionSeparator = .iconRule
 
   enum SectionSeparator {
@@ -91,10 +84,8 @@ struct JournalEntrySectionedBody: View {
               .frame(height: 20)
           }
         }
-        // Scribe’s reader uses plain `Text(section)` so layout is predictable. We still want
-        // markdown (headings, links), but a single `.font` on `Text(AttributedString)` collapses
-        // typography to one run—everything looks “mashed” and `#` headings never read as headings.
-        // SwiftUI only gets explicit sizes if we copy presentation intents into per-range fonts.
+        // A single `.font` on `Text(AttributedString)` collapses all typography to one run —
+        // headings never look like headings. Per-range fonts from presentation intents fix this.
         Text(styledJournalMarkdown(section))
           .lineSpacing(lineSpacing)
           .multilineTextAlignment(.leading)

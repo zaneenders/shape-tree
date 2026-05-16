@@ -3,55 +3,38 @@ import Foundation
 import Security
 import ShapeTreeClient
 
-/// On-device P-256 keypair manager (auth.md, "App (iOS / macOS) changes").
-///
-/// On Secure Enclave-capable devices (real iPhones, Apple silicon Macs) the
-/// private key is created by the Enclave and is non-exportable; we persist
-/// only the opaque `dataRepresentation` blob in the Keychain. On Simulator
-/// and Intel Macs the SE is unavailable, so we fall back to a software
-/// `P256.Signing.PrivateKey` whose raw bytes are stored in the Keychain.
-///
-/// Either way the public surface is the same: `mintES256JWT(...)` produces a
-/// short-lived bearer token, `publicJWK()` returns the JWK to drop into the
-/// server's `authorized_keys/<kid>.jwk`.
 @MainActor
 public final class ShapeTreeKeyStore {
-
-  public enum Backing {
-    case secureEnclave(SecureEnclave.P256.Signing.PrivateKey)
-    case software(P256.Signing.PrivateKey)
-  }
 
   public enum KeyStoreError: Error, LocalizedError {
     case keychain(OSStatus)
     case missingMaterial
-    case signingFailed
     case malformedKeyMaterial
+    case secureEnclaveUnavailable
 
     public var errorDescription: String? {
       switch self {
       case .keychain(let s): return "Keychain error: OSStatus \(s)"
       case .missingMaterial: return "Device key material missing — generate a key first."
-      case .signingFailed: return "Failed to sign JWT with on-device key."
-      case .malformedKeyMaterial: return "Stored key material is malformed; regenerate."
+      case .malformedKeyMaterial:
+        return "Stored key material is malformed — remove it under Connection settings, then regenerate."
+      case .secureEnclaveUnavailable:
+        return "The Secure Enclave is not available on this device."
       }
     }
   }
 
-  /// Bumped if we ever change the on-disk serialization format.
   private static let keychainService = "org.shapetree.shapetree-client.es256"
   private static let keychainAccount = "device-p256-v1"
   private static let labelDefaultsKey = "shape_tree_device_label"
 
-  private var cached: Backing?
+  private var cached: SecureEnclave.P256.Signing.PrivateKey?
   private let labelOverride: String?
 
   public init(labelOverride: String? = nil) {
     self.labelOverride = labelOverride
   }
 
-  /// Operator-friendly device name. Persists across launches; never used for
-  /// authorization, only as the JWT `dev` header for log breadcrumbs.
   public var deviceLabel: String {
     get {
       if let labelOverride { return labelOverride }
@@ -72,36 +55,31 @@ public final class ShapeTreeKeyStore {
     }
   }
 
-  /// Returns true once a key has been provisioned (either freshly minted or
-  /// loaded from the Keychain).
   public var hasKey: Bool {
     if cached != nil { return true }
     return (try? readKeychainBytes()) != nil
   }
 
-  /// Lazily ensures a keypair exists. Idempotent: cheap to call on every request.
   @discardableResult
-  public func loadOrGenerate() throws -> Backing {
+  public func loadOrGenerate() throws -> SecureEnclave.P256.Signing.PrivateKey {
     if let cached { return cached }
     if let raw = try readKeychainBytes() {
-      let backing = try Self.deserialize(raw)
-      cached = backing
-      return backing
+      let key = try Self.deserialize(raw)
+      cached = key
+      return key
     }
-    let backing = try Self.generate()
-    try writeKeychainBytes(Self.serialize(backing))
-    cached = backing
-    return backing
+    let key = try Self.generate()
+    try writeKeychainBytes(Self.serialize(key))
+    cached = key
+    return key
   }
 
-  /// Replaces the keypair with a fresh one. Existing tokens stop verifying as
-  /// soon as the server's old `<old-kid>.jwk` is removed (auth.md, "Routine reset").
   @discardableResult
-  public func regenerate() throws -> Backing {
-    let backing = try Self.generate()
-    try writeKeychainBytes(Self.serialize(backing))
-    cached = backing
-    return backing
+  public func regenerate() throws -> SecureEnclave.P256.Signing.PrivateKey {
+    let key = try Self.generate()
+    try writeKeychainBytes(Self.serialize(key))
+    cached = key
+    return key
   }
 
   public func deleteKeyMaterial() throws {
@@ -120,11 +98,8 @@ public final class ShapeTreeKeyStore {
   // MARK: - Public key surface
 
   public func publicX963Representation() throws -> Data {
-    let backing = try loadOrGenerate()
-    switch backing {
-    case .secureEnclave(let key): return key.publicKey.x963Representation
-    case .software(let key): return key.publicKey.x963Representation
-    }
+    let key = try loadOrGenerate()
+    return key.publicKey.x963Representation
   }
 
   public func kid() throws -> String {
@@ -132,8 +107,6 @@ public final class ShapeTreeKeyStore {
     return try JWKThumbprint.thumbprint(rawP256PublicKey: raw)
   }
 
-  /// Returns the public JWK with `kid` and `label` baked in — same shape the
-  /// server expects in `authorized_keys/<kid>.jwk`.
   public func publicJWK() throws -> [String: String] {
     let raw = try publicX963Representation()
     let xRaw = raw.subdata(in: 1..<33)
@@ -153,8 +126,6 @@ public final class ShapeTreeKeyStore {
     ]
   }
 
-  /// Pretty-printed JSON of `publicJWK()`, ready to copy into the server
-  /// trust store as `<kid>.jwk`.
   public func publicJWKJSON() throws -> String {
     let dict = try publicJWK()
     let data = try JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted, .sortedKeys])
@@ -163,75 +134,40 @@ public final class ShapeTreeKeyStore {
 
   // MARK: - Signing
 
-  public func sign(_ data: Data) throws -> Data {
-    let backing = try loadOrGenerate()
-    do {
-      switch backing {
-      case .secureEnclave(let key): return try key.signature(for: data).rawRepresentation
-      case .software(let key): return try key.signature(for: data).rawRepresentation
-      }
-    } catch {
-      throw KeyStoreError.signingFailed
-    }
-  }
-
-  /// Mints an ES256 JWT signed by the on-device key (auth.md, "JWT shape").
+  /// Preferred app entry point for auth headers; signs via ``ShapeTreeTokenIssuer``.
   public func mintES256JWT(ttl: TimeInterval = 900) throws -> String {
     let kid = try kid()
     let label = deviceLabel
-    let now = Int(Date().timeIntervalSince1970)
-
-    let header: [String: String] = [
-      "typ": "JWT",
-      "alg": "ES256",
-      "kid": kid,
-      "dev": label,
-    ]
-    let payload: [String: Any] = [
-      "sub": kid,
-      "iat": now,
-      "exp": now + Int(ttl),
-      "jti": UUID().uuidString,
-    ]
-
-    let headerJSON = try JSONSerialization.data(withJSONObject: header, options: [.sortedKeys])
-    let payloadJSON = try JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys])
-
-    let h = headerJSON.base64URLEncodedStringNoPadding()
-    let p = payloadJSON.base64URLEncodedStringNoPadding()
-    let signingInput = Data("\(h).\(p)".utf8)
-    let signature = try sign(signingInput)
-    let s = signature.base64URLEncodedStringNoPadding()
-    return "\(h).\(p).\(s)"
+    let key = try loadOrGenerate()
+    return try ShapeTreeTokenIssuer.mintES256(
+      kid: kid,
+      deviceLabel: label,
+      ttl: ttl,
+      sign: { data in
+        try key.signature(for: data).rawRepresentation
+      }
+    )
   }
 
   // MARK: - Internals
 
-  private static func generate() throws -> Backing {
-    if SecureEnclave.isAvailable {
-      let key = try SecureEnclave.P256.Signing.PrivateKey()
-      return .secureEnclave(key)
-    } else {
-      let key = P256.Signing.PrivateKey()
-      return .software(key)
+  private static func generate() throws -> SecureEnclave.P256.Signing.PrivateKey {
+    guard SecureEnclave.isAvailable else {
+      throw KeyStoreError.secureEnclaveUnavailable
     }
+    return try SecureEnclave.P256.Signing.PrivateKey()
   }
 
-  private static func serialize(_ backing: Backing) -> Data {
-    switch backing {
-    case .secureEnclave(let key): return key.dataRepresentation
-    case .software(let key): return key.rawRepresentation
-    }
+  private static func serialize(_ key: SecureEnclave.P256.Signing.PrivateKey) -> Data {
+    key.dataRepresentation
   }
 
-  private static func deserialize(_ data: Data) throws -> Backing {
-    if SecureEnclave.isAvailable {
-      if let key = try? SecureEnclave.P256.Signing.PrivateKey(dataRepresentation: data) {
-        return .secureEnclave(key)
-      }
+  private static func deserialize(_ data: Data) throws -> SecureEnclave.P256.Signing.PrivateKey {
+    guard SecureEnclave.isAvailable else {
+      throw KeyStoreError.secureEnclaveUnavailable
     }
-    if let key = try? P256.Signing.PrivateKey(rawRepresentation: data) {
-      return .software(key)
+    if let key = try? SecureEnclave.P256.Signing.PrivateKey(dataRepresentation: data) {
+      return key
     }
     throw KeyStoreError.malformedKeyMaterial
   }

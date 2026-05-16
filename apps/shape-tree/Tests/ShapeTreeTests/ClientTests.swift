@@ -16,13 +16,11 @@ struct ClientTests {
   @Test func createSession() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.client-create-session")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: store,
-      journalService: journal,
-      journalQuery: journalQuery,
+      journalStore: journal,
       authorizedKeys: fixture.store,
       log: log
     )
@@ -32,7 +30,7 @@ struct ClientTests {
       let port = try #require(client.port, "Expected live server to have a port")
 
       let transport = AsyncHTTPClientTransport()
-      let token = try await JWTTestSupport.mintToken(fixture)
+      let token = try JWTTestSupport.mintToken(fixture)
       let api = Client(
         serverURL: URL(string: "http://localhost:\(port)")!,
         transport: transport,
@@ -58,13 +56,11 @@ struct ClientTests {
   @Test func listJournalSubjects() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.client-journal-subjects")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: store,
-      journalService: journal,
-      journalQuery: journalQuery,
+      journalStore: journal,
       authorizedKeys: fixture.store,
       log: log)
     let app = Application(router: router)
@@ -72,7 +68,7 @@ struct ClientTests {
     try await app.test(.live) { client in
       let port = try #require(client.port)
       let transport = AsyncHTTPClientTransport()
-      let token = try await JWTTestSupport.mintToken(fixture)
+      let token = try JWTTestSupport.mintToken(fixture)
       let api = Client(
         serverURL: URL(string: "http://localhost:\(port)")!,
         transport: transport,
@@ -88,13 +84,11 @@ struct ClientTests {
   @Test func appendJournalSubjectViaGeneratedClient() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.client-append-subject")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: store,
-      journalService: journal,
-      journalQuery: journalQuery,
+      journalStore: journal,
       authorizedKeys: fixture.store,
       log: log)
     let app = Application(router: router)
@@ -102,7 +96,7 @@ struct ClientTests {
     try await app.test(.live) { client in
       let port = try #require(client.port)
       let transport = AsyncHTTPClientTransport()
-      let token = try await JWTTestSupport.mintToken(fixture)
+      let token = try JWTTestSupport.mintToken(fixture)
       let api = Client(
         serverURL: URL(string: "http://localhost:\(port)")!,
         transport: transport,
@@ -120,13 +114,11 @@ struct ClientTests {
   @Test func completionStreamWithMalformedSessionId() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.client-stream-bad-id")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: store,
-      journalService: journal,
-      journalQuery: journalQuery,
+      journalStore: journal,
       authorizedKeys: fixture.store,
       log: log)
     let app = Application(router: router)
@@ -135,7 +127,7 @@ struct ClientTests {
       let port = try #require(client.port)
 
       let transport = AsyncHTTPClientTransport()
-      let token = try await JWTTestSupport.mintToken(fixture)
+      let token = try JWTTestSupport.mintToken(fixture)
       let api = Client(
         serverURL: URL(string: "http://localhost:\(port)")!,
         transport: transport,
@@ -158,13 +150,11 @@ struct ClientTests {
   @Test func completionStreamWithNonexistentSession() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.client-stream-not-found")
-    let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let journalQuery = JournalQueryService(layout: layout, log: log)
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
     let router = buildRoutes(
       store: store,
-      journalService: journal,
-      journalQuery: journalQuery,
+      journalStore: journal,
       authorizedKeys: fixture.store,
       log: log)
     let app = Application(router: router)
@@ -173,7 +163,7 @@ struct ClientTests {
       let port = try #require(client.port)
 
       let transport = AsyncHTTPClientTransport()
-      let token = try await JWTTestSupport.mintToken(fixture)
+      let token = try JWTTestSupport.mintToken(fixture)
       let api = Client(
         serverURL: URL(string: "http://localhost:\(port)")!,
         transport: transport,

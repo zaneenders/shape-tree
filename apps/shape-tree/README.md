@@ -4,11 +4,13 @@ Hummingbird server wrapping ScribeAgent.
 
 ## Configuration
 
-All values are **required**. Create `shape-tree-config.json` in the working directory:
+All non-`server.host` values are **required**. Create `shape-tree-config.json` in the working
+directory:
 
 ```json
 {
   "server": {
+    "host": "127.0.0.1",
     "port": 42069
   },
   "data": {
@@ -23,22 +25,30 @@ All values are **required**. Create `shape-tree-config.json` in the working dire
     "systemPrompt": "You are a helpful coding assistant.",
     "contextWindow": 131072,
     "contextWindowThreshold": 0.85
+  },
+  "journal": {
+    "commitAuthor": {
+      "name": "ShapeTree",
+      "email": "shape-tree@localhost"
+    }
   }
 }
 ```
 
-`server.port` is the listener. `data.path` is the **absolute or relative directory `R`** for all
-mutable ShapeTree files; relative paths (including `"."`) resolve against the server process working
-directory. Journal git state, `journal-subjects.json`, **and the ES256 trust store** live under
-`R/.shape-tree/`. For local development, set `data.path` to the repository root and ignore
+`server.port` is the listener port. `server.host` is the bind address — **defaults to `127.0.0.1`
+(loopback only)** when omitted. Set it to a specific LAN IP only when you intend to expose the
+server to other devices, and only behind TLS (the server speaks plain HTTP). Setting it to
+`0.0.0.0` logs a warning at startup. `data.path` is the **absolute or relative directory `R`** for
+all mutable ShapeTree files; relative paths (including `"."`) resolve against the server process
+working directory. Journal git state, `journal-subjects.json`, **and the ES256 trust store** live
+under `R/.shape-tree/`. For local development, set `data.path` to the repository root and ignore
 `.shape-tree/` via git (see repo `.gitignore`). `ollama.token` may be empty when no bearer token is
 required (e.g. local Ollama).
 
 ## Authentication: per-device ES256 keys
 
-ShapeTree uses an SSH-`authorized_keys`-style trust model. Each frontend (CLI, iOS app, Mac app)
-owns a P-256 private key; the server only knows public keys. The full design lives in
-[`.dev/auth.md`](../../.dev/auth.md); this section covers the day-to-day usage.
+ShapeTree uses an SSH-`authorized_keys`-style trust model. Each frontend (iOS app, Mac app)
+owns a P-256 private key; the server only knows public keys.
 
 ### Trust store
 
@@ -68,30 +78,15 @@ JWTs carry:
 - `sub == kid`, plus `iat`, `exp`, and a random `jti`. TTL is short (5–15 minutes); clients mint
   fresh tokens per request.
 
-### Bootstrapping a CLI device
+The middleware enforces three claim-level pins on top of the signature check:
 
-From `apps/shape-tree`:
-
-```bash
-swift run ShapeTreeClientCLI keygen --label "$(hostname -s)"
-```
-
-This creates a P-256 keypair under `~/.config/shape-tree/`:
-
-- `id_p256.pem` — private key, `0600`.
-- `id_p256.meta.json` — cached `kid` and label, `0600`.
-- `id_p256.pub.jwk` — public JWK with `kid` and `label` baked in, `0644`.
-
-`keygen` prints the public JWK and the thumbprint. To enroll the CLI on a server you control:
-
-```bash
-cp ~/.config/shape-tree/id_p256.pub.jwk \
-   "$DATA_ROOT/.shape-tree/authorized_keys/$(jq -r .kid ~/.config/shape-tree/id_p256.pub.jwk).jwk"
-```
-
-(In a hardened deploy this is a `sudo install -o root -g shape-tree -m 0640 …` against
-`/opt/shape-tree/data/.shape-tree/authorized_keys/`. See `.dev/auth.md`, "Install layout and
-permissions".)
+- `iat` must fall inside `[now − 30 min, now + 60 s]`. Bounds the effective lifetime of any single
+  token regardless of what `exp` the issuer chose, and tolerates small positive clock skew.
+- `jti` is **mandatory** and must be non-empty. The server records every admitted `(kid, jti)` in
+  the in-process ``JWTReplayCache`` until that token's `exp`, so a captured token cannot be
+  replayed inside its TTL. The cache is per-process; if you run the server as multiple replicas
+  in front of a single trust store you must replace it with a shared store.
+- `sub` must equal `kid`, so a token signed by enrolled key A cannot impersonate enrolled key B.
 
 ### Bootstrapping an iOS / macOS app device
 
@@ -103,19 +98,6 @@ JWK so it can be eyeballed against the filename.
 
 "Regenerate device key" wipes and re-creates the on-device keypair; the operator must re-enroll
 the new public JWK before the device can call the server.
-
-### Tokens (CLI)
-
-```bash
-# Print a 15-minute ES256 JWT signed with ~/.config/shape-tree/id_p256.pem.
-swift run ShapeTreeClientCLI mint-token
-
-# Drop into the interactive REPL — auto-mints a token from the on-disk key.
-swift run ShapeTreeClientCLI
-
-# REPL with a token you minted yourself.
-swift run ShapeTreeClientCLI --token "$(swift run ShapeTreeClientCLI mint-token)"
-```
 
 There is no shared secret: nothing in the config file or in any client image authorizes a request.
 The trust anchor is the `<thumbprint>.jwk` file on the server.
