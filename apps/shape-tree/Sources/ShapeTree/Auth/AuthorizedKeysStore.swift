@@ -1,7 +1,6 @@
 import Crypto
 import Foundation
 import JWTKit
-import Logging
 import ShapeTreeClient
 
 struct AuthorizedKeysStore: Sendable {
@@ -33,17 +32,14 @@ struct AuthorizedKeysStore: Sendable {
 
     let url = directory.appendingPathComponent("\(kid).jwk", isDirectory: false)
 
-    let attrs: [FileAttributeKey: Any]
+    let resourceValues: URLResourceValues
     do {
-      attrs = try FileManager.default.attributesOfItem(atPath: url.path)
+      resourceValues = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
     } catch {
       throw LookupError.missing
     }
-
-    if let type = attrs[.type] as? FileAttributeType {
-      if type == .typeSymbolicLink { throw LookupError.symlink }
-      if type != .typeRegular { throw LookupError.missing }
-    }
+    if resourceValues.isSymbolicLink == true { throw LookupError.symlink }
+    guard resourceValues.isRegularFile == true else { throw LookupError.missing }
 
     let data: Data
     do {
@@ -59,14 +55,19 @@ struct AuthorizedKeysStore: Sendable {
       throw LookupError.malformed("JSON decode failed: \(error.localizedDescription)")
     }
 
-    if jwk.kty != "EC" {
+    return try makeStoredKey(jwk: jwk, kid: kid)
+  }
+
+  private func makeStoredKey(jwk: JWKFile, kid: String) throws -> StoredKey {
+    guard jwk.kty == "EC" else {
       throw LookupError.malformed("kty must be \"EC\", got \"\(jwk.kty)\"")
     }
-    if jwk.crv != "P-256" {
+    guard jwk.crv == "P-256" else {
       throw LookupError.malformed("crv must be \"P-256\", got \"\(jwk.crv)\"")
     }
-    if jwk.d != nil {
-      throw LookupError.malformed("authorized_keys entry must not contain a private \"d\" parameter")
+    guard jwk.d == nil else {
+      throw LookupError.malformed(
+        "authorized_keys entry must not contain a private \"d\" parameter")
     }
 
     let publicKey: ECDSA.PublicKey<P256>
@@ -76,12 +77,12 @@ struct AuthorizedKeysStore: Sendable {
       throw LookupError.malformed("invalid P-256 (x, y): \(error.localizedDescription)")
     }
 
-    let recomputed = JWKThumbprint.thumbprint(crv: "P-256", x: jwk.x, y: jwk.y)
-    if recomputed != kid {
-      throw LookupError.filenameMismatch(expected: kid, fromFile: recomputed)
+    let thumbprint = JWKThumbprint.thumbprint(crv: "P-256", x: jwk.x, y: jwk.y)
+    guard thumbprint == kid else {
+      throw LookupError.filenameMismatch(expected: kid, fromFile: thumbprint)
     }
 
-    return StoredKey(publicKey: publicKey, thumbprint: recomputed, label: jwk.label)
+    return StoredKey(publicKey: publicKey, thumbprint: thumbprint, label: jwk.label)
   }
 }
 
@@ -97,5 +98,4 @@ private struct JWKFile: Decodable {
   let y: String
   let d: String?
   let label: String?
-  let kid: String?
 }
