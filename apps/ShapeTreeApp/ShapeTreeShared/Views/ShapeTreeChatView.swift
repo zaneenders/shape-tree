@@ -99,11 +99,8 @@ private struct ShapeTreeMainTabBar: View {
   }
 }
 
-/// Main chat view for the ShapeTree client app.
 struct ShapeTreeChatView: View {
-  /// Batches chat list scroll signals so one `onChange` runs per update instead of several
-  /// (e.g. `messages.last?.scrollFingerprint` is `String?`, and multiple per-frame `onChange`
-  /// callbacks each driving `scrollToBottom` tripped “updated multiple times per frame”).
+  // Coalesces scroll signals to prevent multiple per-frame scrollToBottom calls.
   private struct ChatScrollDriver: Equatable {
     var messageCount: Int
     var lastScrollFingerprint: String?

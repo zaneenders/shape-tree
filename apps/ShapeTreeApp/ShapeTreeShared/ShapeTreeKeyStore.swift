@@ -3,17 +3,6 @@ import Foundation
 import Security
 import ShapeTreeClient
 
-/// On-device P-256 keypair manager (auth.md, "App (iOS / macOS) changes").
-///
-/// On Secure Enclave-capable devices (real iPhones, Apple silicon Macs) the
-/// private key is created by the Enclave and is non-exportable; we persist
-/// only the opaque `dataRepresentation` blob in the Keychain. On Simulator
-/// and Intel Macs the SE is unavailable, so we fall back to a software
-/// `P256.Signing.PrivateKey` whose raw bytes are stored in the Keychain.
-///
-/// Either way the public surface is the same: `mintES256JWT(...)` produces a
-/// short-lived bearer token, `publicJWK()` returns the JWK to drop into the
-/// server's `authorized_keys/<kid>.jwk`.
 @MainActor
 public final class ShapeTreeKeyStore {
 
@@ -36,7 +25,6 @@ public final class ShapeTreeKeyStore {
     }
   }
 
-  /// Bumped if we ever change the on-disk serialization format.
   private static let keychainService = "org.shapetree.shapetree-client.es256"
   private static let keychainAccount = "device-p256-v1"
   private static let labelDefaultsKey = "shape_tree_device_label"
@@ -48,8 +36,6 @@ public final class ShapeTreeKeyStore {
     self.labelOverride = labelOverride
   }
 
-  /// Operator-friendly device name. Persists across launches; never used for
-  /// authorization, only as the JWT `dev` header for log breadcrumbs.
   public var deviceLabel: String {
     get {
       if let labelOverride { return labelOverride }
@@ -70,14 +56,11 @@ public final class ShapeTreeKeyStore {
     }
   }
 
-  /// Returns true once a key has been provisioned (either freshly minted or
-  /// loaded from the Keychain).
   public var hasKey: Bool {
     if cached != nil { return true }
     return (try? readKeychainBytes()) != nil
   }
 
-  /// Lazily ensures a keypair exists. Idempotent: cheap to call on every request.
   @discardableResult
   public func loadOrGenerate() throws -> Backing {
     if let cached { return cached }
@@ -92,8 +75,6 @@ public final class ShapeTreeKeyStore {
     return backing
   }
 
-  /// Replaces the keypair with a fresh one. Existing tokens stop verifying as
-  /// soon as the server's old `<old-kid>.jwk` is removed (auth.md, "Routine reset").
   @discardableResult
   public func regenerate() throws -> Backing {
     let backing = try Self.generate()
@@ -130,8 +111,6 @@ public final class ShapeTreeKeyStore {
     return try JWKThumbprint.thumbprint(rawP256PublicKey: raw)
   }
 
-  /// Returns the public JWK with `kid` and `label` baked in — same shape the
-  /// server expects in `authorized_keys/<kid>.jwk`.
   public func publicJWK() throws -> [String: String] {
     let raw = try publicX963Representation()
     let xRaw = raw.subdata(in: 1..<33)
@@ -151,8 +130,6 @@ public final class ShapeTreeKeyStore {
     ]
   }
 
-  /// Pretty-printed JSON of `publicJWK()`, ready to copy into the server
-  /// trust store as `<kid>.jwk`.
   public func publicJWKJSON() throws -> String {
     let dict = try publicJWK()
     let data = try JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted, .sortedKeys])
@@ -161,7 +138,6 @@ public final class ShapeTreeKeyStore {
 
   // MARK: - Signing
 
-  /// Mints an ES256 JWT signed by the on-device key (auth.md, "JWT shape").
   public func mintES256JWT(ttl: TimeInterval = 900) throws -> String {
     let kid = try kid()
     let label = deviceLabel

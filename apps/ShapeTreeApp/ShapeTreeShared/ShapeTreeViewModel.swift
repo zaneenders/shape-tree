@@ -35,7 +35,6 @@ public final class ShapeTreeViewModel {
   public var journalDraft: String = ""
   public var journalStatus: String? = nil
   public var journalError: String? = nil
-  /// Load failures for the journal calendar grid (separate from composer / subject `journalError`).
   public var journalCalendarError: String? = nil
   public var isJournalWorking: Bool = false
 
@@ -86,8 +85,6 @@ public final class ShapeTreeViewModel {
     try? keyStore.kid()
   }
 
-  /// Forces a key rotation. Existing sessions are invalidated; the operator
-  /// must drop the new public JWK into the server's `authorized_keys/`.
   public func regenerateDeviceKey() throws {
     try keyStore.regenerate()
     resetSession()
@@ -489,7 +486,6 @@ public final class ShapeTreeViewModel {
     }
   }
 
-  /// Lists journal entry metadata for each day in the span `[startDayKey, endDayKey]` (`yy-MM-dd`, device-local calendar).
   public func fetchJournalEntrySummaries(startDayKey: String, endDayKey: String) async throws
     -> [Components.Schemas.JournalEntrySummary]
   {
@@ -517,7 +513,6 @@ public final class ShapeTreeViewModel {
     }
   }
 
-  /// Loads Markdown for `journal_day` (`yy-MM-dd`), or nil when the server reports no file.
   public func fetchJournalEntryDetailIfPresent(dayKey: String) async throws -> Components.Schemas
     .JournalEntryDetailResponse?
   {
@@ -547,7 +542,6 @@ public final class ShapeTreeViewModel {
 
 // MARK: - Chat models
 
-/// One segment of an assistant turn in stream order (thinking, tools, final reply).
 public struct AssistantTimelineBlock: Identifiable, Equatable, Sendable {
   public let id: UUID
   public let kind: Kind
@@ -564,7 +558,6 @@ public struct AssistantTimelineBlock: Identifiable, Equatable, Sendable {
     self.kind = kind
   }
 
-  /// Stable scroll / diff signal for streaming updates.
   fileprivate var scrollFingerprintPiece: String {
     switch kind {
     case .reasoning(let s): return "r:\(s)"
@@ -589,16 +582,12 @@ public struct AssistantTimelineBlock: Identifiable, Equatable, Sendable {
   }
 }
 
-/// A lightweight chat transcript row used by SwiftUI previews.
 public struct ChatMessage: Identifiable, Equatable {
   public let id: UUID
   public let isUser: Bool
-  /// User message text; empty for assistant rows.
   public let content: String
-  /// Ordered timeline for a single assistant reply (reasoning, tools, answer).
   public let assistantBlocks: [AssistantTimelineBlock]
 
-  /// User message.
   public init(id: UUID = UUID(), content: String, isUser: Bool) {
     self.id = id
     self.isUser = isUser
@@ -606,7 +595,6 @@ public struct ChatMessage: Identifiable, Equatable {
     self.assistantBlocks = []
   }
 
-  /// Assistant message built from streamed completion events.
   public init(id: UUID, assistantBlocks: [AssistantTimelineBlock]) {
     self.id = id
     self.isUser = false
@@ -614,7 +602,6 @@ public struct ChatMessage: Identifiable, Equatable {
     self.assistantBlocks = assistantBlocks
   }
 
-  /// Fingerprint so scroll listeners observe streaming placeholder updates for assistant rows.
   public var scrollFingerprint: String {
     if isUser { return content }
     return assistantBlocks.map(\.scrollFingerprintPiece).joined(separator: "\u{1e}")

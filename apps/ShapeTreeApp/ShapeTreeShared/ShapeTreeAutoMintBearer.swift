@@ -3,13 +3,6 @@ import HTTPTypes
 import OpenAPIRuntime
 import ShapeTreeClient
 
-/// `ClientMiddleware` that mints a fresh ES256 JWT from the on-device
-/// `ShapeTreeKeyStore` on every outbound request (auth.md, "App changes").
-///
-/// Caching is deliberately avoided here — minting is local and cheap, the
-/// TTL is short (15 minutes), and per-request minting means a key
-/// regeneration in Settings takes effect on the very next call without any
-/// invalidation plumbing.
 struct ShapeTreeAutoMintBearer: ClientMiddleware {
 
   let keyStore: ShapeTreeKeyStore

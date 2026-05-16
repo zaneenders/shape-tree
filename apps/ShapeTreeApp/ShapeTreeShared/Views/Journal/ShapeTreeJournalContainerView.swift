@@ -8,9 +8,7 @@ import AppKit
 import UIKit
 #endif
 
-// MARK: - Journal visual chrome (Scribe-like dark layout)
-
-private enum ShapeTreeJournalPalette {
+enum ShapeTreeJournalPalette {
   static let accentBlue = Color(red: 0, green: 122 / 255, blue: 1)
   static let sidebar = Color(red: 28 / 255, green: 28 / 255, blue: 30 / 255)
   static let contentPanel = Color(red: 18 / 255, green: 18 / 255, blue: 19 / 255)
@@ -39,7 +37,6 @@ private enum ShapeTreeJournalLocalFormatting {
     return String(format: "%02d-%02d-%02d", yy, mm, dd)
   }
 
-  /// Keeps calendar day (`d`) when advancing months, clamped to destination month length (e.g. May 31 → Jun 30).
   static func constrainDayToMonth(dayFrom selected: Date, monthStart anchor: Date) -> Date {
     let cal = deviceCalendar
     guard let dayRange = cal.range(of: .day, in: .month, for: anchor) else { return anchor }

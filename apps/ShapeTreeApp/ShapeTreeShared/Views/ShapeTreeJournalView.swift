@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// Journal authoring surface (OpenAPI-backed; calendar + preview + composer).
 struct ShapeTreeJournalView: View {
   @Bindable var viewModel: ShapeTreeViewModel
 
