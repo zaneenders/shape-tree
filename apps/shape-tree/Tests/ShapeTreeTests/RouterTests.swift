@@ -19,11 +19,18 @@ struct RouterTests {
     let log = Logger(label: "test.jwt-missing")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: store,
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
@@ -44,11 +51,18 @@ struct RouterTests {
     let log = Logger(label: "test.journal-subjects")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: store,
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
@@ -73,11 +87,18 @@ struct RouterTests {
     let log = Logger(label: "test.journal-subject-append")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: store,
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
@@ -117,11 +138,18 @@ struct RouterTests {
     let log = Logger(label: "test.journal-subject-empty")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: store,
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
@@ -143,11 +171,18 @@ struct RouterTests {
     let log = Logger(label: "test.journal-append")
     let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: store,
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
@@ -183,11 +218,18 @@ struct RouterTests {
     let log = Logger(label: "test.journal-list")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: store,
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
@@ -225,11 +267,18 @@ struct RouterTests {
     let log = Logger(label: "test.journal-detail")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: store,
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
@@ -268,11 +317,18 @@ struct RouterTests {
     let log = Logger(label: "test.journal-detail-missing")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: store,
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
@@ -292,11 +348,18 @@ struct RouterTests {
     let log = Logger(label: "test.journal-list-bad")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: store,
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
@@ -318,11 +381,18 @@ struct RouterTests {
     let log = Logger(label: "test.create-session")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: store,
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
@@ -361,11 +431,18 @@ struct RouterTests {
     let log = Logger(label: "test.completion-bad-id")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: store,
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
@@ -387,11 +464,18 @@ struct RouterTests {
     let log = Logger(label: "test.completion-not-found")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: store,
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 

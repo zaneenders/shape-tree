@@ -36,11 +36,19 @@ struct AuthorizedKeysTests {
     let log = Logger(label: "test.auth.alg-pin")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: SessionStore(),
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
@@ -70,11 +78,19 @@ struct AuthorizedKeysTests {
     let log = Logger(label: "test.auth.alg-none")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: SessionStore(),
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
@@ -99,11 +115,19 @@ struct AuthorizedKeysTests {
     let log = Logger(label: "test.auth.bad-kid")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: SessionStore(),
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
@@ -133,11 +157,19 @@ struct AuthorizedKeysTests {
     let log = Logger(label: "test.auth.unknown-kid")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: SessionStore(),
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
@@ -186,11 +218,19 @@ struct AuthorizedKeysTests {
     let file = fixture.directory.appendingPathComponent("\(fixture.kid).jwk", isDirectory: false)
     try data.write(to: file, options: [.atomic])
 
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: SessionStore(),
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
@@ -209,11 +249,19 @@ struct AuthorizedKeysTests {
     let log = Logger(label: "test.auth.revocation")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: SessionStore(),
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
@@ -249,11 +297,19 @@ struct AuthorizedKeysTests {
     // Generate key B but do NOT enroll it — we only need its thumbprint.
     let fixtureB = try await JWTTestSupport.makeFixture()
 
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: SessionStore(),
       journalStore: journal,
       authorizedKeys: fixtureA.store,
-      log: log
+      log: log,
+
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
