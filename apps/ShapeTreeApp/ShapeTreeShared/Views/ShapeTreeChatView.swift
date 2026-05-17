@@ -19,126 +19,6 @@ private enum ShapeTreeMainTab: String, CaseIterable, Identifiable {
   }
 }
 
-private struct ShapeTreeMainTabBar: View {
-  @Binding var tab: ShapeTreeMainTab
-  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-  @Environment(\.colorScheme) private var colorScheme
-
-  private var compact: Bool {
-    horizontalSizeClass == .compact
-  }
-
-  private var trackFill: Color {
-    Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.06)
-  }
-
-  private var selectionFill: Color {
-    Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.1)
-  }
-
-  var body: some View {
-    VStack(spacing: 0) {
-      HStack {
-        Spacer(minLength: 0)
-        HStack(spacing: 2) {
-          ForEach(ShapeTreeMainTab.allCases) { item in
-            Button {
-              withAnimation(.easeInOut(duration: 0.18)) {
-                tab = item
-              }
-            } label: {
-              HStack(spacing: compact ? 5 : 7) {
-                Image(systemName: item.systemImage)
-                  .font(.system(size: compact ? 12 : 13, weight: .semibold))
-                Text(item.rawValue)
-                  .font(.system(size: compact ? 13 : 14, weight: .semibold))
-              }
-              .foregroundStyle(tab == item ? Color.primary : Color.secondary)
-              .padding(.horizontal, compact ? 18 : 24)
-              .padding(.vertical, compact ? 7 : 8)
-              .background(
-                Capsule(style: .continuous)
-                  .fill(tab == item ? selectionFill : Color.clear)
-              )
-            }
-            #if os(macOS)
-            .buttonStyle(.borderless)
-            #else
-            .buttonStyle(.plain)
-            #endif
-          }
-        }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 5)
-        .background(
-          Capsule(style: .continuous)
-            .fill(trackFill)
-        )
-
-        Spacer(minLength: 0)
-      }
-      .padding(.horizontal, 8)
-      .padding(.bottom, 2)
-      #if os(macOS)
-      .background(Color(nsColor: .windowBackgroundColor).opacity(0.98))
-      #elseif canImport(UIKit)
-      .background(Color(uiColor: UIColor.systemBackground))
-      #else
-      .background(Color.gray.opacity(0.08))
-      #endif
-
-      Divider()
-        .allowsHitTesting(false)
-    }
-  }
-}
-
-// MARK: - Persistent connection status strip
-
-private struct ConnectionStatusStrip: View {
-  let state: ConnectionState
-  let serverURL: String
-
-  private var dotColor: Color {
-    switch state {
-    case .online: return .green
-    case .unauthorized: return .orange
-    case .offline: return .secondary
-    }
-  }
-
-  private var label: String {
-    switch state {
-    case .online: return "online"
-    case .unauthorized: return "not authorized"
-    case .offline: return "offline"
-    }
-  }
-
-  var body: some View {
-    HStack(spacing: 6) {
-      Circle()
-        .frame(width: 7, height: 7)
-        .foregroundStyle(dotColor)
-      Text(label)
-        .font(.caption2.weight(.medium))
-        .foregroundStyle(dotColor)
-      Spacer(minLength: 8)
-      Text(serverURL)
-        .font(.caption2)
-        .foregroundStyle(.tertiary)
-        .lineLimit(1)
-        .truncationMode(.middle)
-    }
-    .padding(.horizontal, 14)
-    .padding(.vertical, 5)
-    .background(Color.primary.opacity(0.03))
-
-    Divider()
-      .allowsHitTesting(false)
-  }
-}
-
 // MARK: - Root shell
 
 struct ShapeTreeChatView: View {
@@ -156,13 +36,7 @@ struct ShapeTreeChatView: View {
     VStack(spacing: 0) {
       errorBanner(viewModel.journalError)
       errorBanner(viewModel.errorMessage)
-
-      ShapeTreeMainTabBar(tab: $mainTab)
-
-      ConnectionStatusStrip(
-        state: viewModel.connectionState,
-        serverURL: viewModel.serverURL)
-
+      toolbar
       Group {
         switch mainTab {
         case .chat:
@@ -187,6 +61,94 @@ struct ShapeTreeChatView: View {
     #endif
   }
 
+  private var toolbar: some View {
+    VStack(spacing: 0) {
+      HStack(spacing: 0) {
+        connectionStatusLabel
+        Spacer()
+        tabPicker
+        Spacer()
+        serverURLText
+      }
+      .padding(.horizontal, 12)
+      .padding(.vertical, 6)
+
+      Divider()
+        .allowsHitTesting(false)
+    }
+    .background(.bar)
+  }
+
+  private var connectionStatusLabel: some View {
+    HStack(spacing: 5) {
+      Circle()
+        .frame(width: 7, height: 7)
+        .foregroundStyle(statusDotColor)
+      Text(statusLabelText)
+        .font(.caption2.weight(.medium))
+        .foregroundStyle(statusDotColor)
+    }
+    .frame(minWidth: 80, alignment: .leading)
+  }
+
+  private var statusDotColor: Color {
+    switch viewModel.connectionState {
+    case .online: return .green
+    case .unauthorized: return .orange
+    case .offline: return .secondary
+    }
+  }
+
+  private var statusLabelText: String {
+    switch viewModel.connectionState {
+    case .online: return "online"
+    case .unauthorized: return "not authorized"
+    case .offline: return "offline"
+    }
+  }
+
+  private var tabPicker: some View {
+    HStack(spacing: 2) {
+      ForEach(ShapeTreeMainTab.allCases) { item in
+        Button {
+          withAnimation(.easeInOut(duration: 0.18)) {
+            mainTab = item
+          }
+        } label: {
+          HStack(spacing: 6) {
+            Image(systemName: item.systemImage)
+              .font(.system(size: 12, weight: .semibold))
+            Text(item.rawValue)
+              .font(.system(size: 13, weight: .semibold))
+          }
+          .foregroundStyle(mainTab == item ? Color.primary : Color.secondary)
+          .padding(.horizontal, 18)
+          .padding(.vertical, 6)
+          .background(
+            Capsule(style: .continuous)
+              .fill(mainTab == item ? Color.primary.opacity(0.1) : Color.clear)
+          )
+        }
+        .buttonStyle(.plain)
+      }
+    }
+    .padding(.horizontal, 4)
+    .padding(.vertical, 3)
+    .background(
+      Capsule(style: .continuous)
+        .fill(Color.primary.opacity(0.06))
+    )
+  }
+
+  private var serverURLText: some View {
+    Text(viewModel.serverURL)
+      .font(.caption2)
+      .foregroundStyle(.tertiary)
+      .lineLimit(1)
+      .truncationMode(.middle)
+      .frame(minWidth: 80, alignment: .trailing)
+  }
+
   @ViewBuilder
   private func errorBanner(_ message: String?) -> some View {
     if let message, !message.isEmpty {
@@ -204,7 +166,6 @@ struct ShapeTreeChatView: View {
   private var assistantRoot: some View {
     VStack(spacing: 0) {
       headerView
-
       ScrollViewReader { proxy in
         ScrollView {
           LazyVStack(spacing: 0) {
@@ -263,8 +224,6 @@ struct ShapeTreeChatView: View {
     }
   }
 
-  // MARK: - Chat header
-
   private var headerView: some View {
     HStack {
       Text("Chat")
@@ -281,8 +240,6 @@ struct ShapeTreeChatView: View {
     .padding(.vertical, 8)
     .background(.bar)
   }
-
-  // MARK: - Empty / offline states
 
   private var emptyStateView: some View {
     VStack(spacing: 16) {
@@ -317,8 +274,6 @@ struct ShapeTreeChatView: View {
     }
     .frame(maxWidth: .infinity, minHeight: 300)
   }
-
-  // MARK: - Helpers
 
   private func scrollToBottom(using proxy: ScrollViewProxy) {
     if viewModel.isLoading {
