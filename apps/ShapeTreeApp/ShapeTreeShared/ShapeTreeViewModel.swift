@@ -353,7 +353,7 @@ public final class ShapeTreeViewModel {
     guard connectionState == .online else { return }
     journalError = nil
     journalStatus = nil
-    guard !serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+    guard !serverURL.isEmpty else {
       journalError = "Enter a ShapeTree server URL first."
       return
     }
@@ -408,7 +408,7 @@ public final class ShapeTreeViewModel {
       journalError = "Enter a subject name before adding."
       return false
     }
-    guard !serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+    guard !serverURL.isEmpty else {
       journalError = "Enter a ShapeTree server URL first."
       return false
     }
@@ -514,7 +514,7 @@ public final class ShapeTreeViewModel {
     guard connectionState == .online else {
       throw AppError.server(offlineOrUnauthorizedMessage)
     }
-    guard !serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+    guard !serverURL.isEmpty else {
       throw AppError.server("Enter a ShapeTree server URL first.")
     }
     let remote = try openAPIClient()
@@ -541,7 +541,7 @@ public final class ShapeTreeViewModel {
     guard connectionState == .online else {
       throw AppError.server(offlineOrUnauthorizedMessage)
     }
-    guard !serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+    guard !serverURL.isEmpty else {
       throw AppError.server("Enter a ShapeTree server URL first.")
     }
     let remote = try openAPIClient()

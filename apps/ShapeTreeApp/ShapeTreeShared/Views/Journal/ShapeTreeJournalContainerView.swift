@@ -75,7 +75,7 @@ final class ShapeTreeJournalCalendarModel {
     let startKey = ShapeTreeJournalLocalFormatting.dayKey(for: startDate)
     let endKey = ShapeTreeJournalLocalFormatting.dayKey(for: endDate)
 
-    guard !journalModel.serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+    guard !journalModel.serverURL.isEmpty else {
       entriesByDay = [:]
       return
     }

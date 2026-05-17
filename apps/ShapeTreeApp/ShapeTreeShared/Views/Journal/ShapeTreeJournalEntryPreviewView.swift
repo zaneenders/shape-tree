@@ -145,7 +145,7 @@ struct ShapeTreeJournalEntryPreviewView: View {
       return
     }
 
-    guard !journalModel.serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+    guard !journalModel.serverURL.isEmpty else {
       loadError = "Enter a ShapeTree server URL in Chat first."
       return
     }

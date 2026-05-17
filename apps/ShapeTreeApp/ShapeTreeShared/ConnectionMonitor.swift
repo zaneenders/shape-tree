@@ -60,8 +60,7 @@ public final class ConnectionMonitor {
   }
 
   private func probe() async {
-    let trimmed = serverURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-    guard !trimmed.isEmpty, let url = URL(string: trimmed + "/ping") else {
+    guard !serverURL.isEmpty, let url = URL(string: serverURL + "/ping") else {
       state = .offline
       return
     }

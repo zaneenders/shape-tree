@@ -270,14 +270,12 @@ struct ShapeTreeChatView: View {
       Text("Chat")
         .font(.headline)
       Spacer()
-      Button {
+      Button("Reset", systemImage: "arrow.counterclockwise") {
         viewModel.reset()
-      } label: {
-        Image(systemName: "arrow.counterclockwise")
-          .font(.system(size: 16))
       }
       .buttonStyle(.plain)
-      .help("New session")
+      .labelStyle(.titleAndIcon)
+      .help("Clear messages and start a new session")
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 8)
