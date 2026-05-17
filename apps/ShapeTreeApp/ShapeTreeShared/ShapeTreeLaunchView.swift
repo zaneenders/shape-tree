@@ -1,15 +1,6 @@
 import CryptoKit
 import SwiftUI
 
-/// Policy for ShapeTree device keys: persisted only via ``ShapeTreeKeyStore``.
-public enum ShapeTreeSecureEnclaveRequirement {
-
-  /// `false` when the platform exposes no usable Secure Enclave (Simulator, some older Mac hardware).
-  public static var isSatisfied: Bool {
-    SecureEnclave.isAvailable
-  }
-}
-
 /// Full UI when Secure Enclave is available.
 public struct ShapeTreeAppRootView: View {
 
@@ -22,14 +13,14 @@ public struct ShapeTreeAppRootView: View {
   }
 }
 
-/// Root that blocks the shell when ``ShapeTreeSecureEnclaveRequirement/isSatisfied`` is false.
+/// Root that blocks the shell when the platform has no Secure Enclave (Simulator, some older Mac hardware).
 public struct ShapeTreeGatedLaunchView: View {
 
   public init() {}
 
   public var body: some View {
     Group {
-      if ShapeTreeSecureEnclaveRequirement.isSatisfied {
+      if SecureEnclave.isAvailable {
         ShapeTreeAppRootView()
       } else {
         SecureEnclaveRequiredScreen()

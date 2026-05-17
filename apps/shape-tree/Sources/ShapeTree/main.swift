@@ -52,10 +52,8 @@ try await journalStore.initializeJournalGitRepoIfNeeded()
 let authorizedKeys = AuthorizedKeysStore(directory: layout.authorizedKeysDirectory)
 let replayCache = JWTReplayCache()
 
-let bearerToken: String? = ollamaToken.isEmpty ? nil : ollamaToken
-
 let store = SessionStore()
-let router = buildRoutes(
+let router = try buildRoutes(
   store: store,
   journalStore: journalStore,
   authorizedKeys: authorizedKeys,
@@ -64,7 +62,7 @@ let router = buildRoutes(
   defaultOllamaURL: ollamaURL,
   agentModel: agentModel,
   systemPrompt: systemPrompt,
-  bearerToken: bearerToken,
+  llmToken: ollamaToken,
   contextWindow: contextWindow,
   contextWindowThreshold: contextWindowThreshold,
   workingDirectory: resolvedDataRoot.path
