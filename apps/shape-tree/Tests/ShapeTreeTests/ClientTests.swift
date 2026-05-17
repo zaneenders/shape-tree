@@ -235,7 +235,7 @@ struct ClientTests {
     }
   }
 
-  @Test func interruptSessionSucceedsForLiveSession() async throws {
+  @Test func interruptSessionReturns204ForExistingSession() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.client-interrupt-204")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
@@ -268,6 +268,25 @@ struct ClientTests {
         middlewares: [BearerAuthClientMiddleware(bearerToken: interruptToken)]
       )
 
+      // Fire a completion stream in a background task so the session is "busy"
+      // when we call interrupt.  The stream will fail quickly (no LLM backend in
+      // test), but that still exercises the concurrency path.
+      let streamTask = Task {
+        let streamToken = try JWTTestSupport.mintToken(fixture)
+        let apiStream = Client(
+          serverURL: URL(string: "http://localhost:\(port)")!,
+          transport: transport,
+          middlewares: [BearerAuthClientMiddleware(bearerToken: streamToken)]
+        )
+        _ = try? await apiStream.runCompletionStream(
+          path: .init(id: sessionId),
+          body: .json(.init(message: "Hello"))
+        )
+      }
+
+      // Give the stream a moment to start before interrupting.
+      try await Task.sleep(for: .milliseconds(50))
+
       let response = try await apiInterrupt.interruptSession(path: .init(id: sessionId))
       switch response {
       case .noContent:
@@ -275,6 +294,9 @@ struct ClientTests {
       default:
         Issue.record("Expected 204 noContent for interrupt on existing session")
       }
+
+      // Wait for the stream task to settle so it doesn't keep the test alive.
+      _ = await streamTask.value
     }
   }
 }

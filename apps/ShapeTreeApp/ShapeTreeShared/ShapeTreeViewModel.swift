@@ -125,7 +125,7 @@ public final class ShapeTreeViewModel {
       }
     }
   }
-    
+
   public func interruptAgentTurn() async {
     guard isLoading, let sid = sessionId else { return }
     errorMessage = nil
@@ -134,7 +134,7 @@ public final class ShapeTreeViewModel {
       let response = try await client.interruptSession(path: .init(id: sid))
       switch response {
       case .noContent:
-        break
+        isLoading = false
       case .badRequest(let err):
         errorMessage = try Self.httpErrorLine { try err.body.json }
       case .notFound:
@@ -293,6 +293,9 @@ public final class ShapeTreeViewModel {
           updateAssistantPlaceholder(id: placeholderID, blocks: blocks)
 
         case .done:
+          if event.outcome == .interrupted, !hasNonemptyAnswerBlock() {
+            blocks.append(.init(kind: .answer("(interrupted)")))
+          }
           if let full = event.assistant_full_text,
             !hasNonemptyAnswerBlock(),
             !full.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
