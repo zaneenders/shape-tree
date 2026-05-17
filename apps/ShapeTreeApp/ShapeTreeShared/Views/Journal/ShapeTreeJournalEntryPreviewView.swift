@@ -127,17 +127,18 @@ struct ShapeTreeJournalEntryPreviewView: View {
   }
 
   private func load() async {
+    guard journalModel.connectionState == .online else {
+      detail = nil
+      loadError = nil
+      return
+    }
+
     isLoading = true
     loadError = nil
     detail = nil
     defer { isLoading = false }
 
     let key = ShapeTreeJournalLocalFormatting.dayKey(for: date)
-
-    guard !journalModel.serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-      loadError = "Enter a ShapeTree server URL in Chat first."
-      return
-    }
 
     do {
       detail = try await journalModel.fetchJournalEntryDetailIfPresent(dayKey: key)

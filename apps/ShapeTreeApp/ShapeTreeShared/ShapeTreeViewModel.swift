@@ -111,6 +111,10 @@ public final class ShapeTreeViewModel {
   public func sendMessage() {
     let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty, !isLoading else { return }
+    guard connectionState == .online else {
+      errorMessage = connectionState == .unauthorized ? Self.unauthorizedMessage : "Server is offline."
+      return
+    }
 
     messages.append(ChatMessage(content: trimmed, isUser: true))
     inputText = ""
@@ -339,6 +343,7 @@ public final class ShapeTreeViewModel {
   }
 
   public func refreshJournalSubjects() async {
+    guard connectionState == .online else { return }
     journalError = nil
     journalStatus = nil
     guard !serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -400,6 +405,10 @@ public final class ShapeTreeViewModel {
       journalError = "Enter a ShapeTree server URL first."
       return false
     }
+    guard connectionState == .online else {
+      journalError = connectionState == .unauthorized ? Self.unauthorizedMessage : "Server is offline."
+      return false
+    }
 
     journalError = nil
     journalStatus = nil
@@ -450,6 +459,10 @@ public final class ShapeTreeViewModel {
       journalError = "Select at least one subject (tap + to create one if the list is empty)."
       return
     }
+    guard connectionState == .online else {
+      journalError = connectionState == .unauthorized ? Self.unauthorizedMessage : "Server is offline."
+      return
+    }
 
     journalError = nil
     journalStatus = nil
@@ -491,6 +504,9 @@ public final class ShapeTreeViewModel {
   public func fetchJournalEntrySummaries(startDayKey: String, endDayKey: String) async throws
     -> [Components.Schemas.JournalEntrySummary]
   {
+    guard connectionState == .online else {
+      throw AppError.server(connectionState == .unauthorized ? Self.unauthorizedMessage : "Server is offline.")
+    }
     let remote = try openAPIClient()
     let response = try await remote.listJournalEntrySummaries(
       Operations.listJournalEntrySummaries.Input(
@@ -512,6 +528,9 @@ public final class ShapeTreeViewModel {
   public func fetchJournalEntryDetailIfPresent(dayKey: String) async throws -> Components.Schemas
     .JournalEntryDetailResponse?
   {
+    guard connectionState == .online else {
+      throw AppError.server(connectionState == .unauthorized ? Self.unauthorizedMessage : "Server is offline.")
+    }
     let remote = try openAPIClient()
     let response = try await remote.getJournalEntryDetail(
       Operations.getJournalEntryDetail.Input(path: .init(journal_day: dayKey)))

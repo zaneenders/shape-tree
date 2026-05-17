@@ -62,6 +62,10 @@ final class ShapeTreeJournalCalendarModel {
   }
 
   func loadEntries() async {
+    guard journalModel.connectionState == .online else {
+      entriesByDay = [:]
+      return
+    }
     let calendar = ShapeTreeJournalLocalFormatting.deviceCalendar
     guard let monthInterval = calendar.dateInterval(of: .month, for: currentMonth),
       let startDate = calendar.date(byAdding: .day, value: -7, to: monthInterval.start),
@@ -165,12 +169,17 @@ struct ShapeTreeJournalContainerView: View {
           newStatus.localizedCaseInsensitiveContains("saved markdown")
         else { return }
         // Defer: mutating several @State values in one onChange pass trips
-        // “tried to update multiple times per frame” for Optional<String> observers.
+        // "tried to update multiple times per frame" for Optional<String> observers.
         Task { @MainActor in
           entryRefreshToken = UUID()
           calendarReloadNonce += 1
           dismissTodayComposer()
         }
+      }
+      .onChange(of: journalModel.connectionState) { oldState, newState in
+        guard oldState != .online, newState == .online else { return }
+        calendarReloadNonce += 1
+        entryRefreshToken = UUID()
       }
   }
 

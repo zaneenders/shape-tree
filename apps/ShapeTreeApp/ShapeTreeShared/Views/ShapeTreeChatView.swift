@@ -1,11 +1,12 @@
 import ShapeTreeClient
 import SwiftUI
 
-// MARK: - Main shell tabs (Chat · Journal)
+// MARK: - Main shell tabs (Chat · Journal · Settings)
 
 private enum ShapeTreeMainTab: String, CaseIterable, Identifiable {
   case chat = "Chat"
   case journal = "Journal"
+  case settings = "Settings"
 
   var id: String { rawValue }
 
@@ -13,6 +14,7 @@ private enum ShapeTreeMainTab: String, CaseIterable, Identifiable {
     switch self {
     case .chat: return "bubble.left.and.bubble.right.fill"
     case .journal: return "book.closed"
+    case .settings: return "gearshape"
     }
   }
 }
@@ -91,6 +93,54 @@ private struct ShapeTreeMainTabBar: View {
   }
 }
 
+// MARK: - Persistent connection status strip
+
+private struct ConnectionStatusStrip: View {
+  let state: ConnectionState
+  let serverURL: String
+
+  private var dotColor: Color {
+    switch state {
+    case .online: return .green
+    case .unauthorized: return .orange
+    case .offline: return .secondary
+    }
+  }
+
+  private var label: String {
+    switch state {
+    case .online: return "online"
+    case .unauthorized: return "not authorized"
+    case .offline: return "offline"
+    }
+  }
+
+  var body: some View {
+    HStack(spacing: 6) {
+      Circle()
+        .frame(width: 7, height: 7)
+        .foregroundStyle(dotColor)
+      Text(label)
+        .font(.caption2.weight(.medium))
+        .foregroundStyle(dotColor)
+      Spacer(minLength: 8)
+      Text(serverURL)
+        .font(.caption2)
+        .foregroundStyle(.tertiary)
+        .lineLimit(1)
+        .truncationMode(.middle)
+    }
+    .padding(.horizontal, 14)
+    .padding(.vertical, 5)
+    .background(Color.primary.opacity(0.03))
+
+    Divider()
+      .allowsHitTesting(false)
+  }
+}
+
+// MARK: - Root shell
+
 struct ShapeTreeChatView: View {
   /// Coalesces scroll signals to prevent multiple per-frame scrollToBottom calls.
   private struct ChatScrollDriver: Equatable {
@@ -101,7 +151,6 @@ struct ShapeTreeChatView: View {
 
   @Bindable var viewModel: ShapeTreeViewModel
   @State private var mainTab: ShapeTreeMainTab = .journal
-  @State private var showConnectionSettings = false
 
   var body: some View {
     VStack(spacing: 0) {
@@ -110,12 +159,18 @@ struct ShapeTreeChatView: View {
 
       ShapeTreeMainTabBar(tab: $mainTab)
 
+      ConnectionStatusStrip(
+        state: viewModel.connectionState,
+        serverURL: viewModel.serverURL)
+
       Group {
         switch mainTab {
         case .chat:
           assistantRoot
         case .journal:
           ShapeTreeJournalView(viewModel: viewModel)
+        case .settings:
+          ShapeTreeSettingsView(viewModel: viewModel)
         }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -123,10 +178,9 @@ struct ShapeTreeChatView: View {
     .task {
       await viewModel.refreshJournalSubjects()
     }
-    .sheet(isPresented: $showConnectionSettings) {
-      ShapeTreeConnectionSettingsView(
-        viewModel: viewModel,
-        isPresented: $showConnectionSettings)
+    .onChange(of: viewModel.connectionState) { oldState, newState in
+      guard oldState != .online, newState == .online else { return }
+      Task { await viewModel.refreshJournalSubjects() }
     }
     #if os(macOS)
     .frame(minWidth: 540, minHeight: 460)
@@ -203,41 +257,13 @@ struct ShapeTreeChatView: View {
     }
   }
 
-  // MARK: - Header
-
-  private var connectionDotColor: Color {
-    switch viewModel.connectionState {
-    case .online: return .green
-    case .unauthorized: return .orange
-    case .offline: return .secondary
-    }
-  }
+  // MARK: - Chat header
 
   private var headerView: some View {
     HStack {
-      VStack(alignment: .leading, spacing: 2) {
-        HStack(spacing: 4) {
-          Text("ShapeTree")
-            .font(.headline)
-          Circle()
-            .frame(width: 6, height: 6)
-            .foregroundStyle(connectionDotColor)
-        }
-        Text("\(viewModel.serverURL)")
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .lineLimit(1)
-      }
+      Text("Chat")
+        .font(.headline)
       Spacer()
-      Button {
-        showConnectionSettings = true
-      } label: {
-        Image(systemName: "network")
-          .font(.system(size: 16))
-      }
-      .buttonStyle(.plain)
-      .help("Server URL and API token")
-
       Button {
         viewModel.reset()
       } label: {
