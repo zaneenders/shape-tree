@@ -11,8 +11,6 @@ import Testing
 @Suite
 struct ClientTests {
 
-  // MARK: - POST /sessions (via generated client)
-
   @Test func createSession() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.client-create-session")
@@ -50,8 +48,6 @@ struct ClientTests {
       #expect(json.createdAt.timeIntervalSince1970 > 0)
     }
   }
-
-  // MARK: - Journal routes (generated client)
 
   @Test func listJournalSubjects() async throws {
     let store = SessionStore()
@@ -145,8 +141,6 @@ struct ClientTests {
     }
   }
 
-  // MARK: - POST /sessions/{id}/completions/stream
-
   @Test func completionStreamWithNonexistentSession() async throws {
     let store = SessionStore()
     let log = Logger(label: "test.client-stream-not-found")
@@ -179,6 +173,108 @@ struct ClientTests {
       let notFound = try response.notFound
       let errorJson = try notFound.body.json
       #expect(!errorJson.error.message.isEmpty)
+    }
+  }
+
+  @Test func interruptSessionWithMalformedId() async throws {
+    let store = SessionStore()
+    let log = Logger(label: "test.client-interrupt-bad-id")
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let fixture = try await JWTTestSupport.makeFixture()
+    let router = buildRoutes(
+      store: store,
+      journalStore: journal,
+      authorizedKeys: fixture.store,
+      log: log)
+    let app = Application(router: router)
+
+    try await app.test(.live) { client in
+      let port = try #require(client.port)
+      let transport = AsyncHTTPClientTransport()
+      let token = try JWTTestSupport.mintToken(fixture)
+      let api = Client(
+        serverURL: URL(string: "http://localhost:\(port)")!,
+        transport: transport,
+        middlewares: [BearerAuthClientMiddleware(bearerToken: token)]
+      )
+
+      let response = try await api.interruptSession(path: .init(id: "not-a-uuid"))
+      let badRequest = try response.badRequest
+      let errorJson = try badRequest.body.json
+      #expect(!errorJson.error.message.isEmpty)
+    }
+  }
+
+  @Test func interruptSessionWithNonexistentSession() async throws {
+    let store = SessionStore()
+    let log = Logger(label: "test.client-interrupt-not-found")
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let fixture = try await JWTTestSupport.makeFixture()
+    let router = buildRoutes(
+      store: store,
+      journalStore: journal,
+      authorizedKeys: fixture.store,
+      log: log)
+    let app = Application(router: router)
+
+    try await app.test(.live) { client in
+      let port = try #require(client.port)
+      let transport = AsyncHTTPClientTransport()
+      let token = try JWTTestSupport.mintToken(fixture)
+      let api = Client(
+        serverURL: URL(string: "http://localhost:\(port)")!,
+        transport: transport,
+        middlewares: [BearerAuthClientMiddleware(bearerToken: token)]
+      )
+
+      let bogusId = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+      let response = try await api.interruptSession(path: .init(id: bogusId.uuidString))
+      let notFound = try response.notFound
+      let errorJson = try notFound.body.json
+      #expect(!errorJson.error.message.isEmpty)
+    }
+  }
+
+  @Test func interruptSessionSucceedsForLiveSession() async throws {
+    let store = SessionStore()
+    let log = Logger(label: "test.client-interrupt-204")
+    let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
+    let fixture = try await JWTTestSupport.makeFixture()
+    let router = buildRoutes(
+      store: store,
+      journalStore: journal,
+      authorizedKeys: fixture.store,
+      log: log)
+    let app = Application(router: router)
+
+    try await app.test(.live) { client in
+      let port = try #require(client.port)
+      let transport = AsyncHTTPClientTransport()
+      let createToken = try JWTTestSupport.mintToken(fixture)
+      let apiCreate = Client(
+        serverURL: URL(string: "http://localhost:\(port)")!,
+        transport: transport,
+        middlewares: [BearerAuthClientMiddleware(bearerToken: createToken)]
+      )
+
+      let created = try await apiCreate.createSession(body: .json(.init(systemPrompt: nil)))
+      let ok = try created.ok
+      let sessionId = try ok.body.json.id
+
+      let interruptToken = try JWTTestSupport.mintToken(fixture)
+      let apiInterrupt = Client(
+        serverURL: URL(string: "http://localhost:\(port)")!,
+        transport: transport,
+        middlewares: [BearerAuthClientMiddleware(bearerToken: interruptToken)]
+      )
+
+      let response = try await apiInterrupt.interruptSession(path: .init(id: sessionId))
+      switch response {
+      case .noContent:
+        break
+      default:
+        Issue.record("Expected 204 noContent for interrupt on existing session")
+      }
     }
   }
 }

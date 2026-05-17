@@ -3,6 +3,7 @@ import SwiftUI
 struct ShapeTreeChatInputView: View {
   @Binding var text: String
   let onSend: () -> Void
+  var onInterrupt: (() -> Void)? = nil
   let isLoading: Bool
   @FocusState private var isFocused: Bool
 
@@ -20,6 +21,23 @@ struct ShapeTreeChatInputView: View {
           sendIfValid()
           return .handled
         }
+
+      if isLoading, let onInterrupt {
+        Button {
+          onInterrupt()
+        } label: {
+          Image(systemName: "stop.fill")
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 32, height: 32)
+            .background(Color.red.opacity(0.85), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Stop")
+        #if os(macOS)
+        .help("Stop the current reply")
+        #endif
+      }
 
       Button(action: sendIfValid) {
         Image(systemName: "arrow.up.circle.fill")

@@ -38,7 +38,6 @@ private struct ShapeTreeMainTabBar: View {
     VStack(spacing: 0) {
       HStack {
         Spacer(minLength: 0)
-
         HStack(spacing: 2) {
           ForEach(ShapeTreeMainTab.allCases) { item in
             Button {
@@ -101,7 +100,7 @@ struct ShapeTreeChatView: View {
   }
 
   @Bindable var viewModel: ShapeTreeViewModel
-  @State private var mainTab: ShapeTreeMainTab = .chat
+  @State private var mainTab: ShapeTreeMainTab = .journal
   @State private var showConnectionSettings = false
 
   var body: some View {
@@ -196,6 +195,9 @@ struct ShapeTreeChatView: View {
       ShapeTreeChatInputView(
         text: $viewModel.inputText,
         onSend: { viewModel.sendMessage() },
+        onInterrupt: {
+          Task { await viewModel.interruptAgentTurn() }
+        },
         isLoading: viewModel.isLoading
       )
     }
