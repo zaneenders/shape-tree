@@ -60,10 +60,12 @@ public final class ConnectionMonitor {
   }
 
   private func probe() async {
-    guard !serverURL.isEmpty, let url = URL(string: serverURL + "/ping") else {
+    let trimmed = serverURL.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty, var url = URL(string: trimmed) else {
       state = .offline
       return
     }
+    url.appendPathComponent("ping")
     do {
       var request = URLRequest(url: url, timeoutInterval: Self.requestTimeout)
       let token = try keyStore.mintES256JWT(ttl: 30)
