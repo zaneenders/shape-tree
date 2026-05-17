@@ -61,17 +61,25 @@ struct ShapeTreeChatView: View {
     #endif
   }
 
+  // MARK: - Toolbar (tabs + status + URL in one row)
+
+  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
   private var toolbar: some View {
-    VStack(spacing: 0) {
+    let compact = horizontalSizeClass == .compact
+
+    return VStack(spacing: 0) {
       HStack(spacing: 0) {
-        connectionStatusLabel
+        connectionStatusLabel(compact: compact)
         Spacer()
-        tabPicker
+        tabPicker(compact: compact)
         Spacer()
-        serverURLText
+        if !compact {
+          serverURLText
+        }
       }
-      .padding(.horizontal, 12)
-      .padding(.vertical, 6)
+      .padding(.horizontal, compact ? 8 : 12)
+      .padding(.vertical, compact ? 4 : 6)
 
       Divider()
         .allowsHitTesting(false)
@@ -79,16 +87,18 @@ struct ShapeTreeChatView: View {
     .background(.bar)
   }
 
-  private var connectionStatusLabel: some View {
+  private func connectionStatusLabel(compact: Bool) -> some View {
     HStack(spacing: 5) {
       Circle()
         .frame(width: 7, height: 7)
         .foregroundStyle(statusDotColor)
-      Text(statusLabelText)
-        .font(.caption2.weight(.medium))
-        .foregroundStyle(statusDotColor)
+      if !compact {
+        Text(statusLabelText)
+          .font(.caption2.weight(.medium))
+          .foregroundStyle(statusDotColor)
+      }
     }
-    .frame(minWidth: 80, alignment: .leading)
+    .frame(minWidth: compact ? 24 : 80, alignment: .leading)
   }
 
   private var statusDotColor: Color {
@@ -107,7 +117,7 @@ struct ShapeTreeChatView: View {
     }
   }
 
-  private var tabPicker: some View {
+  private func tabPicker(compact: Bool) -> some View {
     HStack(spacing: 2) {
       ForEach(ShapeTreeMainTab.allCases) { item in
         Button {
@@ -115,15 +125,15 @@ struct ShapeTreeChatView: View {
             mainTab = item
           }
         } label: {
-          HStack(spacing: 6) {
+          HStack(spacing: compact ? 4 : 6) {
             Image(systemName: item.systemImage)
-              .font(.system(size: 12, weight: .semibold))
+              .font(.system(size: compact ? 11 : 12, weight: .semibold))
             Text(item.rawValue)
-              .font(.system(size: 13, weight: .semibold))
+              .font(.system(size: compact ? 12 : 13, weight: .semibold))
           }
           .foregroundStyle(mainTab == item ? Color.primary : Color.secondary)
-          .padding(.horizontal, 18)
-          .padding(.vertical, 6)
+          .padding(.horizontal, compact ? 12 : 18)
+          .padding(.vertical, compact ? 4 : 6)
           .background(
             Capsule(style: .continuous)
               .fill(mainTab == item ? Color.primary.opacity(0.1) : Color.clear)
@@ -132,8 +142,8 @@ struct ShapeTreeChatView: View {
         .buttonStyle(.plain)
       }
     }
-    .padding(.horizontal, 4)
-    .padding(.vertical, 3)
+    .padding(.horizontal, compact ? 2 : 4)
+    .padding(.vertical, compact ? 2 : 3)
     .background(
       Capsule(style: .continuous)
         .fill(Color.primary.opacity(0.06))
