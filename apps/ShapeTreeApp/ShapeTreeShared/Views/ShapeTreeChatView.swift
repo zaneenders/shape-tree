@@ -205,6 +205,14 @@ struct ShapeTreeChatView: View {
 
   // MARK: - Header
 
+  private var connectionDotColor: Color {
+    switch viewModel.connectionState {
+    case .online: return .green
+    case .unauthorized: return .orange
+    case .offline: return .secondary
+    }
+  }
+
   private var headerView: some View {
     HStack {
       VStack(alignment: .leading, spacing: 2) {
@@ -213,7 +221,7 @@ struct ShapeTreeChatView: View {
             .font(.headline)
           Circle()
             .frame(width: 6, height: 6)
-            .foregroundStyle(.green)
+            .foregroundStyle(connectionDotColor)
         }
         Text("\(viewModel.serverURL)")
           .font(.caption)

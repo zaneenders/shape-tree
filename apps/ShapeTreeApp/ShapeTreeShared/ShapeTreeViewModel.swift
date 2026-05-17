@@ -51,6 +51,7 @@ public final class ShapeTreeViewModel {
 
   public var serverURL: String {
     didSet {
+      connectionMonitor.serverURLDidChange(serverURL)
       invalidateOpenAPIClientAndAgentSession()
       journalSubjects.removeAll()
       journalStatus = nil
@@ -61,6 +62,9 @@ public final class ShapeTreeViewModel {
   }
 
   public let keyStore: ShapeTreeKeyStore
+  public let connectionMonitor: ConnectionMonitor
+
+  public var connectionState: ConnectionState { connectionMonitor.state }
 
   /// Shared generated client — same bearer middleware stack for journal and chat paths.
   private var sharedOpenAPIClient: Client?
@@ -74,7 +78,7 @@ public final class ShapeTreeViewModel {
     self.transport = AsyncHTTPClientTransport()
     self.keyStore = keyStore
     self.serverURL = serverURL
-
+    self.connectionMonitor = ConnectionMonitor(serverURL: serverURL, keyStore: keyStore)
     _ = try? keyStore.loadOrGenerate()
   }
 
