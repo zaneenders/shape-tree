@@ -72,11 +72,19 @@ struct JWTReplayDefenseTests {
     let log = Logger(label: "test.auth.replay")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: SessionStore(),
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
@@ -97,11 +105,19 @@ struct JWTReplayDefenseTests {
     let log = Logger(label: "test.auth.no-jti")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: SessionStore(),
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
@@ -130,11 +146,19 @@ struct JWTReplayDefenseTests {
     let log = Logger(label: "test.auth.iat-stale")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: SessionStore(),
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
@@ -165,11 +189,19 @@ struct JWTReplayDefenseTests {
     let log = Logger(label: "test.auth.iat-future")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: SessionStore(),
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 
@@ -200,11 +232,19 @@ struct JWTReplayDefenseTests {
     let log = Logger(label: "test.auth.iat-skew-tolerated")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: SessionStore(),
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log
+      log: log,
+
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp"
     )
     let app = Application(router: router)
 

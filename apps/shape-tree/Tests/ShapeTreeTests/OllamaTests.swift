@@ -15,11 +15,18 @@ import Testing
   let log = Logger(label: "test.live-completion")
   let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
   let fixture = try await JWTTestSupport.makeFixture()
-  let router = buildRoutes(
+  let router = try buildRoutes(
     store: store,
     journalStore: journal,
     authorizedKeys: fixture.store,
-    log: log)
+    log: log,
+    llmURL: "http://localhost:11434",
+    agentModel: "gemma4:e2b",
+    systemPrompt: "Reply concisely.",
+    llmToken: nil,
+    contextWindow: 8192,
+    contextWindowThreshold: 0.8,
+    workingDirectory: "/tmp")
   let app = Application(router: router)
 
   try await app.test(.router) { client in

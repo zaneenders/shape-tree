@@ -15,7 +15,7 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
   let store: SessionStore
   let journalStore: JournalStore
   let log: Logger
-  let defaultOllamaURL: String
+  let llmURL: String
   let agentModel: String
   let systemPrompt: String
   let llmToken: String?
@@ -203,7 +203,7 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
       agentModel: agentModel,
       contextWindow: contextWindow,
       contextWindowThreshold: contextWindowThreshold,
-      serverURL: defaultOllamaURL,
+      serverURL: llmURL,
       apiKey: llmToken,
       tools: tools,
       workingDirectory: workingDirectory)

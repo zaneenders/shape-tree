@@ -59,7 +59,7 @@ let router = try buildRoutes(
   authorizedKeys: authorizedKeys,
   replayCache: replayCache,
   log: log,
-  defaultOllamaURL: ollamaURL,
+  llmURL: ollamaURL,
   agentModel: agentModel,
   systemPrompt: systemPrompt,
   llmToken: ollamaToken,
