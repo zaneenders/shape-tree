@@ -20,7 +20,6 @@ actor SessionStore {
     sessions[id]
   }
 
-  /// Forwards to ``ScribeAgent/abort()`` — same contract as Scribe CLI
   /// ``ChatCoordinator/interrupt()``.
   func interrupt(_ id: UUID) {
     sessions[id]?.agent.abort()

@@ -280,7 +280,7 @@ struct ClientTests {
         )
         _ = try? await apiStream.runCompletionStream(
           path: .init(id: sessionId),
-          body: .json(.init(message: "Hello"))
+          body: .json(.init(message: "Tell me a short story"))
         )
       }
 
@@ -296,7 +296,7 @@ struct ClientTests {
       }
 
       // Wait for the stream task to settle so it doesn't keep the test alive.
-      _ = await streamTask.value
+      _ = try? await streamTask.value
     }
   }
 }
