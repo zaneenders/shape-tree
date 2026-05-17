@@ -35,7 +35,8 @@ let package = Package(
         .product(name: "Logging", package: "swift-log"),
       ],
       swiftSettings: [
-        .swiftLanguageMode(.v6)
+        .swiftLanguageMode(.v6),
+        .treatAllWarnings(as: .error),
       ]
     ),
     .executableTarget(
@@ -51,7 +52,8 @@ let package = Package(
         .product(name: "Crypto", package: "swift-crypto"),
       ],
       swiftSettings: [
-        .swiftLanguageMode(.v6)
+        .swiftLanguageMode(.v6),
+        .treatAllWarnings(as: .error),
       ]
     ),
     .target(
@@ -63,7 +65,8 @@ let package = Package(
         .product(name: "Crypto", package: "swift-crypto"),
       ],
       swiftSettings: [
-        .swiftLanguageMode(.v6)
+        .swiftLanguageMode(.v6),
+        .treatAllWarnings(as: .error),
       ],
       plugins: [
         .plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")
@@ -76,7 +79,8 @@ let package = Package(
         .product(name: "Logging", package: "swift-log"),
       ],
       swiftSettings: [
-        .swiftLanguageMode(.v6)
+        .swiftLanguageMode(.v6),
+        .treatAllWarnings(as: .error),
       ]
     ),
     .testTarget(
@@ -91,7 +95,8 @@ let package = Package(
         .product(name: "Crypto", package: "swift-crypto"),
       ],
       swiftSettings: [
-        .swiftLanguageMode(.v6)
+        .swiftLanguageMode(.v6),
+        .treatAllWarnings(as: .error),
       ]
     ),
   ]

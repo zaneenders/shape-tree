@@ -15,10 +15,10 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
   let store: SessionStore
   let journalStore: JournalStore
   let log: Logger
-  let defaultOllamaURL: String
+  let llmURL: String
   let agentModel: String
   let systemPrompt: String
-  let bearerToken: String?
+  let llmToken: String?
   let contextWindow: Int
   let contextWindowThreshold: Double
   let workingDirectory: String
@@ -91,7 +91,7 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
     _ input: Operations.listJournalEntrySummaries.Input
   ) async throws -> Operations.listJournalEntrySummaries.Output {
     do {
-      let rows = try await journalStore.listSummaries(
+      let rows = try await journalStore.listMetrics(
         startDayKey: input.query.start_date,
         endDayKey: input.query.end_date)
       let entries = rows.map {
@@ -203,8 +203,8 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
       agentModel: agentModel,
       contextWindow: contextWindow,
       contextWindowThreshold: contextWindowThreshold,
-      serverURL: defaultOllamaURL,
-      apiKey: bearerToken,
+      serverURL: llmURL,
+      apiKey: llmToken,
       tools: tools,
       workingDirectory: workingDirectory)
 

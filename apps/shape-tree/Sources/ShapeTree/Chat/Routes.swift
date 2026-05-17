@@ -11,14 +11,14 @@ func buildRoutes(
   authorizedKeys: AuthorizedKeysStore,
   replayCache: JWTReplayCache = JWTReplayCache(),
   log: Logger,
-  defaultOllamaURL: String = "http://127.0.0.1:11434",
-  agentModel: String = "gemma4:e2b",
-  systemPrompt: String = "You are a helpful coding assistant.",
-  bearerToken: String? = nil,
-  contextWindow: Int = 131_072,
-  contextWindowThreshold: Double = 0.85,
-  workingDirectory: String = "/tmp"
-) -> Router<BasicRequestContext> {
+  llmURL: String,
+  agentModel: String,
+  systemPrompt: String,
+  llmToken: String?,
+  contextWindow: Int,
+  contextWindowThreshold: Double,
+  workingDirectory: String
+) throws -> Router<BasicRequestContext> {
   let router = Router(context: BasicRequestContext.self)
 
   router.add(middleware: ShapeTreeJWTAuthMiddleware(store: authorizedKeys, replayCache: replayCache))
@@ -27,14 +27,14 @@ func buildRoutes(
     store: store,
     journalStore: journalStore,
     log: log,
-    defaultOllamaURL: defaultOllamaURL,
+    llmURL: llmURL,
     agentModel: agentModel,
     systemPrompt: systemPrompt,
-    bearerToken: bearerToken,
+    llmToken: llmToken,
     contextWindow: contextWindow,
     contextWindowThreshold: contextWindowThreshold,
     workingDirectory: workingDirectory)
 
-  try! handler.registerHandlers(on: router)
+  try handler.registerHandlers(on: router)
   return router
 }

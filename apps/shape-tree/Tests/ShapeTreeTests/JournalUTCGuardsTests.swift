@@ -8,7 +8,7 @@ import Testing
 @Suite
 struct JournalUTCGuardsTests {
 
-  /// `listSummaries` / `entryDetail` include any yy-MM-dd in range that exists on disk (no server clock filter).
+  /// `listMetrics` / `entryDetail` include any yy-MM-dd in range that exists on disk (no server clock filter).
   @Test
   func journalQueryListsDiskFilesForTomorrowKeyWhenPresent() async throws {
     let log = Logger(label: "test.journal-query-inclusive-day-keys")
@@ -26,7 +26,7 @@ struct JournalUTCGuardsTests {
     try "bogus".write(to: url, atomically: true, encoding: .utf8)
 
     let key = JournalPathCodec.journalDayKey(for: tomorrow, calendar: cal)
-    let rows = try await store.listSummaries(startDayKey: key, endDayKey: key)
+    let rows = try await store.listMetrics(startDayKey: key, endDayKey: key)
     #expect(rows.count == 1)
     #expect(rows[0].dateKey == key)
 

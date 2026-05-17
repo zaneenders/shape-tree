@@ -41,7 +41,7 @@ public enum JournalQueryError: Error, Sendable, Equatable {
 /// and `JournalQueryService` so callers wire one type instead of two.
 public actor JournalStore {
 
-  public struct Summary: Sendable {
+  public struct Metric: Sendable {
     public let dateKey: String
     public let journalRelativePath: String
     public let wordCount: Int
@@ -198,8 +198,8 @@ public actor JournalStore {
 
   // MARK: - Read (formerly JournalQueryService)
 
-  /// Lists summaries for every calendar day in `[startDayKey, endDayKey]` (inclusive) that has an on-disk entry.
-  public func listSummaries(startDayKey: String, endDayKey: String) throws -> [Summary] {
+  /// Lists metrics for every calendar day in `[startDayKey, endDayKey]` (inclusive) that has an on-disk entry.
+  public func listMetrics(startDayKey: String, endDayKey: String) throws -> [Metric] {
     guard
       let start = JournalPathCodec.date(fromJournalDayKey: startDayKey),
       let end = JournalPathCodec.date(fromJournalDayKey: endDayKey)
@@ -207,7 +207,7 @@ public actor JournalStore {
     guard start <= end else { throw JournalQueryError.invalidRange }
 
     let calendar = JournalPathCodec.utcCalendar
-    var out: [Summary] = []
+    var out: [Metric] = []
     var cursor = start
 
     while cursor <= end {
@@ -220,7 +220,7 @@ public actor JournalStore {
       {
         let counts = Self.wordAndLineCounts(raw)
         out.append(
-          Summary(
+          Metric(
             dateKey: dayKey,
             journalRelativePath: relativePath,
             wordCount: counts.words,
