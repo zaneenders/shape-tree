@@ -1,10 +1,10 @@
 import ShapeTreeClient
 import SwiftUI
 
-// MARK: - Main shell tabs (Chat · Journal · Settings)
+// MARK: - Main shell tabs (Scribe · Journal · Settings)
 
 private enum ShapeTreeMainTab: String, CaseIterable, Identifiable {
-  case chat = "Chat"
+  case scribe = "Scribe"
   case journal = "Journal"
   case settings = "Settings"
 
@@ -12,7 +12,7 @@ private enum ShapeTreeMainTab: String, CaseIterable, Identifiable {
 
   var systemImage: String {
     switch self {
-    case .chat: return "bubble.left.and.bubble.right.fill"
+    case .scribe: return "bubble.left.and.bubble.right.fill"
     case .journal: return "book.closed"
     case .settings: return "gearshape"
     }
@@ -39,7 +39,7 @@ struct ShapeTreeChatView: View {
       toolbar
       Group {
         switch mainTab {
-        case .chat:
+        case .scribe:
           assistantRoot
         case .journal:
           ShapeTreeJournalView(viewModel: viewModel)
@@ -226,7 +226,7 @@ struct ShapeTreeChatView: View {
 
   private var headerView: some View {
     HStack {
-      Text("Chat")
+      Text("Scribe")
         .font(.headline)
       Spacer()
       Button("Reset", systemImage: "arrow.counterclockwise") {
