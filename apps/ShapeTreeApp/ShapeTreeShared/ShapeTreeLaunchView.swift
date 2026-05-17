@@ -5,11 +5,20 @@ import SwiftUI
 public struct ShapeTreeAppRootView: View {
 
   @State private var viewModel = ShapeTreeViewModel(serverURL: ShapeTreeViewModel.serverURL)
+  @Environment(\.scenePhase) private var scenePhase
 
   public init() {}
 
   public var body: some View {
     ShapeTreeChatView(viewModel: viewModel)
+      .onAppear { viewModel.connectionMonitor.start() }
+      .onChange(of: scenePhase) { _, newPhase in
+        switch newPhase {
+        case .active: viewModel.connectionMonitor.start()
+        case .background: viewModel.connectionMonitor.stop()
+        default: break
+        }
+      }
   }
 }
 

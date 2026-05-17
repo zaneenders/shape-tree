@@ -62,6 +62,10 @@ final class ShapeTreeJournalCalendarModel {
   }
 
   func loadEntries() async {
+    guard journalModel.connectionState == .online else {
+      entriesByDay = [:]
+      return
+    }
     let calendar = ShapeTreeJournalLocalFormatting.deviceCalendar
     guard let monthInterval = calendar.dateInterval(of: .month, for: currentMonth),
       let startDate = calendar.date(byAdding: .day, value: -7, to: monthInterval.start),
@@ -71,7 +75,7 @@ final class ShapeTreeJournalCalendarModel {
     let startKey = ShapeTreeJournalLocalFormatting.dayKey(for: startDate)
     let endKey = ShapeTreeJournalLocalFormatting.dayKey(for: endDate)
 
-    guard !journalModel.serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+    guard !journalModel.serverURL.isEmpty else {
       entriesByDay = [:]
       return
     }
@@ -165,12 +169,17 @@ struct ShapeTreeJournalContainerView: View {
           newStatus.localizedCaseInsensitiveContains("saved markdown")
         else { return }
         // Defer: mutating several @State values in one onChange pass trips
-        // “tried to update multiple times per frame” for Optional<String> observers.
+        // "tried to update multiple times per frame" for Optional<String> observers.
         Task { @MainActor in
           entryRefreshToken = UUID()
           calendarReloadNonce += 1
           dismissTodayComposer()
         }
+      }
+      .onChange(of: journalModel.connectionState) { oldState, newState in
+        guard oldState != .online, newState == .online else { return }
+        calendarReloadNonce += 1
+        entryRefreshToken = UUID()
       }
   }
 
@@ -209,7 +218,7 @@ struct ShapeTreeJournalContainerView: View {
         ZStack(alignment: .bottomTrailing) {
           macJournalScroll(proxy: proxy)
 
-          if showsJournalFloatingOverlays {
+          if showsJournalFloatingOverlays, journalModel.connectionState == .online {
             ShapeTreeJournalFloatingEditButton(isComposerVisible: isTodayComposerVisible) {
               floatingEditTapped(proxy: proxy)
             }
@@ -264,8 +273,10 @@ struct ShapeTreeJournalContainerView: View {
             if scrollOffset > 320 {
               scrollToTopButton(proxy: proxy)
             }
-            ShapeTreeJournalFloatingEditButton(isComposerVisible: isTodayComposerVisible) {
-              floatingEditTapped(proxy: proxy)
+            if journalModel.connectionState == .online {
+              ShapeTreeJournalFloatingEditButton(isComposerVisible: isTodayComposerVisible) {
+                floatingEditTapped(proxy: proxy)
+              }
             }
           }
           .padding(.trailing, 12)

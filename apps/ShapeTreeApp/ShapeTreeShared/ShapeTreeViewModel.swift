@@ -8,8 +8,10 @@ import SwiftUI
 @MainActor
 public final class ShapeTreeViewModel {
 
-  fileprivate static let unauthorizedMessage =
+  private static let unauthorizedMessage =
     "Unauthorized (401). This device's public key isn't enrolled on the server. Tap the network icon to copy the public JWK, then drop it into the server's authorized_keys/<kid>.jwk."
+
+  private static let serverOfflineMessage = "Server is offline."
 
   /// The single mapping for HTTP statuses without a typed `case`. 401 always means
   /// "device not enrolled" because this API requires bearer auth on every route.
@@ -51,6 +53,7 @@ public final class ShapeTreeViewModel {
 
   public var serverURL: String {
     didSet {
+      connectionMonitor.serverURLDidChange(serverURL)
       invalidateOpenAPIClientAndAgentSession()
       journalSubjects.removeAll()
       journalStatus = nil
@@ -61,6 +64,14 @@ public final class ShapeTreeViewModel {
   }
 
   public let keyStore: ShapeTreeKeyStore
+  public let connectionMonitor: ConnectionMonitor
+
+  public var connectionState: ConnectionState { connectionMonitor.state }
+  public var isOnline: Bool { connectionState == .online }
+
+  private var offlineOrUnauthorizedMessage: String {
+    connectionState == .unauthorized ? Self.unauthorizedMessage : Self.serverOfflineMessage
+  }
 
   /// Shared generated client — same bearer middleware stack for journal and chat paths.
   private var sharedOpenAPIClient: Client?
@@ -74,7 +85,7 @@ public final class ShapeTreeViewModel {
     self.transport = AsyncHTTPClientTransport()
     self.keyStore = keyStore
     self.serverURL = serverURL
-
+    self.connectionMonitor = ConnectionMonitor(serverURL: serverURL, keyStore: keyStore)
     _ = try? keyStore.loadOrGenerate()
   }
 
@@ -107,6 +118,10 @@ public final class ShapeTreeViewModel {
   public func sendMessage() {
     let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty, !isLoading else { return }
+    guard connectionState == .online else {
+      errorMessage = offlineOrUnauthorizedMessage
+      return
+    }
 
     messages.append(ChatMessage(content: trimmed, isUser: true))
     inputText = ""
@@ -335,9 +350,10 @@ public final class ShapeTreeViewModel {
   }
 
   public func refreshJournalSubjects() async {
+    guard connectionState == .online else { return }
     journalError = nil
     journalStatus = nil
-    guard !serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+    guard !serverURL.isEmpty else {
       journalError = "Enter a ShapeTree server URL first."
       return
     }
@@ -392,8 +408,12 @@ public final class ShapeTreeViewModel {
       journalError = "Enter a subject name before adding."
       return false
     }
-    guard !serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+    guard !serverURL.isEmpty else {
       journalError = "Enter a ShapeTree server URL first."
+      return false
+    }
+    guard connectionState == .online else {
+      journalError = offlineOrUnauthorizedMessage
       return false
     }
 
@@ -446,6 +466,10 @@ public final class ShapeTreeViewModel {
       journalError = "Select at least one subject (tap + to create one if the list is empty)."
       return
     }
+    guard connectionState == .online else {
+      journalError = offlineOrUnauthorizedMessage
+      return
+    }
 
     journalError = nil
     journalStatus = nil
@@ -487,6 +511,12 @@ public final class ShapeTreeViewModel {
   public func fetchJournalEntrySummaries(startDayKey: String, endDayKey: String) async throws
     -> [Components.Schemas.JournalEntrySummary]
   {
+    guard connectionState == .online else {
+      throw AppError.server(offlineOrUnauthorizedMessage)
+    }
+    guard !serverURL.isEmpty else {
+      throw AppError.server("Enter a ShapeTree server URL first.")
+    }
     let remote = try openAPIClient()
     let response = try await remote.listJournalEntrySummaries(
       Operations.listJournalEntrySummaries.Input(
@@ -508,6 +538,12 @@ public final class ShapeTreeViewModel {
   public func fetchJournalEntryDetailIfPresent(dayKey: String) async throws -> Components.Schemas
     .JournalEntryDetailResponse?
   {
+    guard connectionState == .online else {
+      throw AppError.server(offlineOrUnauthorizedMessage)
+    }
+    guard !serverURL.isEmpty else {
+      throw AppError.server("Enter a ShapeTree server URL first.")
+    }
     let remote = try openAPIClient()
     let response = try await remote.getJournalEntryDetail(
       Operations.getJournalEntryDetail.Input(path: .init(journal_day: dayKey)))

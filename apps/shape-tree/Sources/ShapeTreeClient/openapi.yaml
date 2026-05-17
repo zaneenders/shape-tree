@@ -13,6 +13,24 @@ security:
 
 paths:
 
+  /ping:
+    get:
+      operationId: ping
+      summary: Liveness and authorization check.
+      description: >-
+        Returns 204 when the server is reachable and the caller's key is enrolled.
+        The existing bearer-auth middleware returns 401 when the key is unknown,
+        so a single request distinguishes all three client states (online / unauthorized / offline).
+      responses:
+        "204":
+          description: Server is reachable and the bearer key is authorized.
+        "401":
+          description: Missing or invalid bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+
   /journal/subjects:
     get:
       operationId: listJournalSubjects

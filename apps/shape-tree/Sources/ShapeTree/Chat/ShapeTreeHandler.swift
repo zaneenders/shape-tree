@@ -39,6 +39,12 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
     return Self.errorBody(publicMessage)
   }
 
+  // MARK: GET /ping
+
+  func ping(_ input: Operations.ping.Input) async throws -> Operations.ping.Output {
+    .noContent(.init())
+  }
+
   // MARK: GET /journal/subjects
 
   func listJournalSubjects(

@@ -1,95 +1,25 @@
 import ShapeTreeClient
 import SwiftUI
 
-// MARK: - Main shell tabs (Chat · Journal)
+// MARK: - Main shell tabs (Scribe · Journal · Settings)
 
 private enum ShapeTreeMainTab: String, CaseIterable, Identifiable {
-  case chat = "Chat"
+  case scribe = "Scribe"
   case journal = "Journal"
+  case settings = "Settings"
 
   var id: String { rawValue }
 
   var systemImage: String {
     switch self {
-    case .chat: return "bubble.left.and.bubble.right.fill"
+    case .scribe: return "bubble.left.and.bubble.right.fill"
     case .journal: return "book.closed"
+    case .settings: return "gearshape"
     }
   }
 }
 
-private struct ShapeTreeMainTabBar: View {
-  @Binding var tab: ShapeTreeMainTab
-  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-  @Environment(\.colorScheme) private var colorScheme
-
-  private var compact: Bool {
-    horizontalSizeClass == .compact
-  }
-
-  private var trackFill: Color {
-    Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.06)
-  }
-
-  private var selectionFill: Color {
-    Color.primary.opacity(colorScheme == .dark ? 0.14 : 0.1)
-  }
-
-  var body: some View {
-    VStack(spacing: 0) {
-      HStack {
-        Spacer(minLength: 0)
-        HStack(spacing: 2) {
-          ForEach(ShapeTreeMainTab.allCases) { item in
-            Button {
-              withAnimation(.easeInOut(duration: 0.18)) {
-                tab = item
-              }
-            } label: {
-              HStack(spacing: compact ? 5 : 7) {
-                Image(systemName: item.systemImage)
-                  .font(.system(size: compact ? 12 : 13, weight: .semibold))
-                Text(item.rawValue)
-                  .font(.system(size: compact ? 13 : 14, weight: .semibold))
-              }
-              .foregroundStyle(tab == item ? Color.primary : Color.secondary)
-              .padding(.horizontal, compact ? 18 : 24)
-              .padding(.vertical, compact ? 7 : 8)
-              .background(
-                Capsule(style: .continuous)
-                  .fill(tab == item ? selectionFill : Color.clear)
-              )
-            }
-            #if os(macOS)
-            .buttonStyle(.borderless)
-            #else
-            .buttonStyle(.plain)
-            #endif
-          }
-        }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 5)
-        .background(
-          Capsule(style: .continuous)
-            .fill(trackFill)
-        )
-
-        Spacer(minLength: 0)
-      }
-      .padding(.horizontal, 8)
-      .padding(.bottom, 2)
-      #if os(macOS)
-      .background(Color(nsColor: .windowBackgroundColor).opacity(0.98))
-      #elseif canImport(UIKit)
-      .background(Color(uiColor: UIColor.systemBackground))
-      #else
-      .background(Color.gray.opacity(0.08))
-      #endif
-
-      Divider()
-        .allowsHitTesting(false)
-    }
-  }
-}
+// MARK: - Root shell
 
 struct ShapeTreeChatView: View {
   /// Coalesces scroll signals to prevent multiple per-frame scrollToBottom calls.
@@ -101,21 +31,20 @@ struct ShapeTreeChatView: View {
 
   @Bindable var viewModel: ShapeTreeViewModel
   @State private var mainTab: ShapeTreeMainTab = .journal
-  @State private var showConnectionSettings = false
 
   var body: some View {
     VStack(spacing: 0) {
       errorBanner(viewModel.journalError)
       errorBanner(viewModel.errorMessage)
-
-      ShapeTreeMainTabBar(tab: $mainTab)
-
+      toolbar
       Group {
         switch mainTab {
-        case .chat:
+        case .scribe:
           assistantRoot
         case .journal:
           ShapeTreeJournalView(viewModel: viewModel)
+        case .settings:
+          ShapeTreeSettingsView(viewModel: viewModel)
         }
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -123,14 +52,111 @@ struct ShapeTreeChatView: View {
     .task {
       await viewModel.refreshJournalSubjects()
     }
-    .sheet(isPresented: $showConnectionSettings) {
-      ShapeTreeConnectionSettingsView(
-        viewModel: viewModel,
-        isPresented: $showConnectionSettings)
+    .onChange(of: viewModel.connectionState) { oldState, newState in
+      guard oldState != .online, newState == .online else { return }
+      Task { await viewModel.refreshJournalSubjects() }
     }
     #if os(macOS)
     .frame(minWidth: 540, minHeight: 460)
     #endif
+  }
+
+  // MARK: - Toolbar (tabs + status + URL in one row)
+
+  @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+  private var toolbar: some View {
+    let compact = horizontalSizeClass == .compact
+
+    return VStack(spacing: 0) {
+      HStack(spacing: 0) {
+        connectionStatusLabel(compact: compact)
+        Spacer()
+        tabPicker(compact: compact)
+        Spacer()
+        if !compact {
+          serverURLText
+        }
+      }
+      .padding(.horizontal, compact ? 8 : 12)
+      .padding(.vertical, compact ? 4 : 6)
+
+      Divider()
+        .allowsHitTesting(false)
+    }
+    .background(.bar)
+  }
+
+  private func connectionStatusLabel(compact: Bool) -> some View {
+    HStack(spacing: 5) {
+      Circle()
+        .frame(width: 7, height: 7)
+        .foregroundStyle(statusDotColor)
+      if !compact {
+        Text(statusLabelText)
+          .font(.caption2.weight(.medium))
+          .foregroundStyle(statusDotColor)
+      }
+    }
+    .frame(minWidth: compact ? 24 : 80, alignment: .leading)
+  }
+
+  private var statusDotColor: Color {
+    switch viewModel.connectionState {
+    case .online: return .green
+    case .unauthorized: return .orange
+    case .offline: return .secondary
+    }
+  }
+
+  private var statusLabelText: String {
+    switch viewModel.connectionState {
+    case .online: return "online"
+    case .unauthorized: return "not authorized"
+    case .offline: return "offline"
+    }
+  }
+
+  private func tabPicker(compact: Bool) -> some View {
+    HStack(spacing: 2) {
+      ForEach(ShapeTreeMainTab.allCases) { item in
+        Button {
+          withAnimation(.easeInOut(duration: 0.18)) {
+            mainTab = item
+          }
+        } label: {
+          HStack(spacing: compact ? 4 : 6) {
+            Image(systemName: item.systemImage)
+              .font(.system(size: compact ? 11 : 12, weight: .semibold))
+            Text(item.rawValue)
+              .font(.system(size: compact ? 12 : 13, weight: .semibold))
+          }
+          .foregroundStyle(mainTab == item ? Color.primary : Color.secondary)
+          .padding(.horizontal, compact ? 12 : 18)
+          .padding(.vertical, compact ? 4 : 6)
+          .background(
+            Capsule(style: .continuous)
+              .fill(mainTab == item ? Color.primary.opacity(0.1) : Color.clear)
+          )
+        }
+        .buttonStyle(.plain)
+      }
+    }
+    .padding(.horizontal, compact ? 2 : 4)
+    .padding(.vertical, compact ? 2 : 3)
+    .background(
+      Capsule(style: .continuous)
+        .fill(Color.primary.opacity(0.06))
+    )
+  }
+
+  private var serverURLText: some View {
+    Text(viewModel.serverURL)
+      .font(.caption2)
+      .foregroundStyle(.tertiary)
+      .lineLimit(1)
+      .truncationMode(.middle)
+      .frame(minWidth: 80, alignment: .trailing)
   }
 
   @ViewBuilder
@@ -150,12 +176,15 @@ struct ShapeTreeChatView: View {
   private var assistantRoot: some View {
     VStack(spacing: 0) {
       headerView
-
       ScrollViewReader { proxy in
         ScrollView {
           LazyVStack(spacing: 0) {
             if viewModel.messages.isEmpty {
-              emptyStateView
+              if viewModel.isOnline {
+                emptyStateView
+              } else {
+                offlineStateView
+              }
             } else {
               ForEach(viewModel.messages) { message in
                 ShapeTreeMessageBubble(message: message)
@@ -190,61 +219,37 @@ struct ShapeTreeChatView: View {
         }
       }
 
-      Divider()
+      if viewModel.isOnline {
+        Divider()
 
-      ShapeTreeChatInputView(
-        text: $viewModel.inputText,
-        onSend: { viewModel.sendMessage() },
-        onInterrupt: {
-          Task { await viewModel.interruptAgentTurn() }
-        },
-        isLoading: viewModel.isLoading
-      )
+        ShapeTreeChatInputView(
+          text: $viewModel.inputText,
+          onSend: { viewModel.sendMessage() },
+          onInterrupt: {
+            Task { await viewModel.interruptAgentTurn() }
+          },
+          isLoading: viewModel.isLoading
+        )
+      }
     }
   }
 
-  // MARK: - Header
-
   private var headerView: some View {
     HStack {
-      VStack(alignment: .leading, spacing: 2) {
-        HStack(spacing: 4) {
-          Text("ShapeTree")
-            .font(.headline)
-          Circle()
-            .frame(width: 6, height: 6)
-            .foregroundStyle(.green)
-        }
-        Text("\(viewModel.serverURL)")
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .lineLimit(1)
-      }
+      Text("Scribe")
+        .font(.headline)
       Spacer()
-      Button {
-        showConnectionSettings = true
-      } label: {
-        Image(systemName: "network")
-          .font(.system(size: 16))
-      }
-      .buttonStyle(.plain)
-      .help("Server URL and API token")
-
-      Button {
+      Button("Reset", systemImage: "arrow.counterclockwise") {
         viewModel.reset()
-      } label: {
-        Image(systemName: "arrow.counterclockwise")
-          .font(.system(size: 16))
       }
       .buttonStyle(.plain)
-      .help("New session")
+      .labelStyle(.titleAndIcon)
+      .help("Clear messages and start a new session")
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 8)
     .background(.bar)
   }
-
-  // MARK: - Empty state
 
   private var emptyStateView: some View {
     VStack(spacing: 16) {
@@ -263,7 +268,22 @@ struct ShapeTreeChatView: View {
     .frame(maxWidth: .infinity, minHeight: 300)
   }
 
-  // MARK: - Helpers
+  private var offlineStateView: some View {
+    VStack(spacing: 16) {
+      Image(systemName: "wifi.slash")
+        .font(.system(size: 48))
+        .foregroundStyle(.tertiary)
+      Text("Currently offline")
+        .font(.title2)
+        .fontWeight(.semibold)
+      Text("Chat is unavailable while the server is unreachable.")
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, 40)
+    }
+    .frame(maxWidth: .infinity, minHeight: 300)
+  }
 
   private func scrollToBottom(using proxy: ScrollViewProxy) {
     if viewModel.isLoading {
