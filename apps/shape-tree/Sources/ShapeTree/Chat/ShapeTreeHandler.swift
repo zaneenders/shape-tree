@@ -220,6 +220,22 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
     return .ok(.init(body: .json(response)))
   }
 
+  // MARK: POST /sessions/{id}/interrupt
+
+  func interruptSession(
+    _ input: Operations.interruptSession.Input
+  ) async throws -> Operations.interruptSession.Output {
+    guard let sessionId = UUID(uuidString: input.path.id) else {
+      return .badRequest(.init(body: .json(Self.errorBody("Invalid or missing session id."))))
+    }
+    guard await store.get(sessionId) != nil else {
+      return .notFound(.init(body: .json(Self.errorBody("Session not found."))))
+    }
+    await store.interrupt(sessionId)
+    log.debug("event=session.interrupt id=\(sessionId)")
+    return .noContent(.init())
+  }
+
   // MARK: POST /sessions/{id}/completions/stream
 
   func runCompletionStream(
@@ -250,14 +266,21 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
           let assistantText =
             result.messages.last(where: { $0.role == .assistant })?.content ?? ""
 
-          if assistantText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            continuation.yield(.init(kind: .harness_error, harness_error_message: "No assistant response."))
-            continuation.finish()
-            return
+          switch result.outcome {
+          case .completed:
+            if assistantText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+              continuation.yield(
+                .init(kind: .harness_error, harness_error_message: "No assistant response."))
+              continuation.finish()
+              return
+            }
+          case .interrupted, .toolRoundLimit:
+            break
           }
 
           log.info(
-            "event=completion.stream.end session=\(sessionId) assistant_chars=\(assistantText.count)")
+            "event=completion.stream.end session=\(sessionId) outcome=\(result.outcome) assistant_chars=\(assistantText.count)"
+          )
 
           continuation.yield(
             .init(

@@ -126,6 +126,29 @@ public final class ShapeTreeViewModel {
     }
   }
 
+  public func interruptAgentTurn() async {
+    guard isLoading, let sid = sessionId else { return }
+    errorMessage = nil
+    do {
+      let client = try openAPIClient()
+      let response = try await client.interruptSession(path: .init(id: sid))
+      switch response {
+      case .noContent:
+        isLoading = false
+      case .badRequest(let err):
+        errorMessage = try Self.httpErrorLine { try err.body.json }
+      case .notFound:
+        invalidateAgentSessionOnly()
+        errorMessage = "Session expired. Please try again."
+      case .undocumented(let statusCode, _):
+        errorMessage = Self.messageForStatus(
+          statusCode, fallback: "Server returned status \(statusCode)")
+      }
+    } catch {
+      errorMessage = error.localizedDescription
+    }
+  }
+
   private func replaceAssistantPlaceholder(
     id: UUID, blocks: [AssistantTimelineBlock], isLoading: Bool
   ) {
@@ -265,7 +288,14 @@ public final class ShapeTreeViewModel {
                 output: event.tool_output ?? "")))
           updateAssistantPlaceholder(id: placeholderID, blocks: blocks)
 
+        case .turn_interrupted:
+          blocks.append(.init(kind: .answer("(interrupted)")))
+          updateAssistantPlaceholder(id: placeholderID, blocks: blocks)
+
         case .done:
+          if event.outcome == .interrupted, !hasNonemptyAnswerBlock() {
+            blocks.append(.init(kind: .answer("(interrupted)")))
+          }
           if let full = event.assistant_full_text,
             !hasNonemptyAnswerBlock(),
             !full.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -312,8 +342,6 @@ public final class ShapeTreeViewModel {
       return
     }
 
-    // Subject list refresh runs on tab load and from the composer; do not use the global
-    // `isJournalWorking` overlay here — a slow or hung server would block the whole journal UI.
     do {
       let remote = try openAPIClient()
       let response = try await remote.listJournalSubjects(.init(headers: .init()))

@@ -19,4 +19,8 @@ actor SessionStore {
   func get(_ id: UUID) -> Session? {
     sessions[id]
   }
+
+  func interrupt(_ id: UUID) {
+    sessions[id]?.agent.abort()
+  }
 }

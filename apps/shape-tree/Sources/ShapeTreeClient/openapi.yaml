@@ -194,6 +194,35 @@ paths:
               schema:
                 $ref: "#/components/schemas/HTTPErrorResponse"
 
+  /sessions/{id}/interrupt:
+    post:
+      operationId: interruptSession
+      summary: >-
+        Request interruption of the current agent turn for this session (Scribe
+        `ScribeAgent.abort()`). No-op when nothing is running.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Interrupt signal was applied.
+        "400":
+          description: Invalid session id.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "404":
+          description: Session not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+
   /sessions/{id}/completions/stream:
     post:
       operationId: runCompletionStream
