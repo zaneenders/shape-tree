@@ -103,24 +103,36 @@ struct ShapeTreeJournalEntryPreviewView: View {
 
   private var emptyBlock: some View {
     VStack(spacing: 12) {
-      Image(systemName: "doc.text")
-        #if os(iOS)
-      .font(.title2)
-        #else
-      .font(.largeTitle)
-        #endif
-        .foregroundStyle(deepChrome ? Color.white.opacity(0.38) : Color.secondary)
-      Text("No entry for this date")
-        .font(.subheadline)
-        .foregroundStyle(deepChrome ? Color.white.opacity(0.5) : Color.secondary)
-
-      if ShapeTreeJournalLocalFormatting.deviceCalendar.isDateInToday(date) {
-        Button("Write today's entry") {
-          onWriteToday()
+      if journalModel.connectionState == .online {
+        Image(systemName: "doc.text")
+          #if os(iOS)
+          .font(.title2)
+          #else
+          .font(.largeTitle)
+          #endif
+          .foregroundStyle(deepChrome ? Color.white.opacity(0.38) : Color.secondary)
+        Text("No entry for this date")
+          .font(.subheadline)
+          .foregroundStyle(deepChrome ? Color.white.opacity(0.5) : Color.secondary)
+        if ShapeTreeJournalLocalFormatting.deviceCalendar.isDateInToday(date) {
+          Button("Write today's entry") {
+            onWriteToday()
+          }
+          .buttonStyle(.borderedProminent)
+          .tint(ShapeTreeJournalPalette.accentBlue)
+          .controlSize(.small)
         }
-        .buttonStyle(.borderedProminent)
-        .tint(ShapeTreeJournalPalette.accentBlue)
-        .controlSize(.small)
+      } else {
+        Image(systemName: "wifi.slash")
+          #if os(iOS)
+          .font(.title2)
+          #else
+          .font(.largeTitle)
+          #endif
+          .foregroundStyle(deepChrome ? Color.white.opacity(0.25) : Color.secondary)
+        Text("Currently offline")
+          .font(.subheadline)
+          .foregroundStyle(deepChrome ? Color.white.opacity(0.4) : Color.secondary)
       }
     }
     .frame(maxWidth: .infinity, minHeight: entryPreviewEmptyMinHeight)

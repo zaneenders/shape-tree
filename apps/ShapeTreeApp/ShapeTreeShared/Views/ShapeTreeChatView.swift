@@ -209,7 +209,11 @@ struct ShapeTreeChatView: View {
         ScrollView {
           LazyVStack(spacing: 0) {
             if viewModel.messages.isEmpty {
-              emptyStateView
+              if viewModel.isOnline {
+                emptyStateView
+              } else {
+                offlineStateView
+              }
             } else {
               ForEach(viewModel.messages) { message in
                 ShapeTreeMessageBubble(message: message)
@@ -244,16 +248,18 @@ struct ShapeTreeChatView: View {
         }
       }
 
-      Divider()
+      if viewModel.isOnline {
+        Divider()
 
-      ShapeTreeChatInputView(
-        text: $viewModel.inputText,
-        onSend: { viewModel.sendMessage() },
-        onInterrupt: {
-          Task { await viewModel.interruptAgentTurn() }
-        },
-        isLoading: viewModel.isLoading
-      )
+        ShapeTreeChatInputView(
+          text: $viewModel.inputText,
+          onSend: { viewModel.sendMessage() },
+          onInterrupt: {
+            Task { await viewModel.interruptAgentTurn() }
+          },
+          isLoading: viewModel.isLoading
+        )
+      }
     }
   }
 
@@ -278,7 +284,7 @@ struct ShapeTreeChatView: View {
     .background(.bar)
   }
 
-  // MARK: - Empty state
+  // MARK: - Empty / offline states
 
   private var emptyStateView: some View {
     VStack(spacing: 16) {
@@ -289,6 +295,23 @@ struct ShapeTreeChatView: View {
         .font(.title2)
         .fontWeight(.semibold)
       Text("Send a message to start chatting.")
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, 40)
+    }
+    .frame(maxWidth: .infinity, minHeight: 300)
+  }
+
+  private var offlineStateView: some View {
+    VStack(spacing: 16) {
+      Image(systemName: "wifi.slash")
+        .font(.system(size: 48))
+        .foregroundStyle(.tertiary)
+      Text("Currently offline")
+        .font(.title2)
+        .fontWeight(.semibold)
+      Text("Chat is unavailable while the server is unreachable.")
         .font(.subheadline)
         .foregroundStyle(.secondary)
         .multilineTextAlignment(.center)

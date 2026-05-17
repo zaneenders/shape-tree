@@ -65,6 +65,7 @@ public final class ShapeTreeViewModel {
   public let connectionMonitor: ConnectionMonitor
 
   public var connectionState: ConnectionState { connectionMonitor.state }
+  public var isOnline: Bool { connectionState == .online }
 
   /// Shared generated client — same bearer middleware stack for journal and chat paths.
   private var sharedOpenAPIClient: Client?

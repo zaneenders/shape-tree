@@ -218,7 +218,7 @@ struct ShapeTreeJournalContainerView: View {
         ZStack(alignment: .bottomTrailing) {
           macJournalScroll(proxy: proxy)
 
-          if showsJournalFloatingOverlays {
+          if showsJournalFloatingOverlays, journalModel.connectionState == .online {
             ShapeTreeJournalFloatingEditButton(isComposerVisible: isTodayComposerVisible) {
               floatingEditTapped(proxy: proxy)
             }
@@ -273,8 +273,10 @@ struct ShapeTreeJournalContainerView: View {
             if scrollOffset > 320 {
               scrollToTopButton(proxy: proxy)
             }
-            ShapeTreeJournalFloatingEditButton(isComposerVisible: isTodayComposerVisible) {
-              floatingEditTapped(proxy: proxy)
+            if journalModel.connectionState == .online {
+              ShapeTreeJournalFloatingEditButton(isComposerVisible: isTodayComposerVisible) {
+                floatingEditTapped(proxy: proxy)
+              }
             }
           }
           .padding(.trailing, 12)
