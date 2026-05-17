@@ -20,7 +20,6 @@ actor SessionStore {
     sessions[id]
   }
 
-  /// ``ChatCoordinator/interrupt()``.
   func interrupt(_ id: UUID) {
     sessions[id]?.agent.abort()
   }
