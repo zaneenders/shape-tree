@@ -14,6 +14,7 @@ struct ShapeTreeSettingsView: View {
   @State private var draftLabel: String
   @State private var regenerateConfirmation = false
   @State private var copyFeedback: String?
+  @State private var isCheckingNow = false
 
   init(viewModel: ShapeTreeViewModel) {
     self.viewModel = viewModel
@@ -85,9 +86,24 @@ struct ShapeTreeSettingsView: View {
       }
       .padding(.vertical, 4)
 
-      Button("Check now") {
+      Button {
+        isCheckingNow = true
         viewModel.connectionMonitor.start()
+        Task {
+          try? await Task.sleep(for: .seconds(1))
+          isCheckingNow = false
+        }
+      } label: {
+        HStack(spacing: 6) {
+          if isCheckingNow {
+            ProgressView()
+              .scaleEffect(0.7)
+              .frame(width: 12, height: 12)
+          }
+          Text("Check now")
+        }
       }
+      .disabled(isCheckingNow)
     }
   }
 

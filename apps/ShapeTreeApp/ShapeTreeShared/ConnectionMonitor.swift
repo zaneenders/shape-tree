@@ -20,6 +20,7 @@ public final class ConnectionMonitor {
   private let keyStore: ShapeTreeKeyStore
   private var pollingTask: Task<Void, Never>?
   private let session: URLSession
+  private var isActive = false
 
   private static let pollInterval: Duration = .seconds(3)
   private static let requestTimeout: TimeInterval = 1
@@ -36,6 +37,7 @@ public final class ConnectionMonitor {
   /// Starts the polling loop, cancelling any previous one first.
   public func start() {
     stop()
+    isActive = true
     pollingTask = Task {
       while !Task.isCancelled {
         await probe()
@@ -45,15 +47,16 @@ public final class ConnectionMonitor {
   }
 
   public func stop() {
+    isActive = false
     pollingTask?.cancel()
     pollingTask = nil
   }
 
-  /// Call when the server URL changes — resets to `.offline` and restarts polling immediately.
+  /// Call when the server URL changes — resets to `.offline` and restarts polling if active.
   public func serverURLDidChange(_ url: String) {
     serverURL = url
     state = .offline
-    start()
+    if isActive { start() }
   }
 
   private func probe() async {

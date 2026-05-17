@@ -8,8 +8,10 @@ import SwiftUI
 @MainActor
 public final class ShapeTreeViewModel {
 
-  fileprivate static let unauthorizedMessage =
+  private static let unauthorizedMessage =
     "Unauthorized (401). This device's public key isn't enrolled on the server. Tap the network icon to copy the public JWK, then drop it into the server's authorized_keys/<kid>.jwk."
+
+  private static let serverOfflineMessage = "Server is offline."
 
   /// The single mapping for HTTP statuses without a typed `case`. 401 always means
   /// "device not enrolled" because this API requires bearer auth on every route.
@@ -67,6 +69,10 @@ public final class ShapeTreeViewModel {
   public var connectionState: ConnectionState { connectionMonitor.state }
   public var isOnline: Bool { connectionState == .online }
 
+  private var offlineOrUnauthorizedMessage: String {
+    connectionState == .unauthorized ? Self.unauthorizedMessage : Self.serverOfflineMessage
+  }
+
   /// Shared generated client — same bearer middleware stack for journal and chat paths.
   private var sharedOpenAPIClient: Client?
   private var sessionId: String?
@@ -113,7 +119,7 @@ public final class ShapeTreeViewModel {
     let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty, !isLoading else { return }
     guard connectionState == .online else {
-      errorMessage = connectionState == .unauthorized ? Self.unauthorizedMessage : "Server is offline."
+      errorMessage = offlineOrUnauthorizedMessage
       return
     }
 
@@ -407,7 +413,7 @@ public final class ShapeTreeViewModel {
       return false
     }
     guard connectionState == .online else {
-      journalError = connectionState == .unauthorized ? Self.unauthorizedMessage : "Server is offline."
+      journalError = offlineOrUnauthorizedMessage
       return false
     }
 
@@ -461,7 +467,7 @@ public final class ShapeTreeViewModel {
       return
     }
     guard connectionState == .online else {
-      journalError = connectionState == .unauthorized ? Self.unauthorizedMessage : "Server is offline."
+      journalError = offlineOrUnauthorizedMessage
       return
     }
 
@@ -506,7 +512,10 @@ public final class ShapeTreeViewModel {
     -> [Components.Schemas.JournalEntrySummary]
   {
     guard connectionState == .online else {
-      throw AppError.server(connectionState == .unauthorized ? Self.unauthorizedMessage : "Server is offline.")
+      throw AppError.server(offlineOrUnauthorizedMessage)
+    }
+    guard !serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      throw AppError.server("Enter a ShapeTree server URL first.")
     }
     let remote = try openAPIClient()
     let response = try await remote.listJournalEntrySummaries(
@@ -530,7 +539,10 @@ public final class ShapeTreeViewModel {
     .JournalEntryDetailResponse?
   {
     guard connectionState == .online else {
-      throw AppError.server(connectionState == .unauthorized ? Self.unauthorizedMessage : "Server is offline.")
+      throw AppError.server(offlineOrUnauthorizedMessage)
+    }
+    guard !serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      throw AppError.server("Enter a ShapeTree server URL first.")
     }
     let remote = try openAPIClient()
     let response = try await remote.getJournalEntryDetail(
