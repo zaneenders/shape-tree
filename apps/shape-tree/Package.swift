@@ -99,5 +99,7 @@ let package = Package(
         .treatAllWarnings(as: .error),
       ]
     ),
+    .target(name: "TodoTree"),
+    .testTarget(name: "TodoTreeTests", dependencies: ["TodoTree"]),
   ]
 )
