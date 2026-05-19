@@ -103,8 +103,8 @@ let package = Package(
     .target(
       name: "TodoTree",
       dependencies: [
-        .product(name: "_NIOFileSystem", package: "swift-nio"),
-        .product(name: "SystemPackage", package: "swift-system"),
+        .product(name: "NIOFS", package: "swift-nio"),
+        .product(name: "NIOCore", package: "swift-nio"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
@@ -115,8 +115,7 @@ let package = Package(
       name: "TodoTreeTests",
       dependencies: [
         "TodoTree",
-        .product(name: "_NIOFileSystem", package: "swift-nio"),
-        .product(name: "SystemPackage", package: "swift-system"),
+        .product(name: "NIOFS", package: "swift-nio"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
