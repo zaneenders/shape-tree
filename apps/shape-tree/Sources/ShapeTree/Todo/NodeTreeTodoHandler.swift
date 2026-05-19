@@ -74,12 +74,22 @@ struct NodeTreeTodoHandler: APIProtocol, Sendable {
 
     let tree = treeName(from: input.query)
     let parentAPI = body.parent_id ?? .root(.init(kind: .root))
+    let payload = NodeTreeTodoMapping.payload(from: body)
+    if payload.status == .completed, let steps = body.steps, !steps.isEmpty {
+      return .conflict(
+        .init(
+          body: .json(
+            Self.errorBody(
+              "Cannot create a completed item while inline steps would still be open.",
+              code: "parent_cannot_complete"
+            ))))
+    }
 
     do {
       let (store, rootID) = try await openStore(tree: tree)
       let parentId = try NodeTreeTodoMapping.resolveParentID(from: parentAPI, canonicalRootID: rootID)
       let node = try await store.createNode(
-        payload: NodeTreeTodoMapping.payload(from: body),
+        payload: payload,
         parentId: parentId
       )
       if let steps = body.steps {
@@ -90,8 +100,18 @@ struct NodeTreeTodoHandler: APIProtocol, Sendable {
           )
         }
       }
+      if payload.status == .completed {
+        let snapshot = try await store.topologicalSort()
+        try NodeTreeTodoMapping.validateCanComplete(
+          itemID: node.id,
+          newStatus: .completed,
+          nodes: snapshot,
+          canonicalRootID: rootID
+        )
+      }
+      let persisted = try await store.node(id: node.id) ?? node
       return .created(
-        .init(body: .json(NodeTreeTodoMapping.todoItem(from: node, canonicalRootID: rootID))))
+        .init(body: .json(NodeTreeTodoMapping.todoItem(from: persisted, canonicalRootID: rootID))))
     } catch let error as NodeTreeError {
       return nodeTreeErrorOutput(error)
     } catch NodeTreeTodoMapping.MappingError.invalidNodeID(let id) {
@@ -322,7 +342,7 @@ extension Operations.createTodoItem.Output: NodeTreeTodoErrorOutput {
     .notFound(.init(body: .json(body)))
   }
   static func conflict(_ body: Components.Schemas.HTTPErrorResponse) -> Self {
-    .internalServerError(.init(body: .json(body)))
+    .conflict(.init(body: .json(body)))
   }
   static func internalServerError(_ body: Components.Schemas.HTTPErrorResponse) -> Self {
     .internalServerError(.init(body: .json(body)))

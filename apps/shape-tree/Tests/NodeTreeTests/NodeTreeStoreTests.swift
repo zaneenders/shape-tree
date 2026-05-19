@@ -1,4 +1,4 @@
-import NodeTree
+@testable import NodeTree
 import Testing
 import _NIOFileSystem
 
@@ -134,6 +134,49 @@ struct NodeTreeStoreTests {
       #expect(await todo.rootID != context.rootID)
       #expect(try await todo.node(id: contextChild.id) == nil)
       #expect(try await context.node(id: todoChild.id) == nil)
+    }
+  }
+
+  @Test func repairsMultipleRootsWhenReopeningStore() async throws {
+    try await FileSystem.shared.withTemporaryDirectory { _, path in
+      let dataDirectoryName = "todo-tree"
+      let rootA = TreeNode(parentId: .root, payload: TitlePayload(title: "root-a"))
+      let rootB = TreeNode(parentId: .root, payload: TitlePayload(title: "root-b"))
+      let dataDirectory = path.appending(dataDirectoryName)
+      let nodesDirectory = NodeStorage.nodesDirectory(in: dataDirectory)
+      try await FileSystem.shared.createDirectory(at: nodesDirectory, withIntermediateDirectories: true)
+
+      for node in [rootA, rootB] {
+        let nodeDirectory = NodeStorage.nodeDirectory(in: nodesDirectory, id: node.id)
+        try await FileSystem.shared.createDirectory(at: nodeDirectory, withIntermediateDirectories: true)
+        let manifest = NodeStorage.manifestFile(in: nodeDirectory)
+        let data = try NodeStorage.encode(node)
+        try await FileSystem.shared.withFileHandle(
+          forWritingAt: manifest,
+          options: .newFile(replaceExisting: true)
+        ) { handle in
+          try await handle.write(contentsOf: data, toAbsoluteOffset: 0)
+          try await handle.close()
+        }
+      }
+
+      let store = try await NodeTreeStore.open(
+        root: path,
+        dataDirectoryName: dataDirectoryName,
+        rootPayload: TitlePayload(title: "ignored")
+      )
+      let roots = try await store.topologicalSort().filter {
+        if case .root = $0.parentId { return true }
+        return false
+      }
+      #expect(roots.count == 1)
+      let canonicalRootID = try await store.canonicalRootID()
+      let reparented = try await store.node(id: rootA.id == canonicalRootID ? rootB.id : rootA.id)
+      if case .node(let parent) = reparented?.parentId {
+        #expect(parent == canonicalRootID)
+      } else {
+        Issue.record("Expected stray root to be reparented under canonical root")
+      }
     }
   }
 

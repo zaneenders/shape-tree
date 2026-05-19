@@ -21,6 +21,21 @@ import Testing
   #expect(TodoCompletionPolicy.canMarkCompleted(parentID: "exercise", items: items))
 }
 
+@Test func settledLeafWithNoChildrenIsNotSettledWhenOpen() {
+  let items: [(id: String, parentNodeID: String?, status: TodoItemStatus)] = [
+    ("leaf", nil, .open),
+  ]
+  #expect(!TodoCompletionPolicy.isSettled(itemID: "leaf", items: items))
+  #expect(TodoCompletionPolicy.canMarkCompleted(parentID: "leaf", items: items))
+}
+
+@Test func completedLeafIsSettled() {
+  let items: [(id: String, parentNodeID: String?, status: TodoItemStatus)] = [
+    ("leaf", nil, .completed),
+  ]
+  #expect(TodoCompletionPolicy.isSettled(itemID: "leaf", items: items))
+}
+
 @Test func unsettledWhenDirectChildStillOpen() {
   let items: [(id: String, parentNodeID: String?, status: TodoItemStatus)] = [
     ("parent", nil, .open),

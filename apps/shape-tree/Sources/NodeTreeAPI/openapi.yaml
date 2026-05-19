@@ -118,6 +118,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HTTPErrorResponse"
+        "409":
+          description: >-
+            Conflict — for example ``status: completed`` with inline ``steps`` that
+            would still be open children.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "500":

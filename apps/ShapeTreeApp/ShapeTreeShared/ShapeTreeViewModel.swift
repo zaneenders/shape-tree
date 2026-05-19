@@ -710,6 +710,9 @@ public final class ShapeTreeViewModel {
       case .notFound(let err):
         todoError = try Self.todoHTTPErrorLine { try err.body.json }
 
+      case .conflict(let err):
+        todoError = try Self.todoHTTPErrorLine { try err.body.json }
+
       case .internalServerError(let err):
         todoError = try Self.todoHTTPErrorLine { try err.body.json }
 
