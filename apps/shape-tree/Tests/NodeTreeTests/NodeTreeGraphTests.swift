@@ -73,4 +73,18 @@ struct NodeTreeGraphTests {
       try NodeTreeGraph(nodes: [rootA, rootB])
     }
   }
+
+  @Test func adoptLoadedNodesRepairsMultipleRoots() throws {
+    let rootA = TreeNode(parentId: .root, payload: TitlePayload(title: "Todos"))
+    let rootB = TreeNode(parentId: .root, payload: TitlePayload(title: "Todos"))
+    var graph = NodeTreeGraph<TitlePayload>()
+    try graph.adoptLoadedNodes([rootA, rootB])
+    #expect(try graph.normalizeToSingleRoot())
+    let roots = try graph.topologicalSort().filter {
+      if case .root = $0.parentId { return true }
+      return false
+    }
+    #expect(roots.count == 1)
+  }
+
 }

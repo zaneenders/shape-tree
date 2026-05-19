@@ -1,15 +1,18 @@
 import Foundation
 import ShapeTreeClient
 
-/// Layout of Scribe-compatible mutable data under a required server `data_path` root `R`.
+/// Layout of mutable ShapeTree server data under a required server `data_path` root `R`.
 ///
-/// All journal and local device metadata live under `R/.shape-tree/` (dot folder name is fixed for this server).
+/// All on-disk artifacts (journal git repo, trust store, NodeTree stores such as `todo-tree`) live
+/// under `R/.shape-tree/`.
 public struct ShapeTreeDataLayout: Sendable {
 
   public static let dotFolderName = ".shape-tree"
   public static let subjectsFileName = "journal-subjects.json"
   public static let journalDirectoryName = "Journal"
   public static let authorizedKeysDirectoryName = "authorized_keys"
+  /// Default NodeTree store name for the todo HTTP API (`R/.shape-tree/todo-tree/`).
+  public static let defaultTodoTreeName = "todo-tree"
 
   public let dataRoot: URL
 
@@ -32,6 +35,15 @@ public struct ShapeTreeDataLayout: Sendable {
   /// Trust store: `R/.shape-tree/authorized_keys/<thumbprint>.jwk`.
   public var authorizedKeysDirectory: URL {
     dotFolder.appendingPathComponent(Self.authorizedKeysDirectoryName, isDirectory: true)
+  }
+
+  /// Workspace root passed to ``NodeTreeStore`` (`R/.shape-tree/`).
+  public var nodeTreeWorkspace: URL {
+    dotFolder
+  }
+
+  public func nodeTreeDirectory(treeName: String) -> URL {
+    dotFolder.appendingPathComponent(treeName, isDirectory: true)
   }
 
   public func journalEntryFile(for date: Date) -> URL {

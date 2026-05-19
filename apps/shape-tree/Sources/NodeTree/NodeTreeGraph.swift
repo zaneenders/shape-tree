@@ -5,7 +5,7 @@ public struct NodeTreeGraph<Payload: Codable & Sendable>: Sendable {
   private var nodesByID: [NodeID: TreeNode<Payload>]
   private var storedRootID: NodeID?
 
-  init() {
+  public init() {
     nodesByID = [:]
     storedRootID = nil
   }
@@ -93,6 +93,16 @@ public struct NodeTreeGraph<Payload: Codable & Sendable>: Sendable {
     return root
   }
 
+  public mutating func updateNode(id: NodeID, payload: Payload) throws -> TreeNode<Payload> {
+    guard var node = nodesByID[id] else {
+      throw NodeTreeError.nodeNotFound(id)
+    }
+    node.payload = payload
+    nodesByID[id] = node
+    try validate()
+    return node
+  }
+
   public mutating func insertNode(payload: Payload, parentId: ParentId) throws -> TreeNode<Payload> {
     let resolvedParentId = try resolveParentId(parentId)
     let node = TreeNode(parentId: resolvedParentId, payload: payload)
@@ -115,6 +125,44 @@ public struct NodeTreeGraph<Payload: Codable & Sendable>: Sendable {
 
   func allNodes() -> [TreeNode<Payload>] {
     nodesByID.values.sorted(by: Self.stableOrder)
+  }
+
+  /// Loads nodes from disk without enforcing invariants yet (for repair before ``normalizeToSingleRoot()``).
+  public mutating func adoptLoadedNodes(_ nodes: [TreeNode<Payload>]) throws {
+    nodesByID.removeAll()
+    storedRootID = nil
+    for node in nodes {
+      guard nodesByID[node.id] == nil else {
+        throw NodeTreeError.duplicateNodeID(node.id)
+      }
+      nodesByID[node.id] = node
+      if case .root = node.parentId, storedRootID == nil {
+        storedRootID = node.id
+      }
+    }
+  }
+
+  /// Keeps a single canonical root; reparents stray ``.root`` nodes under it. Returns whether anything changed.
+  @discardableResult
+  public mutating func normalizeToSingleRoot() throws -> Bool {
+    let roots = nodesByID.values.filter { $0.parentId == .root }
+    guard roots.count > 1 else { return false }
+
+    let canonicalID: NodeID = {
+      if let storedRootID, nodesByID[storedRootID] != nil { return storedRootID }
+      return roots.sorted(by: Self.stableOrder)[0].id
+    }()
+
+    var changed = false
+    for root in roots where root.id != canonicalID {
+      var node = root
+      node.parentId = .node(canonicalID)
+      nodesByID[node.id] = node
+      changed = true
+    }
+    storedRootID = canonicalID
+    try validate()
+    return changed
   }
 
   func validate() throws {

@@ -10,6 +10,7 @@ let package = Package(
   ],
   products: [
     .library(name: "ShapeTreeClient", targets: ["ShapeTreeClient"]),
+    .library(name: "NodeTreeAPI", targets: ["NodeTreeAPI"]),
     .executable(name: "ShapeTree", targets: ["ShapeTree"]),
   ],
   dependencies: [
@@ -44,6 +45,8 @@ let package = Package(
       name: "ShapeTree",
       dependencies: [
         "ShapeTreeClient",
+        "NodeTree",
+        "NodeTreeAPI",
         "Sit",
         .product(name: "ScribeCore", package: "scribe"),
         .product(name: "Hummingbird", package: "hummingbird"),
@@ -89,6 +92,8 @@ let package = Package(
       dependencies: [
         "ShapeTree",
         "ShapeTreeClient",
+        "NodeTreeAPI",
+        .product(name: "_NIOFileSystem", package: "swift-nio"),
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "HummingbirdTesting", package: "hummingbird"),
         .product(name: "OpenAPIAsyncHTTPClient", package: "swift-openapi-async-http-client"),
@@ -98,6 +103,19 @@ let package = Package(
       swiftSettings: [
         .swiftLanguageMode(.v6),
         .treatAllWarnings(as: .error),
+      ]
+    ),
+    .target(
+      name: "NodeTreeAPI",
+      dependencies: [
+        .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime")
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+        .treatAllWarnings(as: .error),
+      ],
+      plugins: [
+        .plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")
       ]
     ),
     .target(

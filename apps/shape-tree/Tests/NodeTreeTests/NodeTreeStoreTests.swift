@@ -1,6 +1,6 @@
-import _NIOFileSystem
 import NodeTree
 import Testing
+import _NIOFileSystem
 
 @Suite
 struct NodeTreeStoreTests {
@@ -98,13 +98,13 @@ struct NodeTreeStoreTests {
     try await FileSystem.shared.withTemporaryDirectory { _, path in
       let store = try await NodeTreeStore.open(
         root: path,
-        dataDirectoryName: ".todo-tree",
+        dataDirectoryName: "todo-tree",
         rootPayload: TitlePayload(title: "root")
       )
-      #expect(store.dataDirectoryName == ".todo-tree")
+      #expect(store.dataDirectoryName == "todo-tree")
       _ = try await store.createNode(payload: TitlePayload(title: "task"), parentId: .root)
 
-      let nodesDir = path.appending(".todo-tree").appending("nodes")
+      let nodesDir = path.appending("todo-tree").appending("nodes")
       #expect(try await store.fileSystem.info(forFileAt: nodesDir)?.type == .directory)
     }
   }
@@ -113,7 +113,7 @@ struct NodeTreeStoreTests {
     try await FileSystem.shared.withTemporaryDirectory { _, path in
       let todo = try await NodeTreeStore.open(
         root: path,
-        dataDirectoryName: ".todo-tree",
+        dataDirectoryName: "todo-tree",
         rootPayload: TitlePayload(title: "todos")
       )
       let context = try await NodeTreeStore.open(

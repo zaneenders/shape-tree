@@ -1,6 +1,6 @@
 import Foundation
 import Logging
-import ShapeTree
+@testable import ShapeTree
 
 enum JournalTestFixtures {
 
@@ -16,5 +16,9 @@ enum JournalTestFixtures {
     let store = JournalStore(layout: layout, log: log)
     try await store.initializeJournalGitRepoIfNeeded()
     return (store, layout)
+  }
+
+  static func todoTreeService(layout: ShapeTreeDataLayout) -> TodoTreeService {
+    TodoTreeService(layout: layout)
   }
 }

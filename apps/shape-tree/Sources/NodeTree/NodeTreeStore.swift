@@ -4,7 +4,7 @@ import _NIOFileSystem
 /// Persistent payload tree backed by the local file system.
 public actor NodeTreeStore<Payload: Codable & Sendable> {
   public let root: FilePath
-  /// Dot-directory under ``root`` (e.g. `.todo-tree`, `.context-tree`).
+  /// Data directory name under ``root`` (e.g. `todo-tree`, `context-tree`).
   public nonisolated let dataDirectoryName: String
   public let fileSystem: FileSystem
   public private(set) var rootID: NodeID
@@ -69,6 +69,20 @@ public actor NodeTreeStore<Payload: Codable & Sendable> {
     return try graph.topologicalSort()
   }
 
+  /// Direct children of `parentID`, in stable order.
+  public func children(of parentID: NodeID) async throws -> [TreeNode<Payload>] {
+    try await prepareOnDisk()
+    return graph.children(of: parentID)
+  }
+
+  /// Replaces the payload for an existing node and persists `node.json`.
+  public func updateNode(id: NodeID, payload: Payload) async throws -> TreeNode<Payload> {
+    try await prepareOnDisk()
+    let node = try graph.updateNode(id: id, payload: payload)
+    try await persistNode(node)
+    return node
+  }
+
   private var dataDirectory: FilePath {
     root.appending(dataDirectoryName)
   }
@@ -92,21 +106,45 @@ public actor NodeTreeStore<Payload: Codable & Sendable> {
 
     graph = try await loadGraph()
     if graph.isEmpty {
-      let root = try graph.seedRoot(payload: rootPayload)
-      rootID = root.id
-      try await persistNode(root)
+      try await seedCanonicalRootIfNeeded()
     } else {
+      try await repairPersistedGraphIfNeeded()
       rootID = try graph.rootID()
     }
 
     isPrepared = true
   }
 
+  /// Canonical tree root created by the server (not exposed to clients).
+  public func canonicalRootID() async throws -> NodeID {
+    try await prepareOnDisk()
+    return rootID
+  }
+
   private func loadGraph() async throws -> NodeTreeGraph<Payload> {
     let loader = NodeDirectoryLoader<Payload>(fileSystem: fileSystem)
     let nodes = try await loader.loadNodes(from: nodesDirectory)
-    guard !nodes.isEmpty else { return NodeTreeGraph() }
-    return try NodeTreeGraph(nodes: nodes)
+    guard !nodes.isEmpty else { return NodeTreeGraph<Payload>() }
+
+    var graph = NodeTreeGraph<Payload>()
+    try graph.adoptLoadedNodes(nodes)
+    _ = try graph.normalizeToSingleRoot()
+    try graph.validate()
+    return graph
+  }
+
+  private func repairPersistedGraphIfNeeded() async throws {
+    guard try graph.normalizeToSingleRoot() else { return }
+    for node in graph.allNodes() {
+      try await persistNode(node)
+    }
+  }
+
+  private func seedCanonicalRootIfNeeded() async throws {
+    guard graph.isEmpty else { return }
+    let root = try graph.seedRoot(payload: rootPayload)
+    rootID = root.id
+    try await persistNode(root)
   }
 
   private func persistNode(_ node: TreeNode<Payload>) async throws {

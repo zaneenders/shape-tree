@@ -1,6 +1,6 @@
-import _NIOFileSystem
 import NodeTree
 import Testing
+import _NIOFileSystem
 
 @Suite
 struct NodeTreeTests {

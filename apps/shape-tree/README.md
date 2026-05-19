@@ -41,9 +41,9 @@ server to other devices, and only behind TLS (the server speaks plain HTTP). Set
 `0.0.0.0` logs a warning at startup. `data.path` is the **absolute or relative directory `R`** for
 all mutable ShapeTree files; relative paths (including `"."`) resolve against the server process
 working directory. Journal git state, `journal-subjects.json`, **and the ES256 trust store** live
-under `R/.shape-tree/`. For local development, set `data.path` to the repository root and ignore
-`.shape-tree/` via git (see repo `.gitignore`). `ollama.token` may be empty when no bearer token is
-required (e.g. local Ollama).
+under `R/.shape-tree/` (journal, device keys, and NodeTree stores such as `R/.shape-tree/todo-tree/`).
+For local development, set `data.path` to the repository root and ignore `.shape-tree/` via git
+(see repo `.gitignore`). `ollama.token` may be empty when no bearer token is required (e.g. local Ollama).
 
 ## Authentication: per-device ES256 keys
 

@@ -6,6 +6,7 @@ import SwiftUI
 private enum ShapeTreeMainTab: String, CaseIterable, Identifiable {
   case scribe = "Scribe"
   case journal = "Journal"
+  case todos = "TODOs"
   case settings = "Settings"
 
   var id: String { rawValue }
@@ -14,6 +15,7 @@ private enum ShapeTreeMainTab: String, CaseIterable, Identifiable {
     switch self {
     case .scribe: return "bubble.left.and.bubble.right.fill"
     case .journal: return "book.closed"
+    case .todos: return "checklist"
     case .settings: return "gearshape"
     }
   }
@@ -35,6 +37,7 @@ struct ShapeTreeChatView: View {
   var body: some View {
     VStack(spacing: 0) {
       errorBanner(viewModel.journalError)
+      errorBanner(viewModel.todoError)
       errorBanner(viewModel.errorMessage)
       toolbar
       Group {
@@ -43,6 +46,8 @@ struct ShapeTreeChatView: View {
           assistantRoot
         case .journal:
           ShapeTreeJournalView(viewModel: viewModel)
+        case .todos:
+          ShapeTreeTodoView(viewModel: viewModel)
         case .settings:
           ShapeTreeSettingsView(viewModel: viewModel)
         }
@@ -52,9 +57,18 @@ struct ShapeTreeChatView: View {
     .task {
       await viewModel.refreshJournalSubjects()
     }
+    .onChange(of: mainTab) { _, tab in
+      guard tab == .todos else { return }
+      Task { await viewModel.refreshTodoItems() }
+    }
     .onChange(of: viewModel.connectionState) { oldState, newState in
       guard oldState != .online, newState == .online else { return }
-      Task { await viewModel.refreshJournalSubjects() }
+      Task {
+        await viewModel.refreshJournalSubjects()
+        if mainTab == .todos {
+          await viewModel.refreshTodoItems()
+        }
+      }
     }
     #if os(macOS)
     .frame(minWidth: 540, minHeight: 460)
