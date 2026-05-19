@@ -25,6 +25,7 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"),
     .package(url: "https://github.com/vapor/jwt-kit.git", from: "5.0.0"),
     .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
+    .package(url: "https://github.com/apple/swift-nio.git", from: "2.99.0"),
   ],
   targets: [
     .target(
@@ -99,7 +100,28 @@ let package = Package(
         .treatAllWarnings(as: .error),
       ]
     ),
-    .target(name: "TodoTree"),
-    .testTarget(name: "TodoTreeTests", dependencies: ["TodoTree"]),
+    .target(
+      name: "TodoTree",
+      dependencies: [
+        .product(name: "_NIOFileSystem", package: "swift-nio"),
+        .product(name: "SystemPackage", package: "swift-system"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+        .treatAllWarnings(as: .error),
+      ]
+    ),
+    .testTarget(
+      name: "TodoTreeTests",
+      dependencies: [
+        "TodoTree",
+        .product(name: "_NIOFileSystem", package: "swift-nio"),
+        .product(name: "SystemPackage", package: "swift-system"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+        .treatAllWarnings(as: .error),
+      ]
+    ),
   ]
 )
