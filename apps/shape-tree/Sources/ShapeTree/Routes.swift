@@ -3,6 +3,7 @@ import Hummingbird
 import Logging
 import OpenAPIHummingbird
 import ShapeTreeClient
+import SystemPackage
 
 /// Hummingbird router with OpenAPI-generated handlers registered.
 func buildRoutes(
@@ -10,6 +11,7 @@ func buildRoutes(
   journalStore: JournalStore,
   authorizedKeys: AuthorizedKeysStore,
   replayCache: JWTReplayCache = JWTReplayCache(),
+  todoTreeService: TodoTreeService? = nil,
   log: Logger,
   llmURL: String,
   agentModel: String,
@@ -36,5 +38,13 @@ func buildRoutes(
     workingDirectory: workingDirectory)
 
   try handler.registerHandlers(on: router)
+
+  let dataLayout = ShapeTreeDataLayout(
+    dataRoot: URL(fileURLWithPath: workingDirectory, isDirectory: true)
+  )
+  let todoService = todoTreeService ?? TodoTreeService(layout: dataLayout)
+  let todoHandler = NodeTreeTodoHandler(service: todoService, log: log)
+  try todoHandler.registerHandlers(on: router)
+
   return router
 }

@@ -7,7 +7,7 @@ options:
   bundleIdPrefix: shape-tree
 
 packages:
-  ShapeTreeClient:
+  shape-tree:
     path: ../shape-tree
 
 targets:
@@ -47,8 +47,10 @@ targets:
       STRIP_INSTALLED_PRODUCT: YES
       STRIP_STYLE: debugging
     dependencies:
-      - package: ShapeTreeClient
+      - package: shape-tree
         product: ShapeTreeClient
+      - package: shape-tree
+        product: NodeTreeAPI
 
   ShapeTreeApp-Mac:
     type: application
@@ -83,8 +85,10 @@ targets:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
     dependencies:
-      - package: ShapeTreeClient
+      - package: shape-tree
         product: ShapeTreeClient
+      - package: shape-tree
+        product: NodeTreeAPI
 
 schemes:
   ShapeTreeApp-iOS:

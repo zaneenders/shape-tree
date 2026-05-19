@@ -38,6 +38,12 @@ import Testing
     #expect(resolved.deletingLastPathComponent().standardizedFileURL == sandbox.standardizedFileURL)
   }
 
+  @Test func nodeTreeStoresLiveUnderDotFolder() {
+    let layout = ShapeTreeDataLayout(dataRoot: URL(fileURLWithPath: "/tmp/shape-tree-data", isDirectory: true))
+    #expect(layout.nodeTreeDirectory(treeName: "todo-tree").path.hasSuffix("/.shape-tree/todo-tree"))
+    #expect(layout.nodeTreeWorkspace.path.hasSuffix("/.shape-tree"))
+  }
+
   @Test func sanitizeDeviceFilename() {
     #expect(JournalPathCodec.sanitizeFilenameComponent("My Device!") == "My-Device-")
     #expect(JournalPathCodec.sanitizeFilenameComponent(" ") == "unknown-device")

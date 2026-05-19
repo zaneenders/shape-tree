@@ -1,0 +1,512 @@
+openapi: "3.0.3"
+info:
+  title: NodeTree Todo API
+  description: >-
+    HTTP API for a hierarchical todo list backed by ``NodeTree`` on disk.
+    Each ShapeTree data root may host multiple NodeTree stores (for example ``todo-tree``,
+    ``context-tree``) selected with the ``tree`` query parameter. On disk they live under
+    ``<data_path>/.shape-tree/<tree>/nodes/<uuid>/node.json``.
+  version: 0.1.0
+
+servers:
+  - url: http://localhost:42069
+    description: >-
+      Local ShapeTree server (todo routes are expected to be mounted under this origin).
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  /todo/root:
+    get:
+      operationId: getTodoRoot
+      summary: Reserved; server root is not exposed.
+      description: >-
+        Always returns 404. ShapeTree seeds a canonical root under ``.shape-tree`` on
+        the server; clients use ``parent_id: { "kind": "root" }`` on create to mean
+        a top-level todo.
+      tags:
+        - todo
+      parameters:
+        - $ref: "#/components/parameters/TreeQuery"
+      responses:
+        "200":
+          description: Root node.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoItem"
+        "404":
+          description: Tree has no root (empty or corrupt on-disk layout).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "400":
+          description: Invalid ``tree`` name.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /todo/items:
+    get:
+      operationId: listTodoItems
+      summary: List all todo items in topological order.
+      description: >-
+        Returns every node in the tree: root first, then descendants in stable
+        ``created_at`` / id order (same order as ``NodeTreeStore.topologicalSort()``).
+      tags:
+        - todo
+      parameters:
+        - $ref: "#/components/parameters/TreeQuery"
+      responses:
+        "200":
+          description: Items in topological order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoItemListResponse"
+        "400":
+          description: Invalid ``tree`` name.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      operationId: createTodoItem
+      summary: Create a todo item under a parent.
+      description: >-
+        Inserts a new node and persists ``node.json``. Use ``parent_id`` with
+        ``kind: root`` to attach directly under the tree root, or ``kind: node``
+        with a parent UUID. The server resolves ``root`` to the actual root id on disk.
+      tags:
+        - todo
+      parameters:
+        - $ref: "#/components/parameters/TreeQuery"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTodoItemRequest"
+      responses:
+        "201":
+          description: Created item.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoItem"
+        "400":
+          description: Invalid body or ``tree`` name.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "404":
+          description: Parent node does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "409":
+          description: >-
+            Conflict — for example ``status: completed`` with inline ``steps`` that
+            would still be open children.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /todo/items/{itemId}:
+    get:
+      operationId: getTodoItem
+      summary: Fetch one todo item by id.
+      tags:
+        - todo
+      parameters:
+        - $ref: "#/components/parameters/TreeQuery"
+        - $ref: "#/components/parameters/ItemIdPath"
+      responses:
+        "200":
+          description: Item found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoItem"
+        "404":
+          description: Item not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "400":
+          description: Invalid ``tree`` name.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    patch:
+      operationId: updateTodoItem
+      summary: Update a todo item's fields.
+      description: >-
+        Merges the request body into the stored item. Omitted fields are left unchanged.
+        The tree root node's title can be updated; structure (parent link) is not changed.
+      tags:
+        - todo
+      parameters:
+        - $ref: "#/components/parameters/TreeQuery"
+        - $ref: "#/components/parameters/ItemIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTodoItemRequest"
+      responses:
+        "200":
+          description: Updated item.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoItem"
+        "400":
+          description: Invalid body or ``tree`` name.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "404":
+          description: Item not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "409":
+          description: >-
+            Conflict — for example marking a parent ``completed`` while direct
+            children are still ``open``.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /todo/items/{itemId}/break-down:
+    post:
+      operationId: breakDownTodoItem
+      summary: Decompose a todo into child steps.
+      description: >-
+        Creates one child item per step under the given parent. Use this after
+        creating a parent task to split work into smaller todos (continuation-style
+        workflows in clients).
+      tags:
+        - todo
+      parameters:
+        - $ref: "#/components/parameters/TreeQuery"
+        - $ref: "#/components/parameters/ItemIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BreakDownTodoItemRequest"
+      responses:
+        "201":
+          description: Created child items.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoItemListResponse"
+        "400":
+          description: Invalid body or ``tree`` name.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "404":
+          description: Parent item not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /todo/items/{itemId}/children:
+    get:
+      operationId: listTodoItemChildren
+      summary: List direct children of an item.
+      description: >-
+        Returns nodes whose stored parent is the given item (not recursive).
+      tags:
+        - todo
+      parameters:
+        - $ref: "#/components/parameters/TreeQuery"
+        - $ref: "#/components/parameters/ItemIdPath"
+      responses:
+        "200":
+          description: Direct children in stable order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoItemListResponse"
+        "404":
+          description: Parent item not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "400":
+          description: Invalid ``tree`` name.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HTTPErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Same bearer enrollment as the ShapeTree API.
+
+  parameters:
+    TreeQuery:
+      name: tree
+      in: query
+      required: false
+      schema:
+        type: string
+        default: "todo-tree"
+        pattern: '^[^/\\]+$'
+      description: >-
+        NodeTree store name under ``<data_path>/.shape-tree/`` (for example ``todo-tree``,
+        ``context-tree``). Passed to ``NodeTreeStore.open(dataDirectoryName:)``.
+
+    ItemIdPath:
+      name: itemId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid bearer token.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/HTTPErrorResponse"
+    InternalError:
+      description: Server failure.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/HTTPErrorResponse"
+
+  schemas:
+
+    ParentIdRoot:
+      type: object
+      required:
+        - kind
+      properties:
+        kind:
+          type: string
+          enum:
+            - root
+
+    ParentIdNode:
+      type: object
+      required:
+        - kind
+        - id
+      properties:
+        kind:
+          type: string
+          enum:
+            - node
+        id:
+          type: string
+          format: uuid
+
+    ParentId:
+      description: >-
+        Parent link for a tree node. Only the seeded root stores ``kind: root``;
+        other nodes store ``kind: node`` with their parent's id.
+      oneOf:
+        - $ref: "#/components/schemas/ParentIdRoot"
+        - $ref: "#/components/schemas/ParentIdNode"
+      discriminator:
+        propertyName: kind
+        mapping:
+          root: "#/components/schemas/ParentIdRoot"
+          node: "#/components/schemas/ParentIdNode"
+
+    TodoItemStatus:
+      type: string
+      enum:
+        - open
+        - completed
+        - archive
+      description: >-
+        ``open`` — active work. ``completed`` — done. ``archive`` — closed without
+        completion (won't block parent completion).
+
+    TodoPayload:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          minLength: 1
+          description: Display title for the todo item.
+        status:
+          $ref: "#/components/schemas/TodoItemStatus"
+          default: open
+        notes:
+          type: string
+          description: Optional markdown or plain-text notes.
+
+    TodoItem:
+      type: object
+      required:
+        - id
+        - parent_id
+        - created_at
+        - title
+      properties:
+        id:
+          type: string
+          format: uuid
+        parent_id:
+          $ref: "#/components/schemas/ParentId"
+        created_at:
+          type: string
+          format: date-time
+        title:
+          type: string
+        status:
+          $ref: "#/components/schemas/TodoItemStatus"
+          default: open
+        notes:
+          type: string
+
+    BreakDownStep:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          minLength: 1
+
+    BreakDownTodoItemRequest:
+      type: object
+      required:
+        - steps
+      properties:
+        steps:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/BreakDownStep"
+
+    TodoItemListResponse:
+      type: object
+      required:
+        - tree
+        - items
+      properties:
+        tree:
+          type: string
+          description: Resolved ``tree`` query value (data directory name).
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TodoItem"
+
+    CreateTodoItemRequest:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          minLength: 1
+        parent_id:
+          $ref: "#/components/schemas/ParentId"
+          description: >-
+            Where to attach the new item. Defaults to ``{ "kind": "root" }`` when omitted.
+        status:
+          $ref: "#/components/schemas/TodoItemStatus"
+        steps:
+          type: array
+          description: >-
+            Optional child steps to create immediately after the parent (same as
+            ``POST …/break-down`` in one request).
+          items:
+            $ref: "#/components/schemas/BreakDownStep"
+        notes:
+          type: string
+
+    UpdateTodoItemRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+        status:
+          $ref: "#/components/schemas/TodoItemStatus"
+        notes:
+          type: string
+          nullable: true
+
+    HTTPErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - message
+          properties:
+            message:
+              type: string
+            code:
+              type: string
+              description: >-
+                Machine-oriented code when available (for example
+                ``parent_not_found``, ``invalid_data_directory_name``).

@@ -53,11 +53,13 @@ let authorizedKeys = AuthorizedKeysStore(directory: layout.authorizedKeysDirecto
 let replayCache = JWTReplayCache()
 
 let store = SessionStore()
+let todoTreeService = TodoTreeService(layout: layout)
 let router = try buildRoutes(
   store: store,
   journalStore: journalStore,
   authorizedKeys: authorizedKeys,
   replayCache: replayCache,
+  todoTreeService: todoTreeService,
   log: log,
   llmURL: ollamaURL,
   agentModel: agentModel,

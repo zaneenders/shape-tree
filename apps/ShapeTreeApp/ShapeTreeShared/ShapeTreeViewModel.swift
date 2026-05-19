@@ -1,4 +1,5 @@
 import Foundation
+import NodeTreeAPI
 import OpenAPIAsyncHTTPClient
 import OpenAPIRuntime
 import ShapeTreeClient
@@ -21,7 +22,7 @@ public final class ShapeTreeViewModel {
 
   /// Pulls the operator-facing message off an `HTTPErrorResponse` body decoder.
   private static func httpErrorLine(
-    _ decode: () throws -> Components.Schemas.HTTPErrorResponse
+    _ decode: () throws -> ShapeTreeClient.Components.Schemas.HTTPErrorResponse
   ) rethrows -> String {
     try decode().error.message
   }
@@ -51,6 +52,13 @@ public final class ShapeTreeViewModel {
   public var journalCalendarError: String? = nil
   public var isJournalWorking: Bool = false
 
+  public typealias TodoItem = NodeTreeAPI.Components.Schemas.TodoItem
+
+  public var todoItems: [TodoItem] = []
+  public var todoError: String? = nil
+  public var todoStatus: String? = nil
+  public var isTodoWorking: Bool = false
+
   public var serverURL: String {
     didSet {
       connectionMonitor.serverURLDidChange(serverURL)
@@ -60,6 +68,9 @@ public final class ShapeTreeViewModel {
       journalError = nil
       journalCalendarError = nil
       journalSelectedSubjectIDs = []
+      todoItems.removeAll()
+      todoStatus = nil
+      todoError = nil
     }
   }
 
@@ -74,7 +85,8 @@ public final class ShapeTreeViewModel {
   }
 
   /// Shared generated client — same bearer middleware stack for journal and chat paths.
-  private var sharedOpenAPIClient: Client?
+  private var sharedOpenAPIClient: ShapeTreeClient.Client?
+  private var sharedTodoClient: NodeTreeAPI.Client?
   private var sessionId: String?
   private let transport: AsyncHTTPClientTransport
 
@@ -89,17 +101,29 @@ public final class ShapeTreeViewModel {
     _ = try? keyStore.loadOrGenerate()
   }
 
-  private func makeClient() throws -> Client {
-    guard let endpoint = URL(string: serverURL) else {
-      throw AppError.invalidURL(serverURL)
-    }
+  private func bearerMiddlewares() -> [any ClientMiddleware] {
     let store = keyStore
-    let middlewares: [any ClientMiddleware] = [
+    return [
       BearerAuthClientMiddleware(tokenProvider: { @Sendable in
         try await MainActor.run { try store.mintES256JWT(ttl: 900) }
       })
     ]
-    return Client(serverURL: endpoint, transport: transport, middlewares: middlewares)
+  }
+
+  private func makeClient() throws -> ShapeTreeClient.Client {
+    guard let endpoint = URL(string: serverURL) else {
+      throw AppError.invalidURL(serverURL)
+    }
+    return ShapeTreeClient.Client(
+      serverURL: endpoint, transport: transport, middlewares: bearerMiddlewares())
+  }
+
+  private func makeTodoClient() throws -> NodeTreeAPI.Client {
+    guard let endpoint = URL(string: serverURL) else {
+      throw AppError.invalidURL(serverURL)
+    }
+    return NodeTreeAPI.Client(
+      serverURL: endpoint, transport: transport, middlewares: bearerMiddlewares())
   }
 
   public func currentPublicJWKJSON() -> String? {
@@ -199,7 +223,7 @@ public final class ShapeTreeViewModel {
     journalSubjects.removeAll()
   }
 
-  private func openAPIClient() throws -> Client {
+  private func openAPIClient() throws -> ShapeTreeClient.Client {
     if let client = sharedOpenAPIClient {
       return client
     }
@@ -210,14 +234,28 @@ public final class ShapeTreeViewModel {
 
   private func invalidateOpenAPIClientAndAgentSession() {
     sharedOpenAPIClient = nil
+    sharedTodoClient = nil
     sessionId = nil
+  }
+
+  private func openTodoClient() throws -> NodeTreeAPI.Client {
+    if let sharedTodoClient { return sharedTodoClient }
+    let built = try makeTodoClient()
+    sharedTodoClient = built
+    return built
+  }
+
+  private static func todoHTTPErrorLine(
+    _ decode: () throws -> NodeTreeAPI.Components.Schemas.HTTPErrorResponse
+  ) rethrows -> String {
+    try decode().error.message
   }
 
   private func invalidateAgentSessionOnly() {
     sessionId = nil
   }
 
-  private func ensureSession() async throws -> Client {
+  private func ensureSession() async throws -> ShapeTreeClient.Client {
     let api = try openAPIClient()
     if sessionId != nil { return api }
 
@@ -254,7 +292,9 @@ public final class ShapeTreeViewModel {
 
       /// Merge `fragment` into the last block when it matches `kind`; otherwise append a new block
       /// of the same shape. Replaces the previous duplicate appendReasoning/appendAnswer closures.
-      func appendStreamFragment(_ fragment: String, section: Components.Schemas.CompletionStreamSection) {
+      func appendStreamFragment(
+        _ fragment: String, section: ShapeTreeClient.Components.Schemas.CompletionStreamSection
+      ) {
         guard !fragment.isEmpty else { return }
         if let last = blocks.last {
           switch (last.kind, section) {
@@ -478,7 +518,7 @@ public final class ShapeTreeViewModel {
 
     do {
       let remote = try openAPIClient()
-      let payload = Components.Schemas.AppendJournalEntryRequest(
+      let payload = ShapeTreeClient.Components.Schemas.AppendJournalEntryRequest(
         subject_ids: Array(journalSelectedSubjectIDs).sorted(),
         body: bodyText,
         journal_day: JournalPathCodec.journalDayKey(for: filingDate, calendar: .autoupdatingCurrent),
@@ -509,7 +549,7 @@ public final class ShapeTreeViewModel {
   }
 
   public func fetchJournalEntrySummaries(startDayKey: String, endDayKey: String) async throws
-    -> [Components.Schemas.JournalEntrySummary]
+    -> [ShapeTreeClient.Components.Schemas.JournalEntrySummary]
   {
     guard connectionState == .online else {
       throw AppError.server(offlineOrUnauthorizedMessage)
@@ -535,8 +575,8 @@ public final class ShapeTreeViewModel {
     }
   }
 
-  public func fetchJournalEntryDetailIfPresent(dayKey: String) async throws -> Components.Schemas
-    .JournalEntryDetailResponse?
+  public func fetchJournalEntryDetailIfPresent(dayKey: String) async throws
+    -> ShapeTreeClient.Components.Schemas.JournalEntryDetailResponse?
   {
     guard connectionState == .online else {
       throw AppError.server(offlineOrUnauthorizedMessage)
@@ -561,5 +601,275 @@ public final class ShapeTreeViewModel {
       throw AppError.server(
         Self.messageForStatus(code, fallback: "Unexpected status \(code) while loading journal entry."))
     }
+  }
+
+  // MARK: - Todo tree
+
+  public var todoRootItem: TodoItem? {
+    todoItems.first { item in
+      if case .root = item.parent_id { return true }
+      return false
+    }
+  }
+
+  public func refreshTodoItems() async {
+    guard connectionState == .online else {
+      todoItems = []
+      return
+    }
+    guard !serverURL.isEmpty else {
+      todoError = "Enter a ShapeTree server URL first."
+      return
+    }
+
+    todoError = nil
+    todoStatus = nil
+    isTodoWorking = true
+    defer { isTodoWorking = false }
+
+    do {
+      let remote = try openTodoClient()
+      let response = try await remote.listTodoItems(.init())
+
+      switch response {
+      case .ok(let packet):
+        let payload = try packet.body.json
+        todoItems = payload.items
+        todoStatus = todoItems.isEmpty ? "No items yet." : "\(todoItems.count) items loaded."
+
+      case .badRequest(let err):
+        todoError = try Self.todoHTTPErrorLine { try err.body.json }
+
+      case .internalServerError(let err):
+        todoError = try Self.todoHTTPErrorLine { try err.body.json }
+
+      case .unauthorized:
+        todoError = Self.unauthorizedMessage
+
+      case .undocumented(let statusCode, _):
+        todoError = Self.messageForStatus(
+          statusCode, fallback: "Unexpected status \(statusCode) while loading todos.")
+      }
+    } catch {
+      todoError = error.localizedDescription
+    }
+  }
+
+  public typealias TodoItemStatus = NodeTreeAPI.Components.Schemas.TodoItemStatus
+
+  @discardableResult
+  public func createTodoItem(
+    title: String,
+    parentID: NodeTreeAPI.Components.Schemas.ParentId = .root(.init(kind: .root)),
+    steps: [String]? = nil
+  ) async -> TodoItem? {
+    let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else {
+      todoError = "Enter a title before adding."
+      return nil
+    }
+    guard connectionState == .online else {
+      todoError = offlineOrUnauthorizedMessage
+      return nil
+    }
+    guard !serverURL.isEmpty else {
+      todoError = "Enter a ShapeTree server URL first."
+      return nil
+    }
+
+    let stepPayloads = steps?
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+      .map { NodeTreeAPI.Components.Schemas.BreakDownStep(title: $0) }
+
+    todoError = nil
+    isTodoWorking = true
+    defer { isTodoWorking = false }
+
+    do {
+      let remote = try openTodoClient()
+      let response = try await remote.createTodoItem(
+        body: .json(
+          .init(
+            title: trimmed,
+            parent_id: parentID,
+            steps: stepPayloads?.isEmpty == false ? stepPayloads : nil
+          ))
+      )
+
+      switch response {
+      case .created(let packet):
+        let created = try packet.body.json
+        await refreshTodoItems()
+        todoStatus = "Added \"\(trimmed)\"."
+        return created
+
+      case .badRequest(let err):
+        todoError = try Self.todoHTTPErrorLine { try err.body.json }
+
+      case .notFound(let err):
+        todoError = try Self.todoHTTPErrorLine { try err.body.json }
+
+      case .conflict(let err):
+        todoError = try Self.todoHTTPErrorLine { try err.body.json }
+
+      case .internalServerError(let err):
+        todoError = try Self.todoHTTPErrorLine { try err.body.json }
+
+      case .unauthorized:
+        todoError = Self.unauthorizedMessage
+
+      case .undocumented(let statusCode, _):
+        todoError = Self.messageForStatus(
+          statusCode, fallback: "Unexpected status \(statusCode) while creating todo.")
+      }
+    } catch {
+      todoError = error.localizedDescription
+    }
+    return nil
+  }
+
+  @discardableResult
+  public func breakDownTodoItem(id: String, stepTitles: [String]) async -> [TodoItem]? {
+    let steps = stepTitles
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }
+    guard !steps.isEmpty else {
+      todoError = "Add at least one step."
+      return nil
+    }
+    guard connectionState == .online else {
+      todoError = offlineOrUnauthorizedMessage
+      return nil
+    }
+    guard !serverURL.isEmpty else {
+      todoError = "Enter a ShapeTree server URL first."
+      return nil
+    }
+
+    todoError = nil
+    isTodoWorking = true
+    defer { isTodoWorking = false }
+
+    do {
+      let remote = try openTodoClient()
+      let response = try await remote.breakDownTodoItem(
+        path: .init(itemId: id),
+        body: .json(.init(steps: steps.map { .init(title: $0) }))
+      )
+
+      switch response {
+      case .created(let packet):
+        let payload = try packet.body.json
+        await refreshTodoItems()
+        todoStatus = "Added \(steps.count) subtask\(steps.count == 1 ? "" : "s")."
+        return payload.items
+
+      case .badRequest(let err):
+        todoError = try Self.todoHTTPErrorLine { try err.body.json }
+
+      case .notFound(let err):
+        todoError = try Self.todoHTTPErrorLine { try err.body.json }
+
+      case .internalServerError(let err):
+        todoError = try Self.todoHTTPErrorLine { try err.body.json }
+
+      case .unauthorized:
+        todoError = Self.unauthorizedMessage
+
+      case .undocumented(let statusCode, _):
+        todoError = Self.messageForStatus(
+          statusCode, fallback: "Unexpected status \(statusCode) while breaking down todo.")
+      }
+    } catch {
+      todoError = error.localizedDescription
+    }
+    return nil
+  }
+
+  @discardableResult
+  public func updateTodoItem(
+    id: String,
+    title: String? = nil,
+    status: TodoItemStatus? = nil,
+    notes: String? = nil
+  ) async -> Bool {
+    guard connectionState == .online else {
+      todoError = offlineOrUnauthorizedMessage
+      return false
+    }
+    guard !serverURL.isEmpty else {
+      todoError = "Enter a ShapeTree server URL first."
+      return false
+    }
+
+    todoError = nil
+    isTodoWorking = true
+    defer { isTodoWorking = false }
+
+    do {
+      let remote = try openTodoClient()
+      let response = try await remote.updateTodoItem(
+        path: .init(itemId: id),
+        body: .json(.init(title: title, status: status, notes: notes))
+      )
+
+      switch response {
+      case .ok(let packet):
+        let updated = try packet.body.json
+        if let index = todoItems.firstIndex(where: { $0.id == updated.id }) {
+          todoItems[index] = updated
+        } else {
+          await refreshTodoItems()
+        }
+        return true
+
+      case .badRequest(let err):
+        todoError = try Self.todoHTTPErrorLine { try err.body.json }
+
+      case .notFound(let err):
+        todoError = try Self.todoHTTPErrorLine { try err.body.json }
+
+      case .conflict(let err):
+        todoError = try Self.todoHTTPErrorLine { try err.body.json }
+
+      case .internalServerError(let err):
+        todoError = try Self.todoHTTPErrorLine { try err.body.json }
+
+      case .unauthorized:
+        todoError = Self.unauthorizedMessage
+
+      case .undocumented(let statusCode, _):
+        todoError = Self.messageForStatus(
+          statusCode, fallback: "Unexpected status \(statusCode) while updating todo.")
+      }
+    } catch {
+      todoError = error.localizedDescription
+    }
+    return false
+  }
+
+  public func archiveTodoItem(_ item: TodoItem) async -> Bool {
+    await updateTodoItem(id: item.id, status: .archive)
+  }
+
+  public func restoreTodoItem(_ item: TodoItem) async -> Bool {
+    await updateTodoItem(id: item.id, status: .open)
+  }
+
+  public func toggleTodoCompleted(_ item: TodoItem) async {
+    guard !ShapeTreeTodoTree.hasChildren(itemID: item.id, items: todoItems) else { return }
+    guard item.status != .archive else { return }
+
+    let isCompleted = item.status == .completed
+    if !isCompleted,
+      !ShapeTreeTodoTree.canMarkCompleted(itemID: item.id, items: todoItems)
+    {
+      todoError = "Finish or archive all subtasks before completing this item."
+      return
+    }
+
+    let next: TodoItemStatus = isCompleted ? .open : .completed
+    _ = await updateTodoItem(id: item.id, status: next)
   }
 }

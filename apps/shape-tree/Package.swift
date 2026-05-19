@@ -10,6 +10,7 @@ let package = Package(
   ],
   products: [
     .library(name: "ShapeTreeClient", targets: ["ShapeTreeClient"]),
+    .library(name: "NodeTreeAPI", targets: ["NodeTreeAPI"]),
     .executable(name: "ShapeTree", targets: ["ShapeTree"]),
   ],
   dependencies: [
@@ -25,6 +26,7 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"),
     .package(url: "https://github.com/vapor/jwt-kit.git", from: "5.0.0"),
     .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
+    .package(url: "https://github.com/apple/swift-nio.git", from: "2.99.0"),
   ],
   targets: [
     .target(
@@ -43,6 +45,8 @@ let package = Package(
       name: "ShapeTree",
       dependencies: [
         "ShapeTreeClient",
+        "NodeTree",
+        "NodeTreeAPI",
         "Sit",
         .product(name: "ScribeCore", package: "scribe"),
         .product(name: "Hummingbird", package: "hummingbird"),
@@ -88,11 +92,48 @@ let package = Package(
       dependencies: [
         "ShapeTree",
         "ShapeTreeClient",
+        "NodeTreeAPI",
+        .product(name: "_NIOFileSystem", package: "swift-nio"),
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "HummingbirdTesting", package: "hummingbird"),
         .product(name: "OpenAPIAsyncHTTPClient", package: "swift-openapi-async-http-client"),
         .product(name: "JWTKit", package: "jwt-kit"),
         .product(name: "Crypto", package: "swift-crypto"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+        .treatAllWarnings(as: .error),
+      ]
+    ),
+    .target(
+      name: "NodeTreeAPI",
+      dependencies: [
+        .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime")
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+        .treatAllWarnings(as: .error),
+      ],
+      plugins: [
+        .plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")
+      ]
+    ),
+    .target(
+      name: "NodeTree",
+      dependencies: [
+        .product(name: "_NIOFileSystem", package: "swift-nio"),
+        .product(name: "NIOCore", package: "swift-nio"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+        .treatAllWarnings(as: .error),
+      ]
+    ),
+    .testTarget(
+      name: "NodeTreeTests",
+      dependencies: [
+        "NodeTree",
+        .product(name: "_NIOFileSystem", package: "swift-nio"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
