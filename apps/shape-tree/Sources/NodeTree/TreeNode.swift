@@ -1,6 +1,6 @@
 import Foundation
 
-public struct TodoNodeID: Hashable, Sendable, Codable, CustomStringConvertible {
+public struct NodeID: Hashable, Sendable, Codable, CustomStringConvertible {
   public var rawValue: UUID
 
   public init() {
@@ -21,32 +21,32 @@ public struct TodoNodeID: Hashable, Sendable, Codable, CustomStringConvertible {
 /// - ``node(_:)``: this node's parent is the given id (or when creating, attach under that node).
 public enum ParentId: Sendable, Codable, Equatable {
   case root
-  case node(TodoNodeID)
+  case node(NodeID)
 }
 
 extension ParentId {
-  public var parentNodeID: TodoNodeID? {
+  public var parentNodeID: NodeID? {
     guard case .node(let id) = self else { return nil }
     return id
   }
 }
 
-/// A single todo item positioned in a parent/child tree (``parentId`` is ``ParentId/root`` for the root).
-public struct TodoNode: Sendable, Codable, Equatable, Identifiable {
-  public var id: TodoNodeID
-  public var title: String
+/// A tree node: structural fields plus a ``payload`` serialized in `node.json`.
+public struct TreeNode<Payload: Codable & Sendable>: Sendable, Codable, Identifiable {
+  public var id: NodeID
   public var parentId: ParentId
   public var createdAt: Date
+  public var payload: Payload
 
   public init(
-    id: TodoNodeID = TodoNodeID(),
-    title: String,
+    id: NodeID = NodeID(),
     parentId: ParentId,
-    createdAt: Date = Date()
+    createdAt: Date = Date(),
+    payload: Payload
   ) {
     self.id = id
-    self.title = title
     self.parentId = parentId
     self.createdAt = createdAt
+    self.payload = payload
   }
 }

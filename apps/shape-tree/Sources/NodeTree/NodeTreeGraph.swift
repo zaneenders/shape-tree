@@ -1,27 +1,26 @@
 import Foundation
 
-/// In-memory todo tree: each node has at most one parent; exactly one root; no cycles.
-public struct TodoTreeGraph: Sendable, Equatable {
-  private var nodesByID: [TodoNodeID: TodoNode]
-  private var storedRootID: TodoNodeID?
+/// In-memory tree: each node has at most one parent; exactly one root; no cycles.
+public struct NodeTreeGraph<Payload: Codable & Sendable>: Sendable {
+  private var nodesByID: [NodeID: TreeNode<Payload>]
+  private var storedRootID: NodeID?
 
-  /// Empty graph for store bootstrap before the root is seeded.
   init() {
     nodesByID = [:]
     storedRootID = nil
   }
 
-  public init(seedRootTitle: String) throws {
+  public init(seedRootPayload: Payload) throws {
     self.init()
-    _ = try seedRoot(title: seedRootTitle)
+    _ = try seedRoot(payload: seedRootPayload)
   }
 
-  public init(nodes: [TodoNode]) throws {
-    var byID: [TodoNodeID: TodoNode] = [:]
+  public init(nodes: [TreeNode<Payload>]) throws {
+    var byID: [NodeID: TreeNode<Payload>] = [:]
     byID.reserveCapacity(nodes.count)
     for node in nodes {
       guard byID[node.id] == nil else {
-        throw TodoTreeError.duplicateNodeID(node.id)
+        throw NodeTreeError.duplicateNodeID(node.id)
       }
       byID[node.id] = node
     }
@@ -30,7 +29,7 @@ public struct TodoTreeGraph: Sendable, Equatable {
     try validate()
   }
 
-  public func rootID() throws -> TodoNodeID {
+  public func rootID() throws -> NodeID {
     if let storedRootID { return storedRootID }
     return try Self.singleRootID(in: nodesByID)
   }
@@ -39,25 +38,25 @@ public struct TodoTreeGraph: Sendable, Equatable {
 
   public var nodeCount: Int { nodesByID.count }
 
-  public func node(id: TodoNodeID) -> TodoNode? {
+  public func node(id: NodeID) -> TreeNode<Payload>? {
     nodesByID[id]
   }
 
-  public func root() throws -> TodoNode? {
+  public func root() throws -> TreeNode<Payload>? {
     guard !nodesByID.isEmpty else { return nil }
     return nodesByID[try rootID()]
   }
 
-  public func children(of parentID: TodoNodeID) -> [TodoNode] {
+  public func children(of parentID: NodeID) -> [TreeNode<Payload>] {
     nodesByID.values.filter { $0.parentId == .node(parentID) }.sorted(by: Self.stableOrder)
   }
 
   /// Validates invariants and returns nodes in topological order (every parent before its children).
-  public func topologicalSort() throws -> [TodoNode] {
+  public func topologicalSort() throws -> [TreeNode<Payload>] {
     try validate()
     guard !nodesByID.isEmpty else { return [] }
 
-    var childrenByParent: [TodoNodeID: [TodoNodeID]] = [:]
+    var childrenByParent: [NodeID: [NodeID]] = [:]
     for node in nodesByID.values {
       guard case .node(let parentID) = node.parentId else { continue }
       childrenByParent[parentID, default: []].append(node.id)
@@ -68,10 +67,10 @@ public struct TodoTreeGraph: Sendable, Equatable {
       }
     }
 
-    var ordered: [TodoNode] = []
+    var ordered: [TreeNode<Payload>] = []
     ordered.reserveCapacity(nodesByID.count)
 
-    func visit(_ id: TodoNodeID) {
+    func visit(_ id: NodeID) {
       guard let node = nodesByID[id] else { return }
       ordered.append(node)
       for childID in childrenByParent[id] ?? [] {
@@ -83,20 +82,20 @@ public struct TodoTreeGraph: Sendable, Equatable {
     return ordered
   }
 
-  mutating func seedRoot(title: String) throws -> TodoNode {
+  mutating func seedRoot(payload: Payload) throws -> TreeNode<Payload> {
     guard nodesByID.isEmpty else {
       preconditionFailure("seedRoot requires an empty graph")
     }
-    let root = TodoNode(title: try Self.normalizedTitle(title), parentId: .root)
+    let root = TreeNode(parentId: .root, payload: payload)
     nodesByID[root.id] = root
     storedRootID = root.id
     try validate()
     return root
   }
 
-  public mutating func insertNode(title: String, parentId: ParentId) throws -> TodoNode {
+  public mutating func insertNode(payload: Payload, parentId: ParentId) throws -> TreeNode<Payload> {
     let resolvedParentId = try resolveParentId(parentId)
-    let node = TodoNode(title: try Self.normalizedTitle(title), parentId: resolvedParentId)
+    let node = TreeNode(parentId: resolvedParentId, payload: payload)
     nodesByID[node.id] = node
     try validate()
     return node
@@ -108,13 +107,13 @@ public struct TodoTreeGraph: Sendable, Equatable {
       return .node(try rootID())
     case .node(let parentID):
       guard nodesByID[parentID] != nil else {
-        throw TodoTreeError.parentNotFound(parentID)
+        throw NodeTreeError.parentNotFound(parentID)
       }
       return parentId
     }
   }
 
-  func allNodes() -> [TodoNode] {
+  func allNodes() -> [TreeNode<Payload>] {
     nodesByID.values.sorted(by: Self.stableOrder)
   }
 
@@ -124,46 +123,46 @@ public struct TodoTreeGraph: Sendable, Equatable {
     let roots = nodesByID.values.filter { $0.parentId == .root }
     switch roots.count {
     case 0:
-      throw TodoTreeError.noRoot
+      throw NodeTreeError.noRoot
     case 1:
       break
     default:
-      throw TodoTreeError.multipleRoots
+      throw NodeTreeError.multipleRoots
     }
 
     if let storedRootID {
       guard roots[0].id == storedRootID else {
-        throw TodoTreeError.multipleRoots
+        throw NodeTreeError.multipleRoots
       }
     }
 
     for node in nodesByID.values {
       if case .node(let parentID) = node.parentId {
         guard nodesByID[parentID] != nil else {
-          throw TodoTreeError.parentNotFound(parentID)
+          throw NodeTreeError.parentNotFound(parentID)
         }
       }
       if hasCycle(startingAt: node.id) {
-        throw TodoTreeError.cycle(node.id)
+        throw NodeTreeError.cycle(node.id)
       }
     }
   }
 
-  private static func singleRootID(in nodes: [TodoNodeID: TodoNode]) throws -> TodoNodeID {
+  private static func singleRootID(in nodes: [NodeID: TreeNode<Payload>]) throws -> NodeID {
     let roots = nodes.values.filter { $0.parentId == .root }
     switch roots.count {
     case 1:
       return roots[0].id
     case 0:
-      throw TodoTreeError.noRoot
+      throw NodeTreeError.noRoot
     default:
-      throw TodoTreeError.multipleRoots
+      throw NodeTreeError.multipleRoots
     }
   }
 
-  private func hasCycle(startingAt id: TodoNodeID) -> Bool {
-    var visited: Set<TodoNodeID> = []
-    var current: TodoNodeID? = id
+  private func hasCycle(startingAt id: NodeID) -> Bool {
+    var visited: Set<NodeID> = []
+    var current: NodeID? = id
     while let nodeID = current {
       guard visited.insert(nodeID).inserted else { return true }
       current = nodesByID[nodeID]?.parentId.parentNodeID
@@ -171,13 +170,7 @@ public struct TodoTreeGraph: Sendable, Equatable {
     return false
   }
 
-  private static func normalizedTitle(_ title: String) throws -> String {
-    let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { throw TodoTreeError.emptyTitle }
-    return trimmed
-  }
-
-  private static func stableOrder(_ lhs: TodoNode, _ rhs: TodoNode) -> Bool {
+  private static func stableOrder(_ lhs: TreeNode<Payload>, _ rhs: TreeNode<Payload>) -> Bool {
     if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
     return lhs.id.rawValue.uuidString < rhs.id.rawValue.uuidString
   }
