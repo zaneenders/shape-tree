@@ -225,11 +225,18 @@ struct ClientTests {
     let log = Logger(label: "test.client-interrupt-bad-id")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: store,
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log)
+      log: log,
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp")
     let app = Application(router: router)
 
     try await app.test(.live) { client in
@@ -254,11 +261,18 @@ struct ClientTests {
     let log = Logger(label: "test.client-interrupt-not-found")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: store,
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log)
+      log: log,
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp")
     let app = Application(router: router)
 
     try await app.test(.live) { client in
@@ -284,11 +298,18 @@ struct ClientTests {
     let log = Logger(label: "test.client-interrupt-204")
     let (journal, _) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
-    let router = buildRoutes(
+    let router = try buildRoutes(
       store: store,
       journalStore: journal,
       authorizedKeys: fixture.store,
-      log: log)
+      log: log,
+      llmURL: "http://localhost:11434",
+      agentModel: "test-model",
+      systemPrompt: "You are a test assistant.",
+      llmToken: nil,
+      contextWindow: 8192,
+      contextWindowThreshold: 0.8,
+      workingDirectory: "/tmp")
     let app = Application(router: router)
 
     try await app.test(.live) { client in
