@@ -2,6 +2,9 @@ import Configuration
 import Foundation
 import Hummingbird
 import Logging
+import Sit
+import SystemPackage
+import Workflow
 
 let log = Logger(label: "shape-tree.server")
 
@@ -53,11 +56,26 @@ let authorizedKeys = AuthorizedKeysStore(directory: layout.authorizedKeysDirecto
 let replayCache = JWTReplayCache()
 
 let store = SessionStore()
+
+let workflowStore = try await FileStepStore(root: FilePath(layout.workflowsDirectory.path))
+let dailySummaryService = DailySummaryService(
+  journalStore: journalStore,
+  journalRepoPath: layout.journalRepoRoot.path,
+  sit: Sit(),
+  workflowStore: workflowStore,
+  summariesDirectory: layout.summariesDirectory,
+  log: log,
+  llmURL: ollamaURL,
+  agentModel: agentModel,
+  llmToken: ollamaToken,
+  workingDirectory: resolvedDataRoot.path)
+
 let router = try buildRoutes(
   store: store,
   journalStore: journalStore,
   authorizedKeys: authorizedKeys,
   replayCache: replayCache,
+  dailySummaryService: dailySummaryService,
   log: log,
   llmURL: ollamaURL,
   agentModel: agentModel,

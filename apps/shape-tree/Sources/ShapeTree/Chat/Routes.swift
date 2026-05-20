@@ -10,6 +10,7 @@ func buildRoutes(
   journalStore: JournalStore,
   authorizedKeys: AuthorizedKeysStore,
   replayCache: JWTReplayCache = JWTReplayCache(),
+  dailySummaryService: DailySummaryService? = nil,
   log: Logger,
   llmURL: String,
   agentModel: String,
@@ -26,6 +27,7 @@ func buildRoutes(
   let handler = ShapeTreeHandler(
     store: store,
     journalStore: journalStore,
+    dailySummaryService: dailySummaryService,
     log: log,
     llmURL: llmURL,
     agentModel: agentModel,

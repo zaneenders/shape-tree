@@ -45,12 +45,14 @@ let package = Package(
       dependencies: [
         "ShapeTreeClient",
         "Sit",
+        "Workflow",
         .product(name: "ScribeCore", package: "scribe"),
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "OpenAPIHummingbird", package: "swift-openapi-hummingbird"),
         .product(name: "Configuration", package: "swift-configuration"),
         .product(name: "JWTKit", package: "jwt-kit"),
         .product(name: "Crypto", package: "swift-crypto"),
+        .product(name: "SystemPackage", package: "swift-system"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
@@ -111,11 +113,14 @@ let package = Package(
       dependencies: [
         "ShapeTree",
         "ShapeTreeClient",
+        "Sit",
+        "Workflow",
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "HummingbirdTesting", package: "hummingbird"),
         .product(name: "OpenAPIAsyncHTTPClient", package: "swift-openapi-async-http-client"),
         .product(name: "JWTKit", package: "jwt-kit"),
         .product(name: "Crypto", package: "swift-crypto"),
+        .product(name: "SystemPackage", package: "swift-system"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
