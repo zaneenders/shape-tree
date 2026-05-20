@@ -22,6 +22,7 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0"),
     .package(url: "https://github.com/swiftlang/swift-subprocess.git", from: "0.4.0"),
     .package(url: "https://github.com/apple/swift-system.git", from: "1.4.0"),
+    .package(url: "https://github.com/apple/swift-nio.git", from: "2.99.0"),
     .package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"),
     .package(url: "https://github.com/vapor/jwt-kit.git", from: "5.0.0"),
     .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
@@ -70,6 +71,28 @@ let package = Package(
       ],
       plugins: [
         .plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")
+      ]
+    ),
+    .target(
+      name: "Workflow",
+      dependencies: [
+        .product(name: "SystemPackage", package: "swift-system"),
+        .product(name: "_NIOFileSystem", package: "swift-nio"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+        .treatAllWarnings(as: .error),
+      ]
+    ),
+    .testTarget(
+      name: "WorkflowTests",
+      dependencies: [
+        "Workflow",
+        .product(name: "_NIOFileSystem", package: "swift-nio"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+        .treatAllWarnings(as: .error),
       ]
     ),
     .testTarget(
