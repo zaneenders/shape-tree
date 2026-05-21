@@ -1,4 +1,5 @@
 import Foundation
+import Logging
 import SystemPackage
 import Testing
 import _NIOFileSystem
@@ -90,4 +91,133 @@ private func withWorkflowStore<R>(
     let result = try await body(store, dir)
     return result
   }
+}
+
+// MARK: - WorkflowWorker tests
+
+@Suite struct WorkflowWorkerTests {
+
+  @Test func runsPerformForEnqueuedKey() async throws {
+    let tracker = CallTracker()
+    let worker = WorkflowWorker(log: Logger(label: "test")) { key in
+      await tracker.record(key)
+    }
+
+    await worker.enqueue(key: "a")
+    try await waitUntil { await tracker.calls.count >= 1 }
+    #expect(await tracker.calls == ["a"])
+  }
+
+  @Test func deduplicatesInFlightRequests() async throws {
+    let tracker = CallTracker()
+    let gate = Gate()
+    let worker = WorkflowWorker(log: Logger(label: "test")) { _ in
+      await gate.wait()
+      await tracker.record("x")
+    }
+
+    await worker.enqueue(key: "x")
+    await worker.enqueue(key: "x")  // deduplicated: "x" is still in-flight
+    await gate.open()
+
+    try await waitUntil { await tracker.calls.count >= 1 }
+    #expect(await tracker.calls.count == 1)
+  }
+
+  @Test func differentKeysRunIndependently() async throws {
+    let tracker = CallTracker()
+    let worker = WorkflowWorker(log: Logger(label: "test")) { key in
+      await tracker.record(key)
+    }
+
+    await worker.enqueue(key: "a")
+    await worker.enqueue(key: "b")
+    try await waitUntil { await tracker.calls.count >= 2 }
+    #expect(Set(await tracker.calls) == ["a", "b"])
+  }
+
+  @Test func reEnqueueableAfterCompletion() async throws {
+    let tracker = CallTracker()
+    let worker = WorkflowWorker(log: Logger(label: "test")) { key in
+      await tracker.record(key)
+    }
+
+    await worker.enqueue(key: "z")
+    try await waitUntil { await tracker.calls.count >= 1 }
+    await worker.enqueue(key: "z")
+    try await waitUntil { await tracker.calls.count >= 2 }
+    #expect(await tracker.calls.count == 2)
+  }
+
+  @Test func survivesErrorInPerform() async throws {
+    let tracker = CallTracker()
+    let failOnce = FailOnce()
+
+    let worker = WorkflowWorker(log: Logger(label: "test")) { key in
+      if await failOnce.check() {
+        throw WorkerTestError.boom
+      }
+      await tracker.record(key)
+    }
+
+    await worker.enqueue(key: "a")
+    // 50ms is ample for the task to throw and have the actor clean up inFlight.
+    try await Task.sleep(for: .milliseconds(50))
+
+    await worker.enqueue(key: "a")
+    try await waitUntil { await tracker.calls.count >= 1 }
+    #expect(await tracker.calls.count == 1)
+  }
+}
+
+// MARK: - Helpers
+
+private actor CallTracker {
+  var calls: [String] = []
+  func record(_ key: String) { calls.append(key) }
+}
+
+private actor Gate {
+  private var waiter: CheckedContinuation<Void, Never>?
+  private var isOpen = false
+
+  func wait() async {
+    if isOpen { return }
+    await withCheckedContinuation { self.waiter = $0 }
+  }
+
+  func open() {
+    isOpen = true
+    waiter?.resume()
+    waiter = nil
+  }
+}
+
+private actor FailOnce {
+  private var remaining = 1
+  func check() -> Bool {
+    if remaining > 0 {
+      remaining -= 1
+      return true
+    }
+    return false
+  }
+}
+
+private enum WorkerTestError: Error { case boom }
+
+private func waitUntil(
+  timeout: Duration = .seconds(5),
+  _ condition: () async -> Bool
+) async throws {
+  let deadline = ContinuousClock.now + timeout
+  while ContinuousClock.now < deadline {
+    if await condition() { return }
+    try await Task.sleep(for: .milliseconds(10))
+  }
+  throw TimedOutError()
+}
+
+private struct TimedOutError: Error, CustomStringConvertible {
+  var description: String { "Timed out waiting for condition" }
 }

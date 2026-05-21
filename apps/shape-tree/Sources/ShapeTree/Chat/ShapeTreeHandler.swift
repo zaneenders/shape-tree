@@ -4,6 +4,7 @@ import OpenAPIHummingbird
 import OpenAPIRuntime
 import ScribeCore
 import ShapeTreeClient
+import Workflow
 
 // MARK: - APIProtocol implementation
 
@@ -15,6 +16,7 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
   let store: SessionStore
   let journalStore: JournalStore
   let dailySummaryService: DailySummaryService?
+  let worker: WorkflowWorker?
   let log: Logger
   let llmURL: String
   let agentModel: String
@@ -181,6 +183,10 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
         body: body.body,
         createdAt: body.created_at,
         journalDayKey: body.journal_day)
+
+      let dayKey = body.journal_day ?? JournalPathCodec.journalDayKey(for: Date())
+      await worker?.enqueue(key: dayKey)
+
       return .created(.init(body: .json(.init(journal_relative_path: path))))
     } catch let error as JournalServiceError {
       return .badRequest(.init(body: .json(Self.errorBody(error.description))))

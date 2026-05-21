@@ -70,12 +70,17 @@ let dailySummaryService = DailySummaryService(
   llmToken: ollamaToken,
   workingDirectory: resolvedDataRoot.path)
 
+let summaryWorker = WorkflowWorker(log: log) { dayKey in
+  _ = try await dailySummaryService.summarizeDay(dayKey: dayKey)
+}
+
 let router = try buildRoutes(
   store: store,
   journalStore: journalStore,
   authorizedKeys: authorizedKeys,
   replayCache: replayCache,
   dailySummaryService: dailySummaryService,
+  worker: summaryWorker,
   log: log,
   llmURL: ollamaURL,
   agentModel: agentModel,

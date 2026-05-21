@@ -80,6 +80,7 @@ let package = Package(
       dependencies: [
         .product(name: "SystemPackage", package: "swift-system"),
         .product(name: "_NIOFileSystem", package: "swift-nio"),
+        .product(name: "Logging", package: "swift-log"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
@@ -91,6 +92,7 @@ let package = Package(
       dependencies: [
         "Workflow",
         .product(name: "_NIOFileSystem", package: "swift-nio"),
+        .product(name: "Logging", package: "swift-log"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
