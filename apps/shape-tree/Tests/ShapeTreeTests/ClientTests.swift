@@ -230,13 +230,15 @@ struct ClientTests {
       journalStore: journal,
       authorizedKeys: fixture.store,
       log: log,
+
       llmURL: "http://localhost:11434",
       agentModel: "test-model",
       systemPrompt: "You are a test assistant.",
       llmToken: nil,
       contextWindow: 8192,
       contextWindowThreshold: 0.8,
-      workingDirectory: "/tmp")
+      workingDirectory: "/tmp"
+    )
     let app = Application(router: router)
 
     try await app.test(.live) { client in
@@ -266,13 +268,15 @@ struct ClientTests {
       journalStore: journal,
       authorizedKeys: fixture.store,
       log: log,
+
       llmURL: "http://localhost:11434",
       agentModel: "test-model",
       systemPrompt: "You are a test assistant.",
       llmToken: nil,
       contextWindow: 8192,
       contextWindowThreshold: 0.8,
-      workingDirectory: "/tmp")
+      workingDirectory: "/tmp"
+    )
     let app = Application(router: router)
 
     try await app.test(.live) { client in
@@ -303,13 +307,15 @@ struct ClientTests {
       journalStore: journal,
       authorizedKeys: fixture.store,
       log: log,
+
       llmURL: "http://localhost:11434",
       agentModel: "test-model",
       systemPrompt: "You are a test assistant.",
       llmToken: nil,
       contextWindow: 8192,
       contextWindowThreshold: 0.8,
-      workingDirectory: "/tmp")
+      workingDirectory: "/tmp"
+    )
     let app = Application(router: router)
 
     try await app.test(.live) { client in
