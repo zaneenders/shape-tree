@@ -54,22 +54,14 @@ import Workflow
 
     let app = Application(router: router)
 
+    let output = try await summaryService.summarizeDay(dayKey: "25-12-01")
+    #expect(output.dayKey == "25-12-01")
+    #expect(output.entryCount == 0)
+    #expect(output.summary.contains("No journal entries"))
+
     try await app.test(.live) { client in
       let port = try #require(client.port)
       let transport = AsyncHTTPClientTransport()
-
-      // POST — mint a fresh token for this request
-      let postToken = try JWTTestSupport.mintToken(fixture)
-      let postAPI = Client(
-        serverURL: URL(string: "http://localhost:\(port)")!,
-        transport: transport,
-        middlewares: [BearerAuthClientMiddleware(bearerToken: postToken)])
-      let postResponse = try await postAPI.runDailySummary(query: .init(day: "25-12-01"))
-      let postOk = try postResponse.ok
-      let postBody = try postOk.body.json
-      #expect(postBody.day == "25-12-01")
-      #expect(postBody.entry_count == 0)
-      #expect(postBody.summary.contains("No journal entries"))
 
       // GET — fresh token
       let getToken = try JWTTestSupport.mintToken(fixture)
@@ -104,7 +96,6 @@ import Workflow
   @Test func replayReturnsCachedSummary() async throws {
     let log = Logger(label: "test.daily-summary.replay")
     let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
-    let fixture = try await JWTTestSupport.makeFixture()
 
     let workflowStore = try await FileStepStore(root: FilePath(layout.workflowsDirectory.path))
     let summaryService = DailySummaryService(
@@ -119,56 +110,18 @@ import Workflow
       llmToken: nil,
       workingDirectory: layout.dataRoot.path)
 
-    let router = try buildRoutes(
-      store: SessionStore(),
-      journalStore: journal,
-      authorizedKeys: fixture.store,
-      dailySummaryService: summaryService,
-      log: log,
-      llmURL: "http://localhost:11434",
-      agentModel: "test-model",
-      systemPrompt: "You are a test assistant.",
-      llmToken: nil,
-      contextWindow: 8192,
-      contextWindowThreshold: 0.8,
-      workingDirectory: "/tmp")
+    let first = try await summaryService.summarizeDay(dayKey: "25-05-10")
+    #expect(first.summary.contains("No journal entries"))
 
-    let app = Application(router: router)
+    let second = try await summaryService.summarizeDay(dayKey: "25-05-10")
+    #expect(second.summary.contains("No journal entries"))
 
-    try await app.test(.live) { client in
-      let port = try #require(client.port)
-      let transport = AsyncHTTPClientTransport()
-
-      // First run — fresh token
-      let firstToken = try JWTTestSupport.mintToken(fixture)
-      let firstAPI = Client(
-        serverURL: URL(string: "http://localhost:\(port)")!,
-        transport: transport,
-        middlewares: [BearerAuthClientMiddleware(bearerToken: firstToken)])
-      let first = try await firstAPI.runDailySummary(query: .init(day: "25-05-10"))
-      let firstOk = try first.ok
-      let firstBody = try firstOk.body.json
-      #expect(firstBody.summary.contains("No journal entries"))
-
-      // Second run — should hit the cache, fresh token
-      let secondToken = try JWTTestSupport.mintToken(fixture)
-      let secondAPI = Client(
-        serverURL: URL(string: "http://localhost:\(port)")!,
-        transport: transport,
-        middlewares: [BearerAuthClientMiddleware(bearerToken: secondToken)])
-      let second = try await secondAPI.runDailySummary(query: .init(day: "25-05-10"))
-      let secondOk = try second.ok
-      let secondBody = try secondOk.body.json
-      #expect(secondBody.summary.contains("No journal entries"))
-
-      // Verify workflow cache files exist on disk
-      let stepDir = layout.workflowsDirectory
-        .appendingPathComponent("daily-summary-25-05-10", isDirectory: true)
-      #expect(FileManager.default.fileExists(atPath: stepDir.appendingPathComponent("1.json").path))
-      #expect(FileManager.default.fileExists(atPath: stepDir.appendingPathComponent("2.json").path))
-      #expect(FileManager.default.fileExists(atPath: stepDir.appendingPathComponent("3.json").path))
-      #expect(FileManager.default.fileExists(atPath: stepDir.appendingPathComponent("4.json").path))
-    }
+    let stepDir = layout.workflowsDirectory
+      .appendingPathComponent("daily-summary-25-05-10", isDirectory: true)
+    #expect(FileManager.default.fileExists(atPath: stepDir.appendingPathComponent("1.json").path))
+    #expect(FileManager.default.fileExists(atPath: stepDir.appendingPathComponent("2.json").path))
+    #expect(FileManager.default.fileExists(atPath: stepDir.appendingPathComponent("3.json").path))
+    #expect(FileManager.default.fileExists(atPath: stepDir.appendingPathComponent("4.json").path))
   }
 
   /// End-to-end: seeds a few journal entries, then summarizes with a real local LLM.

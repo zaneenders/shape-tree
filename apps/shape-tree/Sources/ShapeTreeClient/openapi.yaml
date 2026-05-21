@@ -286,42 +286,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/HTTPErrorResponse"
 
-  /workflows/daily-summary:
-    post:
-      operationId: runDailySummary
-      summary: Generate or retrieve an LLM summary for one day's journal entries.
-      description: >-
-        Idempotent — the first call for a given day runs the full pipeline (pull
-        journal, read entries, summarize via LLM, write to disk). Subsequent calls
-        for the same day replay instantly from the workflow cache.
-      parameters:
-        - name: day
-          in: query
-          required: false
-          schema:
-            type: string
-            pattern: "^[0-9]{2}-[0-9]{2}-[0-9]{2}$"
-          description: Calendar day key (`yy-MM-dd`). Defaults to today in UTC when omitted.
-      responses:
-        "200":
-          description: Summary generated or retrieved from cache.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DailySummaryResponse"
-        "400":
-          description: Invalid day key.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HTTPErrorResponse"
-        "500":
-          description: Server or LLM failure.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/HTTPErrorResponse"
-
   /summaries/{day}:
     get:
       operationId: getDailySummary
