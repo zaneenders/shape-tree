@@ -67,6 +67,52 @@ import _NIOFileSystem
     }
   }
 
+  @Test func resetClearsStepsForWorkflow() async throws {
+    try await withWorkflowStore { store, _ in
+      let ctx1 = WorkflowContext(store: store)
+      _ = try await ctx1.step { "cached" }
+
+      try await store.reset(workflowID: ctx1.id)
+
+      let ctx2 = WorkflowContext(id: ctx1.id, store: store)
+      var callCount = 0
+      let result = try await ctx2.step {
+        callCount += 1
+        return "fresh"
+      }
+      #expect(result == "fresh")
+      #expect(callCount == 1)
+    }
+  }
+
+  @Test func resetIsNoOpWhenWorkflowAbsent() async throws {
+    try await withWorkflowStore { store, _ in
+      // Should not throw for a workflow ID that was never run.
+      try await store.reset(workflowID: "nonexistent-workflow")
+    }
+  }
+
+  @Test func resetDoesNotAffectOtherWorkflows() async throws {
+    try await withWorkflowStore { store, _ in
+      let ctxA = WorkflowContext(store: store)
+      let ctxB = WorkflowContext(store: store)
+      _ = try await ctxA.step { "a-value" }
+      _ = try await ctxB.step { "b-value" }
+
+      try await store.reset(workflowID: ctxA.id)
+
+      // ctxB's cache is untouched
+      let ctxBReplay = WorkflowContext(id: ctxB.id, store: store)
+      var callCount = 0
+      let result = try await ctxBReplay.step {
+        callCount += 1
+        return "b-replaced"
+      }
+      #expect(result == "b-value")
+      #expect(callCount == 0)
+    }
+  }
+
   @Test func persistsAcrossContexts() async throws {
     try await withWorkflowStore { store, _ in
       let ctx1 = WorkflowContext(store: store)

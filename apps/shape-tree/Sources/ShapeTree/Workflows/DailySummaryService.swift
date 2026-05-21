@@ -87,16 +87,21 @@ public struct DailySummaryService: Sendable {
 
   // MARK: - Summarize
 
-  public func summarizeDay(dayKey: String) async throws -> DailySummaryOutput {
+  public func summarizeDay(dayKey: String, force: Bool = false) async throws -> DailySummaryOutput {
     let workflowID = "daily-summary-\(dayKey)"
-    let ctx = WorkflowContext(id: workflowID, store: workflowStore)
+    if force {
+      log.info("event=summary.reset day=\(dayKey)")
+      try await workflowStore.reset(workflowID: workflowID)
+    }
+    log.info("event=summary.start day=\(dayKey) force=\(force)")
+    let ctx = WorkflowContext(id: workflowID, store: workflowStore, log: log)
 
     // Step 1 — Pull journal repo
     let pull = try await ctx.step {
       try await sit.pullRebaseIfClean(cwd: FilePath(journalRepoPath), log: log)
       return PullResult(pulledAt: Date())
     }
-    log.info("pull:\(pull)")
+    log.info("event=summary.pull day=\(dayKey) pulledAt=\(pull.pulledAt)")
 
     // Step 2 — Read today's entries
     let read = try await ctx.step {
@@ -144,7 +149,7 @@ public struct DailySummaryService: Sendable {
       return WriteResult(path: fileURL.path)
     }
 
-    log.info("summary workflow completed at: \(writeResult.path)")
+    log.info("event=summary.complete day=\(dayKey) path=\(writeResult.path)")
 
     return DailySummaryOutput(
       dayKey: dayKey,

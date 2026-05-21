@@ -71,7 +71,7 @@ let dailySummaryService = DailySummaryService(
   workingDirectory: resolvedDataRoot.path)
 
 let summaryWorker = WorkflowWorker(log: log) { dayKey in
-  _ = try await dailySummaryService.summarizeDay(dayKey: dayKey)
+  _ = try await dailySummaryService.summarizeDay(dayKey: dayKey, force: true)
 }
 
 let router = try buildRoutes(

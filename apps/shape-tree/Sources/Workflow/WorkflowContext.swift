@@ -1,14 +1,17 @@
 import Foundation
+import Logging
 import Synchronization
 
 public final class WorkflowContext: Sendable {
   public let id: String
   private let store: FileStepStore
+  private let log: Logger
   private let stepCounter: Mutex<Int> = Mutex(0)
 
-  public init(id: String = UUID().uuidString, store: FileStepStore) {
+  public init(id: String = UUID().uuidString, store: FileStepStore, log: Logger = Logger(label: "workflow")) {
     self.id = id
     self.store = store
+    self.log = log
   }
 
   public func step<T: Codable & Sendable>(body: () async throws -> T) async throws -> T {
@@ -18,10 +21,14 @@ public final class WorkflowContext: Sendable {
     }
 
     if let cached = try await store.load(workflowID: id, stepKey: key) {
+      log.debug("event=workflow.step.cached workflowID=\(id) step=\(key)")
       return try JSONDecoder().decode(T.self, from: cached)
     }
+
+    log.debug("event=workflow.step.run workflowID=\(id) step=\(key)")
     let value = try await body()
     try await store.save(workflowID: id, stepKey: key, data: JSONEncoder().encode(value))
+    log.debug("event=workflow.step.saved workflowID=\(id) step=\(key)")
     return value
   }
 }

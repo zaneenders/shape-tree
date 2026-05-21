@@ -38,6 +38,15 @@ public final class FileStepStore: Sendable {
     }
   }
 
+  public func reset(workflowID: String) async throws {
+    let dir = root.appending(workflowID)
+    do {
+      try await FileSystem.shared.removeItem(at: dir, recursively: true)
+    } catch let e as FileSystemError where e.code == .notFound {
+      // nothing to reset
+    }
+  }
+
   private func stepPath(workflowID: String, stepKey: String) -> FilePath {
     root.appending(workflowID).appending("\(stepKey).json")
   }
