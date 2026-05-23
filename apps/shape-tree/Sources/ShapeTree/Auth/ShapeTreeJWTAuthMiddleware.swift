@@ -18,10 +18,12 @@ struct ShapeTreeJWTAuthMiddleware: MiddlewareProtocol {
 
   private let store: AuthorizedKeysStore
   private let replayCache: JWTReplayCache
+  private let authCache: JWTAuthCache
 
-  init(store: AuthorizedKeysStore, replayCache: JWTReplayCache) {
+  init(store: AuthorizedKeysStore, replayCache: JWTReplayCache, authCache: JWTAuthCache) {
     self.store = store
     self.replayCache = replayCache
+    self.authCache = authCache
   }
 
   func handle(
@@ -36,15 +38,13 @@ struct ShapeTreeJWTAuthMiddleware: MiddlewareProtocol {
     let outer = try Self.validateOuterHeader(token: token)
 
     let stored: AuthorizedKeysStore.StoredKey
+    let keys: JWTKeyCollection
     do {
-      stored = try store.load(kid: outer.kid)
+      (keys, stored) = try await authCache.entry(for: outer.kid, store: store)
     } catch {
       context.logger.warning("event=auth.lookup_rejected kid=\(outer.kid) error=\(error)")
       throw HTTPError(.unauthorized, message: "Unknown or invalid kid")
     }
-
-    let keys = JWTKeyCollection()
-    await keys.add(ecdsa: stored.publicKey)
 
     let payload: ShapeTreeJWTPayload
     do {
