@@ -11,6 +11,7 @@ func buildRoutes(
   journalStore: JournalStore,
   authorizedKeys: AuthorizedKeysStore,
   replayCache: JWTReplayCache = JWTReplayCache(),
+  authCache: JWTAuthCache = JWTAuthCache(),
   dailySummaryService: DailySummaryService? = nil,
   worker: WorkflowWorker? = nil,
   log: Logger,
@@ -24,7 +25,7 @@ func buildRoutes(
 ) throws -> Router<BasicRequestContext> {
   let router = Router(context: BasicRequestContext.self)
 
-  router.add(middleware: ShapeTreeJWTAuthMiddleware(store: authorizedKeys, replayCache: replayCache))
+  router.add(middleware: ShapeTreeJWTAuthMiddleware(store: authorizedKeys, replayCache: replayCache, authCache: authCache))
 
   let handler = ShapeTreeHandler(
     store: store,

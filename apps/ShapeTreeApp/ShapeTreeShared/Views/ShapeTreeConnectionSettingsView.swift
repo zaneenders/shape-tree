@@ -62,9 +62,11 @@ struct ShapeTreeSettingsView: View {
     case .online:
       return "Server is reachable and this device's key is authorized."
     case .unauthorized:
-      return "Server is reachable but this device's key isn't enrolled. Copy the public JWK below and save it as authorized_keys/<kid>.jwk on the server."
+      return
+        "Server is reachable but this device's key isn't enrolled. Copy the public JWK below and save it as authorized_keys/<kid>.jwk on the server."
     case .offline:
-      return "Server is not responding within 1 second. Check that ShapeTree is running at the URL below and that the device is on the same network."
+      return
+        "Server is not responding within 1 second. Check that ShapeTree is running at the URL below and that the device is on the same network."
     }
   }
 
@@ -114,14 +116,14 @@ struct ShapeTreeSettingsView: View {
       TextField("http://localhost:42069", text: $draftURL)
         .textContentType(.URL)
         #if os(iOS)
-        .textInputAutocapitalization(.never)
-        .keyboardType(.URL)
+      .textInputAutocapitalization(.never)
+      .keyboardType(.URL)
         #endif
         .onSubmit { applyURL() }
 
       TextField("Device label", text: $draftLabel)
         #if os(iOS)
-        .textInputAutocapitalization(.never)
+      .textInputAutocapitalization(.never)
         #endif
         .onSubmit { applyLabel() }
     } header: {

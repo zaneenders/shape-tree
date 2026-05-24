@@ -106,9 +106,9 @@ struct ShapeTreeJournalEntryPreviewView: View {
       if journalModel.connectionState == .online {
         Image(systemName: "doc.text")
           #if os(iOS)
-          .font(.title2)
+        .font(.title2)
           #else
-          .font(.largeTitle)
+        .font(.largeTitle)
           #endif
           .foregroundStyle(deepChrome ? Color.white.opacity(0.38) : Color.secondary)
         Text("No entry for this date")
@@ -125,9 +125,9 @@ struct ShapeTreeJournalEntryPreviewView: View {
       } else {
         Image(systemName: "wifi.slash")
           #if os(iOS)
-          .font(.title2)
+        .font(.title2)
           #else
-          .font(.largeTitle)
+        .font(.largeTitle)
           #endif
           .foregroundStyle(deepChrome ? Color.white.opacity(0.25) : Color.secondary)
         Text("Currently offline")
