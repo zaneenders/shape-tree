@@ -11,6 +11,12 @@ struct AuthorizedKeysStore: Sendable {
     let label: String?
   }
 
+  /// Cheap on-disk identity for cache revalidation (`contentModificationDate` + size).
+  struct FileStamp: Sendable, Equatable {
+    let contentModificationDate: Date?
+    let fileSize: Int?
+  }
+
   enum LookupError: Error, Sendable {
     case invalidKidShape
     case missing
@@ -25,21 +31,17 @@ struct AuthorizedKeysStore: Sendable {
     self.directory = directory.standardizedFileURL
   }
 
+  /// Stat the JWK for `kid` without reading or parsing file contents.
+  func fileStamp(kid: String) throws -> FileStamp {
+    let (_, resourceValues) = try jwkResourceValues(kid: kid)
+    return FileStamp(
+      contentModificationDate: resourceValues.contentModificationDate,
+      fileSize: resourceValues.fileSize
+    )
+  }
+
   func load(kid: String) throws -> StoredKey {
-    guard JWKThumbprint.isWellFormed(kid) else {
-      throw LookupError.invalidKidShape
-    }
-
-    let url = directory.appendingPathComponent("\(kid).jwk", isDirectory: false)
-
-    let resourceValues: URLResourceValues
-    do {
-      resourceValues = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
-    } catch {
-      throw LookupError.missing
-    }
-    if resourceValues.isSymbolicLink == true { throw LookupError.symlink }
-    guard resourceValues.isRegularFile == true else { throw LookupError.missing }
+    let (url, _) = try jwkResourceValues(kid: kid)
 
     let data: Data
     do {
@@ -56,6 +58,30 @@ struct AuthorizedKeysStore: Sendable {
     }
 
     return try makeStoredKey(jwk: jwk, kid: kid)
+  }
+
+  private func jwkResourceValues(kid: String) throws -> (URL, URLResourceValues) {
+    guard JWKThumbprint.isWellFormed(kid) else {
+      throw LookupError.invalidKidShape
+    }
+
+    let url = directory.appendingPathComponent("\(kid).jwk", isDirectory: false)
+
+    let resourceValues: URLResourceValues
+    do {
+      resourceValues = try url.resourceValues(forKeys: [
+        .isRegularFileKey,
+        .isSymbolicLinkKey,
+        .contentModificationDateKey,
+        .fileSizeKey,
+      ])
+    } catch {
+      throw LookupError.missing
+    }
+    if resourceValues.isSymbolicLink == true { throw LookupError.symlink }
+    guard resourceValues.isRegularFile == true else { throw LookupError.missing }
+
+    return (url, resourceValues)
   }
 
   private func makeStoredKey(jwk: JWKFile, kid: String) throws -> StoredKey {
