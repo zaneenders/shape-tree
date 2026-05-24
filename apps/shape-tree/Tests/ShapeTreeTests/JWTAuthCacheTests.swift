@@ -54,4 +54,55 @@ struct JWTAuthCacheTests {
     #expect(stored.label == "after")
     #expect(await cache.count == 1)
   }
+
+  @Test func malformedReloadEvictsCacheAndCanRecover() async throws {
+    let fixture = try await JWTTestSupport.makeFixture(label: "good")
+    let cache = JWTAuthCache()
+    let file = fixture.directory.appendingPathComponent("\(fixture.kid).jwk", isDirectory: false)
+    let validData = try Data(contentsOf: file)
+
+    _ = try await cache.entry(for: fixture.kid, store: fixture.store)
+    #expect(await cache.count == 1)
+
+    try Data("{ not-json".utf8).write(to: file)
+
+    do {
+      _ = try await cache.entry(for: fixture.kid, store: fixture.store)
+      Issue.record("Expected malformed authorized key")
+    } catch AuthorizedKeysStore.LookupError.malformed {
+    } catch {
+      Issue.record("Unexpected error: \(error)")
+    }
+    #expect(await cache.count == 0)
+
+    do {
+      _ = try await cache.entry(for: fixture.kid, store: fixture.store)
+      Issue.record("Expected malformed authorized key on retry")
+    } catch AuthorizedKeysStore.LookupError.malformed {
+    } catch {
+      Issue.record("Unexpected error: \(error)")
+    }
+    #expect(await cache.count == 0)
+
+    try validData.write(to: file)
+    let (_, stored) = try await cache.entry(for: fixture.kid, store: fixture.store)
+    #expect(stored.label == "good")
+    #expect(await cache.count == 1)
+  }
+
+  @Test func malformedKeyNeverEntersCache() async throws {
+    let fixture = try await JWTTestSupport.makeFixture()
+    let file = fixture.directory.appendingPathComponent("\(fixture.kid).jwk", isDirectory: false)
+    try Data("[]".utf8).write(to: file)
+
+    let cache = JWTAuthCache()
+    do {
+      _ = try await cache.entry(for: fixture.kid, store: fixture.store)
+      Issue.record("Expected malformed authorized key")
+    } catch AuthorizedKeysStore.LookupError.malformed {
+    } catch {
+      Issue.record("Unexpected error: \(error)")
+    }
+    #expect(await cache.count == 0)
+  }
 }

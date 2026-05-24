@@ -2,6 +2,7 @@ import Foundation
 import HTTPTypes
 import Hummingbird
 import JWTKit
+import Logging
 import ShapeTreeClient
 
 /// Bearer JWT auth: ES256 only, outer parse pins alg/typ/kid before disk;
@@ -42,7 +43,7 @@ struct ShapeTreeJWTAuthMiddleware: MiddlewareProtocol {
     do {
       (keys, stored) = try await authCache.entry(for: outer.kid, store: store)
     } catch {
-      context.logger.warning("event=auth.lookup_rejected kid=\(outer.kid) error=\(error)")
+      Self.logKeyLookupFailure(logger: context.logger, kid: outer.kid, error: error)
       throw HTTPError(.unauthorized, message: "Unknown or invalid kid")
     }
 
@@ -99,6 +100,26 @@ struct ShapeTreeJWTAuthMiddleware: MiddlewareProtocol {
       "event=auth.ok kid=\(stored.thumbprint) sub=\(payload.sub.value) dev=\(outer.dev.isEmpty ? "-" : outer.dev)")
 
     return try await next(request, context)
+  }
+
+  private static func logKeyLookupFailure(logger: Logger, kid: String, error: Error) {
+    guard let lookup = error as? AuthorizedKeysStore.LookupError else {
+      logger.warning("event=auth.lookup_rejected kid=\(kid) error=\(error)")
+      return
+    }
+    switch lookup {
+    case .invalidKidShape:
+      logger.warning("event=auth.key_invalid_kid kid=\(kid)")
+    case .missing:
+      logger.warning("event=auth.key_missing kid=\(kid)")
+    case .symlink:
+      logger.warning("event=auth.key_symlink kid=\(kid)")
+    case .malformed(let reason):
+      logger.warning("event=auth.key_malformed kid=\(kid) reason=\(reason)")
+    case .filenameMismatch(let expected, let fromFile):
+      logger.warning(
+        "event=auth.key_filename_mismatch kid=\(kid) expected=\(expected) from_file=\(fromFile)")
+    }
   }
 
   private static func extractBearerToken(from request: Request) throws -> String {

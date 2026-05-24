@@ -41,7 +41,7 @@ enum ShapeTree {
 
     let authorizedKeys = AuthorizedKeysStore(directory: layout.authorizedKeysDirectory)
     let replayCache = JWTReplayCache()
-    let authCache = JWTAuthCache()
+    let authCache = JWTAuthCache(log: log)
 
     let store = SessionStore()
     let router = try buildRoutes(

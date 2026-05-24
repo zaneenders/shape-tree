@@ -34,14 +34,13 @@ struct AuthorizedKeysStore: Sendable {
   /// Stat the JWK for `kid` without reading or parsing file contents.
   func fileStamp(kid: String) throws -> FileStamp {
     let (_, resourceValues) = try jwkResourceValues(kid: kid)
-    return FileStamp(
-      contentModificationDate: resourceValues.contentModificationDate,
-      fileSize: resourceValues.fileSize
-    )
+    return fileStamp(from: resourceValues)
   }
 
-  func load(kid: String) throws -> StoredKey {
-    let (url, _) = try jwkResourceValues(kid: kid)
+  /// Load and parse the JWK; `FileStamp` comes from the same stat as the read.
+  func load(kid: String) throws -> (StoredKey, FileStamp) {
+    let (url, resourceValues) = try jwkResourceValues(kid: kid)
+    let stamp = fileStamp(from: resourceValues)
 
     let data: Data
     do {
@@ -57,7 +56,15 @@ struct AuthorizedKeysStore: Sendable {
       throw LookupError.malformed("JSON decode failed: \(error.localizedDescription)")
     }
 
-    return try makeStoredKey(jwk: jwk, kid: kid)
+    let stored = try makeStoredKey(jwk: jwk, kid: kid)
+    return (stored, stamp)
+  }
+
+  private func fileStamp(from resourceValues: URLResourceValues) -> FileStamp {
+    FileStamp(
+      contentModificationDate: resourceValues.contentModificationDate,
+      fileSize: resourceValues.fileSize
+    )
   }
 
   private func jwkResourceValues(kid: String) throws -> (URL, URLResourceValues) {
