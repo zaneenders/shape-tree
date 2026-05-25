@@ -30,6 +30,9 @@ enum ShapeTree {
     let journalCommitFallbackEmail = try await reader.fetchRequiredString(
       forKey: ConfigKeys.journalCommitAuthorEmail)
 
+    let raftEndpointStrings = try await reader.fetchRequiredStringArray(
+      forKey: ConfigKeys.workflowRaftEndpoints)
+
     let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
     let resolvedDataRoot = ShapeTreeDataLayout.resolveDataRoot(rawPath: dataPathRaw, cwd: cwd)
     let layout = ShapeTreeDataLayout(dataRoot: resolvedDataRoot)
@@ -48,7 +51,9 @@ enum ShapeTree {
 
     let store = SessionStore()
 
-    let workflowStore = try await FileStepStore(root: FilePath(layout.workflowsDirectory.path))
+    let workflowStore = try WorkflowStoreFactory.make(
+      raftEndpointStrings: raftEndpointStrings,
+      log: log)
     let dailySummaryService = DailySummaryService(
       journalStore: journalStore,
       journalRepoPath: layout.journalRepoRoot.path,

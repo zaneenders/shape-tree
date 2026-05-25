@@ -31,6 +31,15 @@ directory:
       "name": "ShapeTree",
       "email": "shape-tree@localhost"
     }
+  },
+  "workflow": {
+    "raft": {
+      "endpoints": [
+        "127.0.0.1:9100",
+        "127.0.0.1:9101",
+        "127.0.0.1:9102"
+      ]
+    }
   }
 }
 ```

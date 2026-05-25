@@ -67,7 +67,10 @@ struct RaftWorkflowClusterTests {
       #expect(loaded == Data("cached".utf8))
 
       let followerClient = RaftWorkflowClient(endpoints: [endpoints[2]])
-      let onFollower = try await followerClient.load(workflowID: "daily-summary-25-05-24", stepKey: "1")
+      let onFollower = try await followerClient.load(
+        workflowID: "daily-summary-25-05-24",
+        stepKey: "1",
+        waitForReplication: .seconds(5))
       #expect(onFollower == Data("cached".utf8))
     }
   }

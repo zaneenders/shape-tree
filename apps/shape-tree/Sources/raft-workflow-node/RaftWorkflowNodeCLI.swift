@@ -17,13 +17,20 @@ struct RaftWorkflowNodeCommand: AsyncParsableCommand {
         swift run raft-workflow-node --port 9101 --peer 9100 --peer 9102 --no-wait-for-peers
         swift run raft-workflow-node --port 9102 --peer 9100 --peer 9101 --no-wait-for-peers
 
+      Docker Compose (from apps/shape-tree):
+
+        docker compose up --build
+
       Each node waits until all peers are listening before starting elections unless
       `--no-wait-for-peers` is passed.
       """
   )
 
-  @Option(name: .long, help: "Bind/advertise host.")
+  @Option(name: .long, help: "Address to bind the TCP listener.")
   var host: String = "127.0.0.1"
+
+  @Option(name: .long, help: "Host name peers use to reach this node (defaults to --host).")
+  var advertiseHost: String?
 
   @Option(name: .long, help: "Port for this node.")
   var port: Int
@@ -66,7 +73,8 @@ struct RaftWorkflowNodeCommand: AsyncParsableCommand {
 
     let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
 
-    let myselfNode = Node(host: host, port: port)
+    let raftHost = advertiseHost ?? host
+    let myselfNode = Node(host: raftHost, port: port)
     let myself = NetworkPeer(raftNode: myselfNode, eventLoopGroup: group)
 
     let peerNodes = peers.map { Node(host: $0.host, port: $0.port) }

@@ -47,13 +47,13 @@ public struct DailySummaryOutput: Sendable {
 
 /// Produces an LLM-generated summary of one day's journal entries,
 /// cached via `WorkflowContext` so repeated requests for the same
-/// day replay instantly from disk.
+/// day replay from the configured step store.
 public struct DailySummaryService: Sendable {
 
   private let journalStore: JournalStore
   private let journalRepoPath: String
   private let sit: Sit
-  private let workflowStore: FileStepStore
+  private let workflowStore: any StepStore
   public let summariesDirectory: URL
   private let log: Logger
   private let llmURL: String
@@ -65,7 +65,7 @@ public struct DailySummaryService: Sendable {
     journalStore: JournalStore,
     journalRepoPath: String,
     sit: Sit,
-    workflowStore: FileStepStore,
+    workflowStore: any StepStore,
     summariesDirectory: URL,
     log: Logger,
     llmURL: String,

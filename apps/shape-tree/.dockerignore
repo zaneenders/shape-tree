@@ -1,0 +1,10 @@
+.build
+.git
+**/.DS_Store
+Tests
+apps/ShapeTreeApp
+Sources/ShapeTree
+Sources/ShapeTreeClient
+Sources/Sit
+Package.swift
+Package.resolved

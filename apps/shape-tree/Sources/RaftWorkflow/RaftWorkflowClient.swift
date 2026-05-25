@@ -48,7 +48,27 @@ public actor RaftWorkflowClient {
     }
   }
 
-  public func load(workflowID: String, stepKey: String) async throws -> Data? {
+  public func load(
+    workflowID: String,
+    stepKey: String,
+    waitForReplication timeout: Duration = .zero
+  ) async throws -> Data? {
+    let deadline = ContinuousClock.now + timeout
+
+    repeat {
+      if let data = try await queryEndpoints(workflowID: workflowID, stepKey: stepKey) {
+        return data
+      }
+      if timeout == .zero || ContinuousClock.now >= deadline {
+        return nil
+      }
+      try await Task.sleep(for: .milliseconds(25))
+    } while ContinuousClock.now < deadline
+
+    return nil
+  }
+
+  private func queryEndpoints(workflowID: String, stepKey: String) async throws -> Data? {
     let ordered = orderedEndpoints()
     guard !ordered.isEmpty else { throw RaftWorkflowError.noEndpoints }
 
@@ -58,14 +78,19 @@ public actor RaftWorkflowClient {
         let wire = WorkflowQueryWire(workflowID: workflowID, stepKey: stepKey)
         let frame = try await send(wire, to: endpoint)
         let reply = try JSONDecoder().decode(WorkflowQueryReplyWire.self, from: frame)
-        preferredEndpoint = endpoint
-        return reply.found ? reply.data : nil
+        if reply.found {
+          preferredEndpoint = endpoint
+          return reply.data
+        }
       } catch {
         lastError = error
       }
     }
 
-    throw lastError ?? RaftWorkflowError.requestFailed("Failed to query any workflow node.")
+    if lastError != nil, ordered.count == 1 {
+      throw lastError!
+    }
+    return nil
   }
 
   private func sendCommand(_ command: Data) async throws -> ClientCommandReplyWire {

@@ -10,7 +10,9 @@ let package = Package(
   ],
   products: [
     .library(name: "ShapeTreeClient", targets: ["ShapeTreeClient"]),
+    .library(name: "RaftWorkflow", targets: ["RaftWorkflow"]),
     .executable(name: "ShapeTree", targets: ["ShapeTree"]),
+    .executable(name: "raft-workflow-node", targets: ["raft-workflow-node"]),
   ],
   dependencies: [
     .package(url: "https://github.com/zaneenders/scribe.git", revision: "a132415"),
@@ -48,6 +50,7 @@ let package = Package(
         "ShapeTreeClient",
         "Sit",
         "Workflow",
+        "RaftWorkflow",
         .product(name: "ScribeCore", package: "scribe"),
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "OpenAPIHummingbird", package: "swift-openapi-hummingbird"),

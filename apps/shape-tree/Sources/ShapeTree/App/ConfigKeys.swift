@@ -12,4 +12,5 @@ enum ConfigKeys {
   static let contextWindowThreshold: ConfigKey = "agent.contextWindowThreshold"
   static let journalCommitAuthorName: ConfigKey = "journal.commitAuthor.name"
   static let journalCommitAuthorEmail: ConfigKey = "journal.commitAuthor.email"
+  static let workflowRaftEndpoints: ConfigKey = "workflow.raft.endpoints"
 }

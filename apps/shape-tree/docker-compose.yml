@@ -1,0 +1,71 @@
+services:
+  raft-workflow-0:
+    build:
+      context: .
+      dockerfile: docker/raft-workflow-node/Dockerfile
+    image: shape-tree-raft-workflow-node
+    command:
+      - --host=0.0.0.0
+      - --advertise-host=raft-workflow-0
+      - --port=9100
+      - --peer=raft-workflow-1:9101
+      - --peer=raft-workflow-2:9102
+      - --store-dir=/data/raft-workflow-node
+      - --no-wait-for-peers
+    ports:
+      - "9100:9100"
+    volumes:
+      - raft-workflow-0-data:/data/raft-workflow-node
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/127.0.0.1/9100"]
+      interval: 2s
+      timeout: 1s
+      retries: 15
+      start_period: 3s
+
+  raft-workflow-1:
+    image: shape-tree-raft-workflow-node
+    command:
+      - --host=0.0.0.0
+      - --advertise-host=raft-workflow-1
+      - --port=9101
+      - --peer=raft-workflow-0:9100
+      - --peer=raft-workflow-2:9102
+      - --store-dir=/data/raft-workflow-node
+      - --no-wait-for-peers
+    ports:
+      - "9101:9101"
+    volumes:
+      - raft-workflow-1-data:/data/raft-workflow-node
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/127.0.0.1/9101"]
+      interval: 2s
+      timeout: 1s
+      retries: 15
+      start_period: 3s
+
+  raft-workflow-2:
+    image: shape-tree-raft-workflow-node
+    command:
+      - --host=0.0.0.0
+      - --advertise-host=raft-workflow-2
+      - --port=9102
+      - --peer=raft-workflow-0:9100
+      - --peer=raft-workflow-1:9101
+      - --store-dir=/data/raft-workflow-node
+      - --no-wait-for-peers
+    ports:
+      - "9102:9102"
+    volumes:
+      - raft-workflow-2-data:/data/raft-workflow-node
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/127.0.0.1/9102"]
+      interval: 2s
+      timeout: 1s
+      retries: 15
+      start_period: 3s
+
+volumes:
+  raft-workflow-0-data:
+  raft-workflow-1-data:
+  raft-workflow-2-data:
