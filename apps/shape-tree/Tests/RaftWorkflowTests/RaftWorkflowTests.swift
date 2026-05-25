@@ -55,8 +55,8 @@ import Workflow
 @Suite(.serialized)
 struct RaftWorkflowClusterTests {
   @Test func replicatedStepVisibleOnFollower() async throws {
-    try await withRaftWorkflowCluster { endpoints in
-      let store = RaftStepStore(endpoints: endpoints)
+    try await withRaftWorkflowCluster { cluster in
+      let store = RaftStepStore(endpoints: cluster.endpoints)
 
       try await store.save(
         workflowID: "daily-summary-25-05-24",
@@ -66,7 +66,7 @@ struct RaftWorkflowClusterTests {
       let loaded = try await store.load(workflowID: "daily-summary-25-05-24", stepKey: "1")
       #expect(loaded == Data("cached".utf8))
 
-      let followerClient = RaftWorkflowClient(endpoints: [endpoints[2]])
+      let followerClient = RaftWorkflowClient(endpoints: [cluster.endpoints[2]])
       let onFollower = try await followerClient.load(
         workflowID: "daily-summary-25-05-24",
         stepKey: "1",
@@ -76,8 +76,8 @@ struct RaftWorkflowClusterTests {
   }
 
   @Test func workflowContextReplayUsesRaftStore() async throws {
-    try await withRaftWorkflowCluster { endpoints in
-      let store = RaftStepStore(endpoints: endpoints)
+    try await withRaftWorkflowCluster { cluster in
+      let store = RaftStepStore(endpoints: cluster.endpoints)
 
       var callCount = 0
       let ctx1 = WorkflowContext(id: "wf-replay", store: store)
@@ -99,8 +99,8 @@ struct RaftWorkflowClusterTests {
   }
 
   @Test func resetClearsReplicatedSteps() async throws {
-    try await withRaftWorkflowCluster { endpoints in
-      let store = RaftStepStore(endpoints: endpoints)
+    try await withRaftWorkflowCluster { cluster in
+      let store = RaftStepStore(endpoints: cluster.endpoints)
 
       let ctx = WorkflowContext(id: "wf-reset", store: store)
       _ = try await ctx.step { "keep-me" }
@@ -117,10 +117,80 @@ struct RaftWorkflowClusterTests {
       #expect(callCount == 1)
     }
   }
+
+  /// Kills each node in turn; the remaining two-node cluster should elect a new leader and keep accepting writes.
+  @Test func survivesSingleNodeKill() async throws {
+    for killedIndex in 0..<3 {
+      try await withRaftWorkflowCluster { cluster in
+        let store = RaftStepStore(endpoints: cluster.endpoints)
+        let workflowID = "chaos-kill-\(killedIndex)"
+
+        try await store.save(workflowID: workflowID, stepKey: "1", data: Data("before".utf8))
+
+        cluster.killNode(at: killedIndex)
+        let survivors = cluster.endpoints(excluding: killedIndex)
+        try await waitForLeader(endpoints: survivors)
+
+        let activeStore = RaftStepStore(endpoints: survivors)
+        try await activeStore.save(workflowID: workflowID, stepKey: "2", data: Data("after".utf8))
+
+        #expect(try await activeStore.load(workflowID: workflowID, stepKey: "1") == Data("before".utf8))
+        #expect(try await activeStore.load(workflowID: workflowID, stepKey: "2") == Data("after".utf8))
+
+        let survivor = survivors[0]
+        let onSurvivor = try await RaftWorkflowClient(endpoints: [survivor]).load(
+          workflowID: workflowID,
+          stepKey: "2",
+          waitForReplication: .seconds(5))
+        #expect(onSurvivor == Data("after".utf8))
+      }
+    }
+  }
+
+  /// With only one follower alive there is no quorum; writes should fail quickly.
+  @Test func writeFailsWithoutQuorum() async throws {
+    try await withRaftWorkflowCluster { cluster in
+      let store = RaftStepStore(endpoints: cluster.endpoints)
+
+      try await store.save(workflowID: "chaos-quorum", stepKey: "1", data: Data("ok".utf8))
+
+      let leaderIndex = try await indexOfLeader(endpoints: cluster.endpoints)
+      let followerToKill = (leaderIndex + 1) % 3
+      cluster.killNode(at: leaderIndex)
+      cluster.killNode(at: followerToKill)
+      try await Task.sleep(for: .milliseconds(500))
+
+      let loneIndex = [0, 1, 2].first { $0 != leaderIndex && $0 != followerToKill }!
+      let loneStore = RaftStepStore(endpoints: [cluster.endpoints[loneIndex]])
+
+      await #expect(throws: RaftWorkflowError.self) {
+        try await loneStore.save(workflowID: "chaos-quorum", stepKey: "2", data: Data("blocked".utf8))
+      }
+    }
+  }
+}
+
+private final class ManagedRaftWorkflowCluster: @unchecked Sendable {
+  let endpoints: [RaftWorkflowEndpoint]
+  private let processes: [Process]
+
+  init(endpoints: [RaftWorkflowEndpoint], processes: [Process]) {
+    self.endpoints = endpoints
+    self.processes = processes
+  }
+
+  func killNode(at index: Int) {
+    guard processes.indices.contains(index), processes[index].isRunning else { return }
+    processes[index].terminate()
+  }
+
+  func endpoints(excluding index: Int) -> [RaftWorkflowEndpoint] {
+    endpoints.enumerated().filter { $0.offset != index }.map(\.element)
+  }
 }
 
 private func withRaftWorkflowCluster<R>(
-  _ body: ([RaftWorkflowEndpoint]) async throws -> R
+  _ body: (ManagedRaftWorkflowCluster) async throws -> R
 ) async throws -> R {
   let basePort = 19_000 + Int.random(in: 0..<100) * 10
   let ports = [basePort, basePort + 1, basePort + 2]
@@ -163,7 +233,8 @@ private func withRaftWorkflowCluster<R>(
   try await waitForPorts(ports)
   try await waitForLeader(endpoints: endpoints)
 
-  return try await body(endpoints)
+  let cluster = ManagedRaftWorkflowCluster(endpoints: endpoints, processes: processes)
+  return try await body(cluster)
 }
 
 private func locateRaftWorkflowNodeBinary() throws -> String {
@@ -196,6 +267,19 @@ private func waitForLeader(
   }
 
   throw ClusterTestError.timeout
+}
+
+private func indexOfLeader(endpoints: [RaftWorkflowEndpoint]) async throws -> Int {
+  for (index, endpoint) in endpoints.enumerated() {
+    let client = RaftWorkflowClient(endpoints: [endpoint])
+    do {
+      try await client.propose(.saveStep(workflowID: "__probe__", stepKey: "0", data: Data("x".utf8)))
+      return index
+    } catch RaftWorkflowError.notLeader {
+      continue
+    }
+  }
+  throw ClusterTestError.noLeader
 }
 
 private func waitForPorts(_ ports: [Int], timeout: Duration = .seconds(15)) async throws {
@@ -232,6 +316,7 @@ private func isPortOpen(_ port: Int) -> Bool {
 private enum ClusterTestError: Error, CustomStringConvertible {
   case missingBinary
   case timeout
+  case noLeader
 
   var description: String {
     switch self {
@@ -239,6 +324,8 @@ private enum ClusterTestError: Error, CustomStringConvertible {
       "Build raft-workflow-node first: swift build --product raft-workflow-node"
     case .timeout:
       "Timed out waiting for raft-workflow-node processes."
+    case .noLeader:
+      "No Raft leader found among workflow node endpoints."
     }
   }
 }

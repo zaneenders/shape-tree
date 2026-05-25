@@ -1,7 +1,4 @@
 import Foundation
-#if canImport(FoundationNetworking)
-import FoundationNetworking
-#endif
 import HTTPTypes
 import Hummingbird
 import HummingbirdTesting
@@ -17,6 +14,10 @@ import Workflow
 
 @testable import ShapeTree
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+
 @Suite struct DailySummaryTests {
 
   /// No entries for the day — workflow short-circuits the LLM call and still writes output.
@@ -25,7 +26,7 @@ import Workflow
     let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
 
-    let workflowStore = try await FileStepStore(root: FilePath(layout.workflowsDirectory.path))
+    let workflowStore = try await testFileStepStore(in: layout)
     let summaryService = DailySummaryService(
       journalStore: journal,
       journalRepoPath: layout.journalRepoRoot.path,
@@ -97,7 +98,7 @@ import Workflow
     let log = Logger(label: "test.daily-summary.replay")
     let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
 
-    let workflowStore = try await FileStepStore(root: FilePath(layout.workflowsDirectory.path))
+    let workflowStore = try await testFileStepStore(in: layout)
     let summaryService = DailySummaryService(
       journalStore: journal,
       journalRepoPath: layout.journalRepoRoot.path,
@@ -116,7 +117,7 @@ import Workflow
     let second = try await summaryService.summarizeDay(dayKey: "25-05-10")
     #expect(second.summary.contains("No journal entries"))
 
-    let stepDir = layout.workflowsDirectory
+    let stepDir = testWorkflowStoreRoot(in: layout)
       .appendingPathComponent("daily-summary-25-05-10", isDirectory: true)
     #expect(FileManager.default.fileExists(atPath: stepDir.appendingPathComponent("1.json").path))
     #expect(FileManager.default.fileExists(atPath: stepDir.appendingPathComponent("2.json").path))
@@ -155,7 +156,7 @@ import Workflow
       createdAt: nil,
       journalDayKey: todayKey)
 
-    let workflowStore = try await FileStepStore(root: FilePath(layout.workflowsDirectory.path))
+    let workflowStore = try await testFileStepStore(in: layout)
     let summaryService = DailySummaryService(
       journalStore: journal,
       journalRepoPath: layout.journalRepoRoot.path,
@@ -194,6 +195,14 @@ import Workflow
   }
 
   // MARK: - Helpers
+
+  private func testWorkflowStoreRoot(in layout: ShapeTreeDataLayout) -> URL {
+    layout.dotFolder.appendingPathComponent("test-workflows", isDirectory: true)
+  }
+
+  private func testFileStepStore(in layout: ShapeTreeDataLayout) async throws -> FileStepStore {
+    try await FileStepStore(root: FilePath(testWorkflowStoreRoot(in: layout).path))
+  }
 
   private func ollamaIsReachable(_ baseURL: String) async -> Bool {
     guard let url = URL(string: "\(baseURL)/api/tags") else { return false }

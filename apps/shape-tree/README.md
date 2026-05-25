@@ -147,3 +147,15 @@ llvm-cov report "$BIN" --instr-profile="$PROFDATA" \
   --ignore-filename-regex='\.build\/' \
   --ignore-filename-regex='\/scribe\/Sources\/'
 ```
+
+### Raft 
+
+```
+# Watch logs
+docker compose logs -f raft-workflow-0 raft-workflow-1 raft-workflow-2
+
+# kill node
+docker compose kill raft-workflow-1
+# bring node back up
+docker compose up -d raft-workflow-1
+```
