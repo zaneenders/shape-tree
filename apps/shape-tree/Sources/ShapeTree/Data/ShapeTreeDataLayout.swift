@@ -11,7 +11,6 @@ public struct ShapeTreeDataLayout: Sendable {
   public static let journalDirectoryName = "Journal"
   public static let authorizedKeysDirectoryName = "authorized_keys"
   public static let summariesDirectoryName = "summaries"
-  public static let workflowsDirectoryName = "workflows"
 
   public let dataRoot: URL
 
@@ -39,11 +38,6 @@ public struct ShapeTreeDataLayout: Sendable {
   /// Daily summaries: `R/.shape-tree/summaries/{yy-MM-dd}.md`
   public var summariesDirectory: URL {
     dotFolder.appendingPathComponent(Self.summariesDirectoryName, isDirectory: true)
-  }
-
-  /// Workflow step cache: `R/.shape-tree/workflows/{workflowID}/{stepKey}.json`
-  public var workflowsDirectory: URL {
-    dotFolder.appendingPathComponent(Self.workflowsDirectoryName, isDirectory: true)
   }
 
   public func journalEntryFile(for date: Date) -> URL {
@@ -93,10 +87,6 @@ public struct ShapeTreeDataLayout: Sendable {
 
     try fileManager.createDirectory(
       at: layout.summariesDirectory,
-      withIntermediateDirectories: true)
-
-    try fileManager.createDirectory(
-      at: layout.workflowsDirectory,
       withIntermediateDirectories: true)
 
     if !fileManager.fileExists(atPath: layout.journalSubjectsFile.path) {
