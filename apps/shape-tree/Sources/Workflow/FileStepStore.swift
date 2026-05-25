@@ -2,7 +2,7 @@ import Foundation
 import SystemPackage
 import _NIOFileSystem
 
-public final class FileStepStore: Sendable {
+public struct FileStepStore: StepStore, Sendable {
   private let root: FilePath
 
   public init(root: FilePath) async throws {

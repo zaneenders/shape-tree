@@ -2,13 +2,13 @@ import Foundation
 import Logging
 import Synchronization
 
-public final class WorkflowContext: Sendable {
+public struct WorkflowContext: Sendable, ~Copyable {
   public let id: String
-  private let store: FileStepStore
+  private let store: any StepStore
   private let log: Logger
   private let stepCounter: Mutex<Int> = Mutex(0)
 
-  public init(id: String = UUID().uuidString, store: FileStepStore, log: Logger = Logger(label: "workflow")) {
+  public init(id: String = UUID().uuidString, store: any StepStore, log: Logger = Logger(label: "workflow")) {
     self.id = id
     self.store = store
     self.log = log

@@ -26,6 +26,8 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"),
     .package(url: "https://github.com/vapor/jwt-kit.git", from: "5.0.0"),
     .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
+    .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.0"),
+    .package(url: "https://github.com/zaneenders/swift-raft.git", revision: "841decd"),
   ],
   targets: [
     .target(
@@ -87,12 +89,51 @@ let package = Package(
         .treatAllWarnings(as: .error),
       ]
     ),
+    .target(
+      name: "RaftWorkflow",
+      dependencies: [
+        "Workflow",
+        .product(name: "Raft", package: "swift-raft"),
+        .product(name: "NIOCore", package: "swift-nio"),
+        .product(name: "NIOPosix", package: "swift-nio"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+        .treatAllWarnings(as: .error),
+      ]
+    ),
+    .executableTarget(
+      name: "raft-workflow-node",
+      dependencies: [
+        "RaftWorkflow",
+        .product(name: "Raft", package: "swift-raft"),
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        .product(name: "Logging", package: "swift-log"),
+        .product(name: "NIOCore", package: "swift-nio"),
+        .product(name: "NIOPosix", package: "swift-nio"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+        .treatAllWarnings(as: .error),
+      ]
+    ),
     .testTarget(
       name: "WorkflowTests",
       dependencies: [
         "Workflow",
         .product(name: "_NIOFileSystem", package: "swift-nio"),
         .product(name: "Logging", package: "swift-log"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+        .treatAllWarnings(as: .error),
+      ]
+    ),
+    .testTarget(
+      name: "RaftWorkflowTests",
+      dependencies: [
+        "RaftWorkflow",
+        "Workflow",
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
