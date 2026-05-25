@@ -2,7 +2,7 @@ services:
   raft-workflow-0:
     build:
       context: .
-      dockerfile: docker/raft-workflow-node/Dockerfile
+      dockerfile: Dockerfile
     image: shape-tree-raft-workflow-node
     command:
       - --host=0.0.0.0
