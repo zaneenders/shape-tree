@@ -1,12 +1,15 @@
 import Foundation
 import Logging
 import Raft
+import RaftBlob
+import RaftNIO
 import RaftShell
 import RaftWorkflow
 
 actor WorkflowNodeService {
   private let shell: Raft.Shell<NetworkPeer>
   private let stateMachine: WorkflowStateMachine
+  private let blobStore: any BlobStore
   private let logger: Logger
   private let snapshotInterval: UInt
 
@@ -15,17 +18,20 @@ actor WorkflowNodeService {
   init(
     shell: Raft.Shell<NetworkPeer>,
     stateMachine: WorkflowStateMachine,
+    blobStore: any BlobStore,
     logger: Logger,
     snapshotInterval: UInt
   ) {
     self.shell = shell
     self.stateMachine = stateMachine
+    self.blobStore = blobStore
     self.logger = logger
     self.snapshotInterval = snapshotInterval
   }
 
   static func make(
     shell: Raft.Shell<NetworkPeer>,
+    blobStore: any BlobStore,
     logger: Logger,
     snapshotInterval: UInt
   ) async -> WorkflowNodeService {
@@ -33,6 +39,7 @@ actor WorkflowNodeService {
     let service = WorkflowNodeService(
       shell: shell,
       stateMachine: stateMachine,
+      blobStore: blobStore,
       logger: logger,
       snapshotInterval: snapshotInterval)
 
@@ -76,8 +83,13 @@ actor WorkflowNodeService {
   }
 
   func handleQuery(_ wire: WorkflowQueryWire) async -> WorkflowQueryReplyWire {
-    let data = await stateMachine.load(workflowID: wire.workflowID, stepKey: wire.stepKey)
-    return WorkflowQueryReplyWire(found: data != nil, data: data)
+    guard let ref = await stateMachine.stepRef(workflowID: wire.workflowID, stepKey: wire.stepKey) else {
+      return WorkflowQueryReplyWire(found: false, data: nil)
+    }
+    guard let data = try? await blobStore.get(hash: ref.hash), data.count == ref.byteCount else {
+      return WorkflowQueryReplyWire(found: false, data: nil)
+    }
+    return WorkflowQueryReplyWire(found: true, data: data)
   }
 
   private func waitApplied(index: Int, timeout: Duration = .seconds(30)) async {

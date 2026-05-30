@@ -1,8 +1,8 @@
 import Foundation
 import Logging
+import RaftWorkflow
 import ScribeCore
 import Sit
-import Workflow
 
 #if canImport(System)
 import System
@@ -94,17 +94,17 @@ public struct DailySummaryService: Sendable {
       try await workflowStore.reset(workflowID: workflowID)
     }
     log.info("event=summary.start day=\(dayKey) force=\(force)")
-    let ctx = WorkflowContext(id: workflowID, store: workflowStore, log: log)
+    let ctx = WorkflowContext(id: workflowID, store: workflowStore)
 
     // Step 1 — Pull journal repo
-    let pull = try await ctx.step {
+    let pull = try await ctx.step("pull") {
       try await sit.pullRebaseIfClean(cwd: FilePath(journalRepoPath), log: log)
       return PullResult(pulledAt: Date())
     }
-    log.info("event=summary.pull day=\(dayKey) pulledAt=\(pull.pulledAt)")
+    log.info("event=summary.pull day=\(dayKey) pulledAt=\(pull.value.pulledAt)")
 
     // Step 2 — Read today's entries
-    let read = try await ctx.step {
+    let read = try await ctx.step("read") {
       if let detail = try await journalStore.entryDetail(dayKey: dayKey) {
         return ReadResult(entryText: detail.content, entryCount: detail.lineCount)
       }
@@ -112,8 +112,8 @@ public struct DailySummaryService: Sendable {
     }
 
     // Step 3 — Summarize (or short-circuit if no entries)
-    let summary = try await ctx.step {
-      guard !read.entryText.isEmpty else {
+    let summary = try await ctx.step("summarize") {
+      guard !read.value.entryText.isEmpty else {
         return SummarizeResult(summary: "No journal entries for \(dayKey).")
       }
 
@@ -128,7 +128,7 @@ public struct DailySummaryService: Sendable {
       let agent = try ScribeAgent(
         configuration: config,
         systemPrompt: Self.summarizationPrompt)
-      let stream = await agent.prompt(read.entryText, log: log)
+      let stream = await agent.prompt(read.value.entryText, log: log)
       let result = try await stream.result.value
       let text =
         result.messages.last(where: { $0.role == .assistant })?.content
@@ -137,11 +137,11 @@ public struct DailySummaryService: Sendable {
     }
 
     // Step 4 — Write to summaries directory
-    let writeResult = try await ctx.step {
+    let writeResult = try await ctx.step("write") {
       let fileURL = summariesDirectory.appendingPathComponent("\(dayKey).md", isDirectory: false)
       let fm = FileManager.default
       try fm.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-      guard let data = summary.summary.data(using: .utf8) else {
+      guard let data = summary.value.summary.data(using: .utf8) else {
         throw DailySummaryError.utf8EncodingFailed
       }
       try data.write(to: fileURL, options: .atomic)
@@ -149,12 +149,12 @@ public struct DailySummaryService: Sendable {
       return WriteResult(path: fileURL.path)
     }
 
-    log.info("event=summary.complete day=\(dayKey) path=\(writeResult.path)")
+    log.info("event=summary.complete day=\(dayKey) path=\(writeResult.value.path)")
 
     return DailySummaryOutput(
       dayKey: dayKey,
-      summary: summary.summary,
-      entryCount: read.entryCount)
+      summary: summary.value.summary,
+      entryCount: read.value.entryCount)
   }
 
   // MARK: - Prompt

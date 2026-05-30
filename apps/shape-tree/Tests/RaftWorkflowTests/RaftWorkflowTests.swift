@@ -1,54 +1,61 @@
 import Darwin
 import Foundation
 import Raft
+import RaftBlob
+import RaftWorkflow
 import Testing
-import Workflow
-
-@testable import RaftWorkflow
 
 @Suite struct WorkflowStateMachineTests {
-  @Test func saveAndLoadStep() async throws {
+  @Test func saveAndLoadStepRef() async throws {
     let machine = WorkflowStateMachine()
+    let data = Data("hello".utf8)
+    let hash = ContentHash.sha256(data)
     let entry = LogEntry(
       term: 1,
-      command: try WorkflowCodec.encode(.saveStep(workflowID: "wf-1", stepKey: "1", data: Data("hello".utf8))))
+      command: try WorkflowCodec.encode(
+        .saveStepRef(workflowID: "wf-1", stepKey: "1", hash: hash, byteCount: data.count)))
 
     let result = try await machine.apply(entry: entry)
     #expect(result == .saved)
 
-    let loaded = await machine.load(workflowID: "wf-1", stepKey: "1")
-    #expect(loaded == Data("hello".utf8))
+    let loaded = await machine.stepRef(workflowID: "wf-1", stepKey: "1")
+    #expect(loaded == StepRef(hash: hash, byteCount: data.count))
   }
 
   @Test func resetRemovesWorkflow() async throws {
     let machine = WorkflowStateMachine()
+    let data = Data("x".utf8)
+    let hash = ContentHash.sha256(data)
     _ = try await machine.apply(
       entry: LogEntry(
         term: 1,
-        command: try WorkflowCodec.encode(.saveStep(workflowID: "wf-1", stepKey: "1", data: Data("x".utf8)))))
+        command: try WorkflowCodec.encode(
+          .saveStepRef(workflowID: "wf-1", stepKey: "1", hash: hash, byteCount: data.count))))
 
     _ = try await machine.apply(
       entry: LogEntry(
         term: 1,
         command: try WorkflowCodec.encode(.resetWorkflow(workflowID: "wf-1"))))
 
-    let loaded = await machine.load(workflowID: "wf-1", stepKey: "1")
-    #expect(loaded == nil)
+    #expect(await machine.hasStep(workflowID: "wf-1", stepKey: "1") == false)
   }
 
   @Test func snapshotRoundTrip() async throws {
     let machine = WorkflowStateMachine()
+    let data = Data("a".utf8)
+    let hash = ContentHash.sha256(data)
     _ = try await machine.apply(
       entry: LogEntry(
         term: 1,
-        command: try WorkflowCodec.encode(.saveStep(workflowID: "wf-1", stepKey: "1", data: Data("a".utf8)))))
+        command: try WorkflowCodec.encode(
+          .saveStepRef(workflowID: "wf-1", stepKey: "1", hash: hash, byteCount: data.count))))
 
     let snapshot = try await machine.snapshot()
     let restored = WorkflowStateMachine()
     try await restored.restore(from: snapshot)
 
-    let loaded = await restored.load(workflowID: "wf-1", stepKey: "1")
-    #expect(loaded == Data("a".utf8))
+    let loaded = await restored.stepRef(workflowID: "wf-1", stepKey: "1")
+    #expect(loaded == StepRef(hash: hash, byteCount: data.count))
   }
 }
 
@@ -66,7 +73,7 @@ struct RaftWorkflowClusterTests {
       let loaded = try await store.load(workflowID: "daily-summary-25-05-24", stepKey: "1")
       #expect(loaded == Data("cached".utf8))
 
-      let followerClient = RaftWorkflowClient(endpoints: [cluster.endpoints[2]])
+      let followerClient = WorkflowClient(endpoints: [cluster.endpoints[2]])
       let onFollower = try await followerClient.load(
         workflowID: "daily-summary-25-05-24",
         stepKey: "1",
@@ -81,19 +88,19 @@ struct RaftWorkflowClusterTests {
 
       var callCount = 0
       let ctx1 = WorkflowContext(id: "wf-replay", store: store)
-      let first = try await ctx1.step {
+      let first = try await ctx1.step("work") {
         callCount += 1
         return "expensive-result"
       }
 
       let ctx2 = WorkflowContext(id: "wf-replay", store: store)
-      let replay = try await ctx2.step {
+      let replay = try await ctx2.step("work") {
         callCount += 1
         return "different"
       }
 
-      #expect(first == "expensive-result")
-      #expect(replay == "expensive-result")
+      #expect(first.value == "expensive-result")
+      #expect(replay.value == "expensive-result")
       #expect(callCount == 1)
     }
   }
@@ -103,22 +110,30 @@ struct RaftWorkflowClusterTests {
       let store = RaftStepStore(endpoints: cluster.endpoints)
 
       let ctx = WorkflowContext(id: "wf-reset", store: store)
-      _ = try await ctx.step { "keep-me" }
+      _ = try await ctx.step("keep") { "keep-me" }
 
       try await store.reset(workflowID: "wf-reset")
 
+      let resetDeadline = ContinuousClock.now + .seconds(5)
+      while ContinuousClock.now < resetDeadline {
+        if try await store.load(workflowID: "wf-reset", stepKey: "keep") == nil {
+          break
+        }
+        try await Task.sleep(for: .milliseconds(50))
+      }
+
       var callCount = 0
-      let fresh = try await ctx.step {
+      let freshCtx = WorkflowContext(id: "wf-reset", store: store)
+      let fresh = try await freshCtx.step("keep") {
         callCount += 1
         return "new-value"
       }
 
-      #expect(fresh == "new-value")
+      #expect(fresh.value == "new-value")
       #expect(callCount == 1)
     }
   }
 
-  /// Kills each node in turn; the remaining two-node cluster should elect a new leader and keep accepting writes.
   @Test func survivesSingleNodeKill() async throws {
     for killedIndex in 0..<3 {
       try await withRaftWorkflowCluster { cluster in
@@ -138,7 +153,7 @@ struct RaftWorkflowClusterTests {
         #expect(try await activeStore.load(workflowID: workflowID, stepKey: "2") == Data("after".utf8))
 
         let survivor = survivors[0]
-        let onSurvivor = try await RaftWorkflowClient(endpoints: [survivor]).load(
+        let onSurvivor = try await WorkflowClient(endpoints: [survivor]).load(
           workflowID: workflowID,
           stepKey: "2",
           waitForReplication: .seconds(5))
@@ -147,7 +162,6 @@ struct RaftWorkflowClusterTests {
     }
   }
 
-  /// With only one follower alive there is no quorum; writes should fail quickly.
   @Test func writeFailsWithoutQuorum() async throws {
     try await withRaftWorkflowCluster { cluster in
       let store = RaftStepStore(endpoints: cluster.endpoints)
@@ -163,7 +177,7 @@ struct RaftWorkflowClusterTests {
       let loneIndex = [0, 1, 2].first { $0 != leaderIndex && $0 != followerToKill }!
       let loneStore = RaftStepStore(endpoints: [cluster.endpoints[loneIndex]])
 
-      await #expect(throws: RaftWorkflowError.self) {
+      await #expect(throws: WorkflowClientError.self) {
         try await loneStore.save(workflowID: "chaos-quorum", stepKey: "2", data: Data("blocked".utf8))
       }
     }
@@ -171,10 +185,10 @@ struct RaftWorkflowClusterTests {
 }
 
 private final class ManagedRaftWorkflowCluster: @unchecked Sendable {
-  let endpoints: [RaftWorkflowEndpoint]
+  let endpoints: [WorkflowEndpoint]
   private let processes: [Process]
 
-  init(endpoints: [RaftWorkflowEndpoint], processes: [Process]) {
+  init(endpoints: [WorkflowEndpoint], processes: [Process]) {
     self.endpoints = endpoints
     self.processes = processes
   }
@@ -184,7 +198,7 @@ private final class ManagedRaftWorkflowCluster: @unchecked Sendable {
     processes[index].terminate()
   }
 
-  func endpoints(excluding index: Int) -> [RaftWorkflowEndpoint] {
+  func endpoints(excluding index: Int) -> [WorkflowEndpoint] {
     endpoints.enumerated().filter { $0.offset != index }.map(\.element)
   }
 }
@@ -194,7 +208,7 @@ private func withRaftWorkflowCluster<R>(
 ) async throws -> R {
   let basePort = 19_000 + Int.random(in: 0..<100) * 10
   let ports = [basePort, basePort + 1, basePort + 2]
-  let endpoints = ports.map { RaftWorkflowEndpoint(host: "127.0.0.1", port: $0) }
+  let endpoints = ports.map { WorkflowEndpoint(host: "127.0.0.1", port: $0) }
 
   let binary = try locateRaftWorkflowNodeBinary()
   let storeRoot = FileManager.default.temporaryDirectory
@@ -250,18 +264,17 @@ private func locateRaftWorkflowNodeBinary() throws -> String {
 }
 
 private func waitForLeader(
-  endpoints: [RaftWorkflowEndpoint],
+  endpoints: [WorkflowEndpoint],
   timeout: Duration = .seconds(10)
 ) async throws {
   let deadline = ContinuousClock.now + timeout
-  let client = RaftWorkflowClient(endpoints: endpoints)
+  let store = RaftStepStore(endpoints: endpoints)
 
   while ContinuousClock.now < deadline {
     do {
-      try await client.propose(
-        .saveStep(workflowID: "__probe__", stepKey: "0", data: Data("ok".utf8)))
+      try await store.save(workflowID: "__probe__", stepKey: "0", data: Data("ok".utf8))
       return
-    } catch RaftWorkflowError.notLeader {
+    } catch WorkflowClientError.notLeader {
       try await Task.sleep(for: .milliseconds(100))
     }
   }
@@ -269,13 +282,13 @@ private func waitForLeader(
   throw ClusterTestError.timeout
 }
 
-private func indexOfLeader(endpoints: [RaftWorkflowEndpoint]) async throws -> Int {
+private func indexOfLeader(endpoints: [WorkflowEndpoint]) async throws -> Int {
   for (index, endpoint) in endpoints.enumerated() {
-    let client = RaftWorkflowClient(endpoints: [endpoint])
+    let store = RaftStepStore(endpoints: [endpoint])
     do {
-      try await client.propose(.saveStep(workflowID: "__probe__", stepKey: "0", data: Data("x".utf8)))
+      try await store.save(workflowID: "__probe__", stepKey: "0", data: Data("x".utf8))
       return index
-    } catch RaftWorkflowError.notLeader {
+    } catch WorkflowClientError.notLeader {
       continue
     }
   }
@@ -283,9 +296,10 @@ private func indexOfLeader(endpoints: [RaftWorkflowEndpoint]) async throws -> In
 }
 
 private func waitForPorts(_ ports: [Int], timeout: Duration = .seconds(15)) async throws {
+  let allPorts = ports + ports.map { $0 + 1000 }
   let deadline = ContinuousClock.now + timeout
   while ContinuousClock.now < deadline {
-    if ports.allSatisfy(isPortOpen) {
+    if allPorts.allSatisfy(isPortOpen) {
       try await Task.sleep(for: .milliseconds(200))
       return
     }

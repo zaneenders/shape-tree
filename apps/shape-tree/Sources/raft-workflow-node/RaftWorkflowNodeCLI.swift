@@ -3,7 +3,9 @@ import Foundation
 import Logging
 import NIOPosix
 import Raft
+import RaftBlob
 import RaftExtras
+import RaftNIO
 import RaftShell
 import RaftWorkflow
 
@@ -24,7 +26,7 @@ struct RaftWorkflowNodeCommand: AsyncParsableCommand {
         docker compose up --build
 
       Each node waits until all peers are listening before starting elections unless
-      `--no-wait-for-peers` is passed.
+      `--no-wait-for-peers` is passed. Blob storage listens on the Raft port + 1000.
       """
   )
 
@@ -52,6 +54,9 @@ struct RaftWorkflowNodeCommand: AsyncParsableCommand {
   @Option(name: .long, help: "Take a snapshot every N committed entries (default: 100, 0 = disabled).")
   var snapshotInterval: UInt = 100
 
+  @Option(name: .long, help: "Blob listener port (default: Raft port + 1000).")
+  var workerPort: Int?
+
   @Flag(name: .shortAndLong, help: "Enable verbose logging.")
   var verbose: Bool = false
 
@@ -62,9 +67,13 @@ struct RaftWorkflowNodeCommand: AsyncParsableCommand {
   }
 
   mutating func run() async throws {
-    let peers = try peer.map { try parsePeerAddress($0, defaultHost: host) }
+    let peerDefaultHost = EndpointAddressParser.peerDefaultHost(
+      bindHost: host,
+      advertiseHost: advertiseHost)
+    let peers = try peer.map { try EndpointAddressParser.parse($0, defaultHost: peerDefaultHost) }
     let (electionTimeoutMin, electionTimeoutMax) = try parseElectionTimeout(electionTimeoutMs)
     let logLevel: Logger.Level = verbose ? .trace : .info
+    let resolvedWorkerPort = workerPort ?? (port + 1000)
 
     LoggingSystem.bootstrap { label in
       var handler = StreamLogHandler.standardError(label: label)
@@ -90,7 +99,8 @@ struct RaftWorkflowNodeCommand: AsyncParsableCommand {
     )
 
     let storeURL = URL(fileURLWithPath: storeDir, isDirectory: true)
-    let persister = FilePersister(storeDirectory: storeURL, nodeId: "\(host)-\(port)")
+    let blobStore = try FileBlobStore(directory: storeURL.appendingPathComponent("blobs"))
+    let persister = try FilePersister(storeDirectory: storeURL, nodeId: "\(host)-\(port)")
     let shell = await Raft.Shell<NetworkPeer>.make(
       settings: settings,
       myself: myself,
@@ -101,9 +111,13 @@ struct RaftWorkflowNodeCommand: AsyncParsableCommand {
 
     let service = await WorkflowNodeService.make(
       shell: shell,
+      blobStore: blobStore,
       logger: logger,
       snapshotInterval: snapshotInterval
     )
+
+    let blobServer = BlobWorkerServer(eventLoopGroup: group, blobStore: blobStore)
+    try await blobServer.start(host: host, port: resolvedWorkerPort)
 
     let server = RaftServer(
       eventLoopGroup: group,
@@ -125,18 +139,27 @@ struct RaftWorkflowNodeCommand: AsyncParsableCommand {
       onClientCommand: { wire in
         await service.handleClientCommand(wire)
       },
-      onWorkflowQuery: { wire in
-        await service.handleQuery(wire)
-      }
+      customFrameHandler: { frame in
+        if let wire = try? JSONDecoder().decode(WorkflowQueryWire.self, from: frame) {
+          let reply = await service.handleQuery(wire)
+          return try WireCodec.encode(reply)
+        }
+        return nil
+      },
+      logger: logger
     )
 
     try await server.start(host: host, port: port)
 
     logger.info("listening on \(myselfNode)")
+    logger.info("blob listener on \(raftHost):\(resolvedWorkerPort)")
     logger.info("peers: \(peerNodes.map(\.description).joined(separator: ", "))")
 
     if !noWaitForPeers {
-      try await PeerReadiness.waitForPeers(peers, eventLoopGroup: group, logger: logger)
+      try await PeerReadiness.waitForPeers(
+        peers.map { PeerAddress(host: $0.host, port: $0.port) },
+        eventLoopGroup: group,
+        logger: logger)
     }
 
     await shell.start()
@@ -149,49 +172,15 @@ struct RaftWorkflowNodeCommand: AsyncParsableCommand {
   }
 }
 
-actor PeerRegistry {
-  private var peersByNode: [Node: NetworkPeer]
-  private let eventLoopGroup: MultiThreadedEventLoopGroup
-
-  init(initialPeers: [NetworkPeer], eventLoopGroup: MultiThreadedEventLoopGroup) {
-    self.peersByNode = Dictionary(uniqueKeysWithValues: initialPeers.map { ($0.raftNode, $0) })
-    self.eventLoopGroup = eventLoopGroup
-  }
-
-  func peer(for node: Node) -> NetworkPeer {
-    if let p = peersByNode[node] { return p }
-    let newPeer = NetworkPeer(raftNode: node, eventLoopGroup: eventLoopGroup)
-    peersByNode[node] = newPeer
-    return newPeer
-  }
-}
-
 private enum CLIError: Error, CustomStringConvertible {
-  case invalidPeer(String)
   case invalidElectionTimeout(String)
 
   var description: String {
     switch self {
-    case .invalidPeer(let value):
-      "invalid --peer value '\(value)', expected HOST:PORT or PORT"
     case .invalidElectionTimeout(let value):
       "invalid --election-timeout-ms value '\(value)', expected MIN-MAX"
     }
   }
-}
-
-private func parsePeerAddress(_ value: String, defaultHost: String) throws -> PeerAddress {
-  if value.contains(":") {
-    let parts = value.split(separator: ":", maxSplits: 1)
-    guard parts.count == 2, let port = Int(parts[1]) else {
-      throw CLIError.invalidPeer(value)
-    }
-    return PeerAddress(host: String(parts[0]), port: port)
-  }
-  guard let port = Int(value) else {
-    throw CLIError.invalidPeer(value)
-  }
-  return PeerAddress(host: defaultHost, port: port)
 }
 
 private func parseElectionTimeout(_ value: String) throws -> (UInt, UInt) {

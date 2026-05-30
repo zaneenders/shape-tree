@@ -8,12 +8,14 @@ services:
       - --host=0.0.0.0
       - --advertise-host=raft-workflow-0
       - --port=9100
+      - --worker-port=10100
       - --peer=raft-workflow-1:9101
       - --peer=raft-workflow-2:9102
       - --store-dir=/data/raft-workflow-node
       - --no-wait-for-peers
     ports:
       - "9100:9100"
+      - "10100:10100"
     volumes:
       - raft-workflow-0-data:/data/raft-workflow-node
     healthcheck:
@@ -29,12 +31,14 @@ services:
       - --host=0.0.0.0
       - --advertise-host=raft-workflow-1
       - --port=9101
+      - --worker-port=10101
       - --peer=raft-workflow-0:9100
       - --peer=raft-workflow-2:9102
       - --store-dir=/data/raft-workflow-node
       - --no-wait-for-peers
     ports:
       - "9101:9101"
+      - "10101:10101"
     volumes:
       - raft-workflow-1-data:/data/raft-workflow-node
     healthcheck:
@@ -50,12 +54,14 @@ services:
       - --host=0.0.0.0
       - --advertise-host=raft-workflow-2
       - --port=9102
+      - --worker-port=10102
       - --peer=raft-workflow-0:9100
       - --peer=raft-workflow-1:9101
       - --store-dir=/data/raft-workflow-node
       - --no-wait-for-peers
     ports:
       - "9102:9102"
+      - "10102:10102"
     volumes:
       - raft-workflow-2-data:/data/raft-workflow-node
     healthcheck:

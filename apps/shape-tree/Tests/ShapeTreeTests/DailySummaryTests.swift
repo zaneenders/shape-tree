@@ -6,6 +6,7 @@ import Logging
 import NIOCore
 import OpenAPIAsyncHTTPClient
 import OpenAPIRuntime
+import RaftWorkflow
 import ShapeTreeClient
 import Sit
 import SystemPackage
@@ -26,7 +27,7 @@ import FoundationNetworking
     let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
     let fixture = try await JWTTestSupport.makeFixture()
 
-    let workflowStore = try await testFileStepStore(in: layout)
+    let workflowStore = try testFileStepStore(in: layout)
     let summaryService = DailySummaryService(
       journalStore: journal,
       journalRepoPath: layout.journalRepoRoot.path,
@@ -98,7 +99,7 @@ import FoundationNetworking
     let log = Logger(label: "test.daily-summary.replay")
     let (journal, layout) = try await JournalTestFixtures.ephemeralJournalWorkspace(log: log)
 
-    let workflowStore = try await testFileStepStore(in: layout)
+    let workflowStore = try testFileStepStore(in: layout)
     let summaryService = DailySummaryService(
       journalStore: journal,
       journalRepoPath: layout.journalRepoRoot.path,
@@ -119,10 +120,10 @@ import FoundationNetworking
 
     let stepDir = testWorkflowStoreRoot(in: layout)
       .appendingPathComponent("daily-summary-25-05-10", isDirectory: true)
-    #expect(FileManager.default.fileExists(atPath: stepDir.appendingPathComponent("1.json").path))
-    #expect(FileManager.default.fileExists(atPath: stepDir.appendingPathComponent("2.json").path))
-    #expect(FileManager.default.fileExists(atPath: stepDir.appendingPathComponent("3.json").path))
-    #expect(FileManager.default.fileExists(atPath: stepDir.appendingPathComponent("4.json").path))
+    #expect(FileManager.default.fileExists(atPath: stepDir.appendingPathComponent("pull").path))
+    #expect(FileManager.default.fileExists(atPath: stepDir.appendingPathComponent("read").path))
+    #expect(FileManager.default.fileExists(atPath: stepDir.appendingPathComponent("summarize").path))
+    #expect(FileManager.default.fileExists(atPath: stepDir.appendingPathComponent("write").path))
   }
 
   /// End-to-end: seeds a few journal entries, then summarizes with a real local LLM.
@@ -156,7 +157,7 @@ import FoundationNetworking
       createdAt: nil,
       journalDayKey: todayKey)
 
-    let workflowStore = try await testFileStepStore(in: layout)
+    let workflowStore = try testFileStepStore(in: layout)
     let summaryService = DailySummaryService(
       journalStore: journal,
       journalRepoPath: layout.journalRepoRoot.path,
@@ -200,8 +201,8 @@ import FoundationNetworking
     layout.dotFolder.appendingPathComponent("test-workflows", isDirectory: true)
   }
 
-  private func testFileStepStore(in layout: ShapeTreeDataLayout) async throws -> FileStepStore {
-    try await FileStepStore(root: FilePath(testWorkflowStoreRoot(in: layout).path))
+  private func testFileStepStore(in layout: ShapeTreeDataLayout) throws -> FileStepStore {
+    try FileStepStore(directory: testWorkflowStoreRoot(in: layout))
   }
 
   private func ollamaIsReachable(_ baseURL: String) async -> Bool {

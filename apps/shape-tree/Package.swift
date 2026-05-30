@@ -10,11 +10,11 @@ let package = Package(
   ],
   products: [
     .library(name: "ShapeTreeClient", targets: ["ShapeTreeClient"]),
-    .library(name: "RaftWorkflow", targets: ["RaftWorkflow"]),
     .executable(name: "ShapeTree", targets: ["ShapeTree"]),
     .executable(name: "raft-workflow-node", targets: ["raft-workflow-node"]),
   ],
   dependencies: [
+    .package(url: "https://github.com/zaneenders/swift-raft.git", revision: "d50e476"),
     .package(url: "https://github.com/zaneenders/scribe.git", revision: "a132415"),
     .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.24.0"),
     .package(url: "https://github.com/hummingbird-project/swift-openapi-hummingbird.git", from: "2.0.1"),
@@ -29,7 +29,6 @@ let package = Package(
     .package(url: "https://github.com/vapor/jwt-kit.git", from: "5.0.0"),
     .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
     .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.0"),
-    .package(url: "https://github.com/zaneenders/swift-raft.git", revision: "aa06bce"),
   ],
   targets: [
     .target(
@@ -50,7 +49,7 @@ let package = Package(
         "ShapeTreeClient",
         "Sit",
         "Workflow",
-        "RaftWorkflow",
+        .product(name: "RaftWorkflow", package: "swift-raft"),
         .product(name: "ScribeCore", package: "scribe"),
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "OpenAPIHummingbird", package: "swift-openapi-hummingbird"),
@@ -83,6 +82,7 @@ let package = Package(
     .target(
       name: "Workflow",
       dependencies: [
+        .product(name: "RaftWorkflow", package: "swift-raft"),
         .product(name: "SystemPackage", package: "swift-system"),
         .product(name: "_NIOFileSystem", package: "swift-nio"),
         .product(name: "Logging", package: "swift-log"),
@@ -92,26 +92,15 @@ let package = Package(
         .treatAllWarnings(as: .error),
       ]
     ),
-    .target(
-      name: "RaftWorkflow",
-      dependencies: [
-        "Workflow",
-        .product(name: "Raft", package: "swift-raft"),
-        .product(name: "NIOCore", package: "swift-nio"),
-        .product(name: "NIOPosix", package: "swift-nio"),
-      ],
-      swiftSettings: [
-        .swiftLanguageMode(.v6),
-        .treatAllWarnings(as: .error),
-      ]
-    ),
     .executableTarget(
       name: "raft-workflow-node",
       dependencies: [
-        "RaftWorkflow",
         .product(name: "Raft", package: "swift-raft"),
         .product(name: "RaftShell", package: "swift-raft"),
         .product(name: "RaftExtras", package: "swift-raft"),
+        .product(name: "RaftNIO", package: "swift-raft"),
+        .product(name: "RaftBlob", package: "swift-raft"),
+        .product(name: "RaftWorkflow", package: "swift-raft"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
         .product(name: "Logging", package: "swift-log"),
         .product(name: "NIOCore", package: "swift-nio"),
@@ -126,6 +115,7 @@ let package = Package(
       name: "WorkflowTests",
       dependencies: [
         "Workflow",
+        .product(name: "RaftWorkflow", package: "swift-raft"),
         .product(name: "_NIOFileSystem", package: "swift-nio"),
         .product(name: "Logging", package: "swift-log"),
       ],
@@ -137,8 +127,7 @@ let package = Package(
     .testTarget(
       name: "RaftWorkflowTests",
       dependencies: [
-        "RaftWorkflow",
-        "Workflow",
+        .product(name: "RaftWorkflow", package: "swift-raft"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
@@ -163,6 +152,7 @@ let package = Package(
         "ShapeTreeClient",
         "Sit",
         "Workflow",
+        .product(name: "RaftWorkflow", package: "swift-raft"),
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "HummingbirdTesting", package: "hummingbird"),
         .product(name: "OpenAPIAsyncHTTPClient", package: "swift-openapi-async-http-client"),

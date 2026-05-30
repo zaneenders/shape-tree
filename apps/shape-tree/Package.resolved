@@ -1,5 +1,5 @@
 {
-  "originHash" : "622e7f70b452ff173aede785a338688f5b64a699a72bbb782d0f105efc4fc303",
+  "originHash" : "4bda81033678cb49a631a1817b26b1c2925ea20e93c58540dbf90bd48afb9851",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -312,8 +312,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/zaneenders/swift-raft.git",
       "state" : {
-        "branch" : "aa06bce",
-        "revision" : "aa06bceef54c258009ede03618ef624d720d2eb8"
+        "branch" : "d50e476",
+        "revision" : "d50e476ff4740b73462f387794db4ab0a5d0e514"
       }
     },
     {

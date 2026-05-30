@@ -1,7 +1,6 @@
 import Foundation
 import Logging
 import RaftWorkflow
-import Workflow
 
 enum WorkflowStoreError: Error, CustomStringConvertible {
   case missingEndpoints
@@ -26,16 +25,17 @@ enum WorkflowStoreFactory {
       throw WorkflowStoreError.missingEndpoints
     }
 
-    var endpoints: [RaftWorkflowEndpoint] = []
+    var endpoints: [WorkflowEndpoint] = []
     endpoints.reserveCapacity(raftEndpointStrings.count)
 
     for value in raftEndpointStrings {
       let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
       guard !trimmed.isEmpty else { continue }
 
-      if let endpoint = parseRaftEndpoint(trimmed) {
-        endpoints.append(endpoint)
-      } else {
+      do {
+        let parsed = try EndpointAddressParser.parse(trimmed, defaultHost: "127.0.0.1")
+        endpoints.append(WorkflowEndpoint(host: parsed.host, port: parsed.port))
+      } catch {
         throw WorkflowStoreError.invalidEndpoint(trimmed)
       }
     }
@@ -47,16 +47,5 @@ enum WorkflowStoreFactory {
     log.info(
       "event=workflow.store backend=raft endpoints=\(endpoints.map { "\($0.host):\($0.port)" }.joined(separator: ","))")
     return RaftStepStore(endpoints: endpoints)
-  }
-
-  private static func parseRaftEndpoint(_ value: String) -> RaftWorkflowEndpoint? {
-    if value.contains(":") {
-      let parts = value.split(separator: ":", maxSplits: 1)
-      guard parts.count == 2, let port = Int(parts[1]) else { return nil }
-      return RaftWorkflowEndpoint(host: String(parts[0]), port: port)
-    }
-
-    guard let port = Int(value) else { return nil }
-    return RaftWorkflowEndpoint(host: "127.0.0.1", port: port)
   }
 }
