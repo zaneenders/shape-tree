@@ -1,6 +1,7 @@
 import Foundation
 import OpenAPIRuntime
 import ShapeTreeClient
+import Workflow
 
 extension ShapeTreeHandler {
 
@@ -139,6 +140,10 @@ extension ShapeTreeHandler {
         body: body.body,
         createdAt: body.created_at,
         journalDayKey: body.journal_day)
+
+      let dayKey = body.journal_day ?? JournalPathCodec.journalDayKey(for: Date())
+      await worker?.enqueue(key: dayKey)
+
       return .created(.init(body: .json(.init(journal_relative_path: path))))
     } catch let error as JournalServiceError {
       return .badRequest(.init(body: .json(Self.errorBody(error.description))))

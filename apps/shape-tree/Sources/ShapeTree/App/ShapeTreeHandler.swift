@@ -4,6 +4,7 @@ import OpenAPIHummingbird
 import OpenAPIRuntime
 import ScribeCore
 import ShapeTreeClient
+import Workflow
 
 /// Implements the generated `APIProtocol` produced by swift-openapi-generator.
 /// Uses generated request/response types from the `ShapeTreeClient` module
@@ -12,6 +13,8 @@ struct ShapeTreeHandler: APIProtocol, Sendable {
 
   let store: SessionStore
   let journalStore: JournalStore
+  let dailySummaryService: DailySummaryService?
+  let worker: WorkflowWorker?
   let log: Logger
   let llmURL: String
   let agentModel: String

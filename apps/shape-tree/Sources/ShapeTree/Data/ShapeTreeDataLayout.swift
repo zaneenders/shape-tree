@@ -10,6 +10,7 @@ public struct ShapeTreeDataLayout: Sendable {
   public static let subjectsFileName = "journal-subjects.json"
   public static let journalDirectoryName = "Journal"
   public static let authorizedKeysDirectoryName = "authorized_keys"
+  public static let summariesDirectoryName = "summaries"
 
   public let dataRoot: URL
 
@@ -34,11 +35,21 @@ public struct ShapeTreeDataLayout: Sendable {
     dotFolder.appendingPathComponent(Self.authorizedKeysDirectoryName, isDirectory: true)
   }
 
+  /// Daily summaries: `R/.shape-tree/summaries/{yy-MM-dd}.md`
+  public var summariesDirectory: URL {
+    dotFolder.appendingPathComponent(Self.summariesDirectoryName, isDirectory: true)
+  }
+
   public func journalEntryFile(for date: Date) -> URL {
     journalRepoRoot.appendingPathComponent(
       JournalPathCodec.relativeMarkdownPath(for: date),
       isDirectory: false
     )
+  }
+
+  /// Summary file for a given `yy-MM-dd` day key.
+  public func summaryFile(dayKey: String) -> URL {
+    summariesDirectory.appendingPathComponent("\(dayKey).md", isDirectory: false)
   }
 
   /// Resolves the configured `data_path` string into an absolute directory URL.
@@ -72,6 +83,10 @@ public struct ShapeTreeDataLayout: Sendable {
 
     try fileManager.createDirectory(
       at: layout.authorizedKeysDirectory,
+      withIntermediateDirectories: true)
+
+    try fileManager.createDirectory(
+      at: layout.summariesDirectory,
       withIntermediateDirectories: true)
 
     if !fileManager.fileExists(atPath: layout.journalSubjectsFile.path) {

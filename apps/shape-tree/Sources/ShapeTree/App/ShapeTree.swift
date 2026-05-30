@@ -2,6 +2,9 @@ import Configuration
 import Foundation
 import Hummingbird
 import Logging
+import Sit
+import SystemPackage
+import Workflow
 
 @main
 enum ShapeTree {
@@ -27,6 +30,9 @@ enum ShapeTree {
     let journalCommitFallbackEmail = try await reader.fetchRequiredString(
       forKey: ConfigKeys.journalCommitAuthorEmail)
 
+    let raftEndpointStrings = try await reader.fetchRequiredStringArray(
+      forKey: ConfigKeys.workflowRaftEndpoints)
+
     let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
     let resolvedDataRoot = ShapeTreeDataLayout.resolveDataRoot(rawPath: dataPathRaw, cwd: cwd)
     let layout = ShapeTreeDataLayout(dataRoot: resolvedDataRoot)
@@ -44,12 +50,33 @@ enum ShapeTree {
     let authCache = JWTAuthCache(log: log)
 
     let store = SessionStore()
+
+    let workflowStore = try WorkflowStoreFactory.make(
+      raftEndpointStrings: raftEndpointStrings,
+      log: log)
+    let dailySummaryService = DailySummaryService(
+      journalStore: journalStore,
+      journalRepoPath: layout.journalRepoRoot.path,
+      sit: Sit(),
+      workflowStore: workflowStore,
+      summariesDirectory: layout.summariesDirectory,
+      log: log,
+      llmURL: ollamaURL,
+      agentModel: agentModel,
+      llmToken: ollamaToken,
+      workingDirectory: resolvedDataRoot.path)
+    let summaryWorker = WorkflowWorker(log: log) { dayKey in
+      _ = try await dailySummaryService.summarizeDay(dayKey: dayKey, force: true)
+    }
+
     let router = try buildRoutes(
       store: store,
       journalStore: journalStore,
       authorizedKeys: authorizedKeys,
       replayCache: replayCache,
       authCache: authCache,
+      dailySummaryService: dailySummaryService,
+      worker: summaryWorker,
       log: log,
       llmURL: ollamaURL,
       agentModel: agentModel,

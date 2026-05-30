@@ -3,6 +3,7 @@ import Hummingbird
 import Logging
 import OpenAPIHummingbird
 import ShapeTreeClient
+import Workflow
 
 /// Hummingbird router with OpenAPI-generated handlers registered.
 func buildRoutes(
@@ -11,6 +12,8 @@ func buildRoutes(
   authorizedKeys: AuthorizedKeysStore,
   replayCache: JWTReplayCache = JWTReplayCache(),
   authCache: JWTAuthCache = JWTAuthCache(),
+  dailySummaryService: DailySummaryService? = nil,
+  worker: WorkflowWorker? = nil,
   log: Logger,
   llmURL: String,
   agentModel: String,
@@ -22,11 +25,14 @@ func buildRoutes(
 ) throws -> Router<BasicRequestContext> {
   let router = Router(context: BasicRequestContext.self)
 
-  router.add(middleware: ShapeTreeJWTAuthMiddleware(store: authorizedKeys, replayCache: replayCache, authCache: authCache))
+  router.add(
+    middleware: ShapeTreeJWTAuthMiddleware(store: authorizedKeys, replayCache: replayCache, authCache: authCache))
 
   let handler = ShapeTreeHandler(
     store: store,
     journalStore: journalStore,
+    dailySummaryService: dailySummaryService,
+    worker: worker,
     log: log,
     llmURL: llmURL,
     agentModel: agentModel,
