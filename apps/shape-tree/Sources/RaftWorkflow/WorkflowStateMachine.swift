@@ -5,6 +5,7 @@ public enum WorkflowApplyResult: Sendable, Equatable {
   case saved
   case reset
   case ignoredDuplicateSave
+  case ignoredRaftInternalEntry
 }
 
 /// Deterministic state machine driven by committed Raft log entries.
@@ -16,20 +17,25 @@ public actor WorkflowStateMachine {
   public init() {}
 
   public func apply(entry: LogEntry) throws -> WorkflowApplyResult {
-    let command = try WorkflowCodec.decode(from: entry.command)
-    switch command {
-    case .saveStep(let workflowID, let stepKey, let data):
-      var workflow = steps[workflowID, default: [:]]
-      if workflow[stepKey] != nil {
-        return .ignoredDuplicateSave
-      }
-      workflow[stepKey] = data
-      steps[workflowID] = workflow
-      return .saved
+    switch entry.payload {
+    case .noOp, .membership:
+      return .ignoredRaftInternalEntry
+    case .command(let data):
+      let command = try WorkflowCodec.decode(from: data)
+      switch command {
+      case .saveStep(let workflowID, let stepKey, let data):
+        var workflow = steps[workflowID, default: [:]]
+        if workflow[stepKey] != nil {
+          return .ignoredDuplicateSave
+        }
+        workflow[stepKey] = data
+        steps[workflowID] = workflow
+        return .saved
 
-    case .resetWorkflow(let workflowID):
-      steps.removeValue(forKey: workflowID)
-      return .reset
+      case .resetWorkflow(let workflowID):
+        steps.removeValue(forKey: workflowID)
+        return .reset
+      }
     }
   }
 

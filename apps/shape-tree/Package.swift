@@ -29,7 +29,7 @@ let package = Package(
     .package(url: "https://github.com/vapor/jwt-kit.git", from: "5.0.0"),
     .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
     .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.0"),
-    .package(url: "https://github.com/zaneenders/swift-raft.git", revision: "841decd"),
+    .package(url: "https://github.com/zaneenders/swift-raft.git", revision: "aa06bce"),
   ],
   targets: [
     .target(
@@ -110,6 +110,8 @@ let package = Package(
       dependencies: [
         "RaftWorkflow",
         .product(name: "Raft", package: "swift-raft"),
+        .product(name: "RaftShell", package: "swift-raft"),
+        .product(name: "RaftExtras", package: "swift-raft"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
         .product(name: "Logging", package: "swift-log"),
         .product(name: "NIOCore", package: "swift-nio"),

@@ -3,6 +3,8 @@ import Foundation
 import Logging
 import NIOPosix
 import Raft
+import RaftExtras
+import RaftShell
 import RaftWorkflow
 
 @main
@@ -82,7 +84,8 @@ struct RaftWorkflowNodeCommand: AsyncParsableCommand {
     let peerRegistry = PeerRegistry(initialPeers: networkPeers, eventLoopGroup: group)
 
     let settings = Raft.Settings(
-      electionTimeoutRange: (min: electionTimeoutMin, max: electionTimeoutMax),
+      electionTimeoutMin: electionTimeoutMin,
+      electionTimeoutMax: electionTimeoutMax,
       snapshotInterval: snapshotInterval
     )
 
@@ -117,13 +120,7 @@ struct RaftWorkflowNodeCommand: AsyncParsableCommand {
       onInstallSnapshot: { wire in
         let fromPeer = await peerRegistry.peer(for: wire.origin)
         await shell.addPeer(fromPeer)
-        let oldLastIncluded = await shell.snapshotLastIncludedIndex
-        let reply = await shell.receiveInstallSnapshot(wire.args, from: fromPeer)
-        let newLastIncluded = await shell.snapshotLastIncludedIndex
-        if newLastIncluded > oldLastIncluded {
-          await service.handleInstallSnapshot(args: wire.args)
-        }
-        return reply
+        return await shell.receiveInstallSnapshot(wire.args, from: fromPeer)
       },
       onClientCommand: { wire in
         await service.handleClientCommand(wire)
@@ -143,7 +140,6 @@ struct RaftWorkflowNodeCommand: AsyncParsableCommand {
     }
 
     await shell.start()
-    await service.startApplyLoop()
 
     logger.info("waiting for election timeout… (Ctrl+C to stop)")
 
