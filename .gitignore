@@ -1,5 +1,6 @@
 # ShapeTree
 *shape-tree-config.json
+apps/shape-tree/.env
 
 # Mutable Scribe-compatible store (`data.path` pointing at checkout root keeps this subtree local only)
 /.shape-tree/

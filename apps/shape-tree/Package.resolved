@@ -1,5 +1,5 @@
 {
-  "originHash" : "e06c2050cc517e7fad4c94b30199251b51d6838b95621ede998d9ce9af062e61",
+  "originHash" : "5c1be6d10a4712e97189db4d12c88f5158933e2233af41c39b8c9f86cb561ed2",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/hummingbird-project/hummingbird.git",
       "state" : {
-        "revision" : "2f407402799c2217df69b01582f3a44856fef012",
-        "version" : "2.24.0"
+        "revision" : "eebb5ecf8a39beea87401f014fdf87f0ce5b159d",
+        "version" : "2.25.0"
       }
     },
     {
@@ -26,6 +26,15 @@
       "state" : {
         "revision" : "2033b3e661238dda3d30e36a2d40987499d987de",
         "version" : "5.2.0"
+      }
+    },
+    {
+      "identity" : "lorikeet",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/zaneenders/lorikeet.git",
+      "state" : {
+        "branch" : "96170fa",
+        "revision" : "96170fa5c0e3c23021fc436595859b8e58e1fc6d"
       }
     },
     {
