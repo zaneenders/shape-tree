@@ -16,11 +16,12 @@ enum ShapeTreeWeb {
         allowMissing: true
       ),
     ])
-    let host = config.string(forKey: "HOST", default: "127.0.0.1")
-    let port = config.int(forKey: "PORT", default: 8080)
-    let contentPath = config.string(forKey: "CONTENT_PATH", default: "Examples/content")
+    let host = try config.requiredString(forKey: "HOST")
+    let port = try config.requiredInt(forKey: "PORT")
+    let contentPath = try config.requiredString(forKey: "CONTENT_PATH")
 
-    let contentURL = URL(fileURLWithPath: contentPath, relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
+    let contentURL = URL(
+      fileURLWithPath: contentPath, relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
     let store = try ContentStore(contentDirectory: contentURL)
     let initial = store.indexPost ?? store.publishedPosts.first ?? fallbackIndexPost()
 
