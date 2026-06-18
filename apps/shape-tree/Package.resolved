@@ -1,5 +1,5 @@
 {
-  "originHash" : "5c1be6d10a4712e97189db4d12c88f5158933e2233af41c39b8c9f86cb561ed2",
+  "originHash" : "60cef10bdfe660ff7c7ba7a9e1b1d1bfde2f66a4ab1af2de334715686adfc16e",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -33,8 +33,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/zaneenders/lorikeet.git",
       "state" : {
-        "branch" : "96170fa",
-        "revision" : "96170fa5c0e3c23021fc436595859b8e58e1fc6d"
+        "branch" : "31904cb",
+        "revision" : "31904cbdae8ea3b2e8638d459efd44d8954f80e9"
       }
     },
     {

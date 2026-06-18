@@ -1,1 +1,1 @@
-// site.css is embedded at build time by Lorikeet's EmbedTargetTextAssets plugin.
+// Web assets (.css, .html, .js) are embedded at build time by Lorikeet's EmbedWebAssets plugin.

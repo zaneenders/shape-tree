@@ -14,7 +14,7 @@ let package = Package(
     .executable(name: "ShapeTreeWeb", targets: ["ShapeTreeWeb"]),
   ],
   dependencies: [
-    .package(url: "https://github.com/zaneenders/lorikeet.git", revision: "96170fa"),
+    .package(url: "https://github.com/zaneenders/lorikeet.git", revision: "31904cb"),
     .package(url: "https://github.com/apple/swift-markdown.git", from: "0.7.0"),
     .package(url: "https://github.com/zaneenders/scribe.git", revision: "a132415"),
     .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.24.0"),
@@ -115,8 +115,9 @@ let package = Package(
     .target(
       name: "ShapeTreeWebAssets",
       path: "Sources/ShapeTreeWebAssets",
+      sources: ["Assets.swift"],
       plugins: [
-        .plugin(name: "EmbedTargetTextAssets", package: "Lorikeet")
+        .plugin(name: "EmbedWebAssets", package: "Lorikeet")
       ]
     ),
     .testTarget(
