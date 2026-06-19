@@ -3,11 +3,11 @@ import Hummingbird
 import NIOCore
 import ShapeTreeWebAssets
 
-enum NavClientRoutes {
-  private static let basePath = "assets/nav-client"
+enum ClientRoutes {
+  private static let basePath = "assets/client"
 
   static func register(on router: Router<BasicRequestContext>) {
-    guard NavClientAssetCatalog.isAvailable else { return }
+    guard ClientAssetCatalog.isAvailable else { return }
 
     for relativePath in [
       "WASMClient.wasm",
@@ -28,7 +28,7 @@ enum NavClientRoutes {
   }
 
   private static func assetResponse(for relativePath: String, head: Bool) throws -> Response {
-    guard let entry = NavClientAssetCatalog.entry(forRelativePath: relativePath) else {
+    guard let entry = ClientAssetCatalog.entry(forRelativePath: relativePath) else {
       throw HTTPError(.notFound)
     }
 

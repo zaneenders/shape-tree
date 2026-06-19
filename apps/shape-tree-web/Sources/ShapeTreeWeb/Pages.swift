@@ -166,14 +166,14 @@ enum WebPages {
     HTML.raw(
       """
       <script type="module" hx-preserve="true">
-      import { init } from "/assets/nav-client/index.js";
+      import { init } from "/assets/client/index.js";
 
       if (!window.__shapeTreeNavDismiss) {
         window.__shapeTreeNavDismiss = true;
 
         async function start() {
           await init({
-            module: fetch("/assets/nav-client/WASMClient.wasm", { cache: "no-store" }),
+            module: fetch("/assets/client/WASMClient.wasm", { cache: "no-store" }),
           });
         }
 

@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CLIENT="$ROOT/WASMClient"
 ASSETS="$ROOT/Sources/ShapeTreeWebAssets"
-OUT_JS="$ASSETS/nav-client"
+OUT_JS="$ASSETS/client"
 BUILD_DIR="$CLIENT/.build/js"
 SDK="${SWIFT_WASM_SDK:-swift-6.3.2-RELEASE_wasm-embedded}"
 
@@ -44,12 +44,12 @@ rm -rf "$OUT_JS"
 mkdir -p "$OUT_JS/platforms"
 cp "$BUILD_DIR/index.js" "$BUILD_DIR/instantiate.js" "$BUILD_DIR/runtime.js" "$OUT_JS/"
 cp "$BUILD_DIR/platforms/browser.js" "$OUT_JS/platforms/"
-cp "$WASM" "$ASSETS/NavClientWasm.wasm"
+cp "$WASM" "$ASSETS/ClientWasm.wasm"
 
 # WASI shim is committed under Sources/ShapeTreeWebAssets/Vendor/ and served locally.
 perl -pi -e "s|'\\@bjorn3/browser_wasi_shim'|'../browser_wasi_shim.js'|g" \
   "$OUT_JS/platforms/browser.js"
 
-echo "Wrote nav-client JS to ${OUT_JS}"
-echo "Wrote ${ASSETS}/NavClientWasm.wasm"
+echo "Wrote client JS to ${OUT_JS}"
+echo "Wrote ${ASSETS}/ClientWasm.wasm"
 echo "Run: swift build && swift run ShapeTreeWeb"

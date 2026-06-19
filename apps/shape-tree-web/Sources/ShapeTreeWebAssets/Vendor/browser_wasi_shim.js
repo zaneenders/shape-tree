@@ -1,6 +1,6 @@
 /**
  * Vendored from https://cdn.jsdelivr.net/npm/@bjorn3/browser_wasi_shim@0.4.1/+esm
- * Served locally at /assets/nav-client/browser_wasi_shim.js (embedded by EmbedWebAssets).
+ * Served locally at /assets/client/browser_wasi_shim.js (embedded by EmbedWebAssets).
  * To refresh, update WASI_SHIM_URL in Scripts/build-client.sh and re-download here.
  *
  * Bundled by jsDelivr using Rollup v2.79.2 and Terser v5.39.0.
