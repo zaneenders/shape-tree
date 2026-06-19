@@ -13,14 +13,18 @@ let package = Package(
     .executable(name: "ShapeTree", targets: ["ShapeTree"]),
   ],
   dependencies: [
-    .package(url: "https://github.com/zaneenders/scribe.git", revision: "a132415"),
+    .package(url: "https://github.com/zaneenders/scribe.git", revision: "83dc1fc"),
     .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.24.0"),
     .package(url: "https://github.com/hummingbird-project/swift-openapi-hummingbird.git", from: "2.0.1"),
     .package(url: "https://github.com/apple/swift-openapi-generator.git", from: "1.0.0"),
     .package(url: "https://github.com/apple/swift-openapi-runtime.git", from: "1.0.0"),
     .package(url: "https://github.com/swift-server/swift-openapi-async-http-client.git", from: "1.0.0"),
     .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0"),
-    .package(url: "https://github.com/swiftlang/swift-subprocess.git", from: "0.4.0"),
+    .package(
+      url: "https://github.com/swiftlang/swift-subprocess.git",
+      revision: "049ddf9",
+      traits: ["SubprocessFoundation"]
+    ),
     .package(url: "https://github.com/apple/swift-system.git", from: "1.4.0"),
     .package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"),
     .package(url: "https://github.com/vapor/jwt-kit.git", from: "5.0.0"),
