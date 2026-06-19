@@ -1,6 +1,6 @@
 # ShapeTree Client App
 
-Cross-platform (**iOS** + **macOS**) SwiftUI shell that talks exclusively to your [ShapeTree server](../shape-tree/README.md) via the OpenAPI-generated [ShapeTreeClient](../shape-tree/Sources/ShapeTreeClient/). Transport uses `OpenAPIAsyncHTTPClient`; there is **no journal data path on device** — all journal git work happens server-side (`data.path` + `.shape-tree/`).
+Cross-platform (**iOS** + **macOS**) SwiftUI shell that talks exclusively to your [ShapeTree server](../shape-tree-api/README.md) via the OpenAPI-generated [ShapeTreeClient](../shape-tree-api/Sources/ShapeTreeClient/). Transport uses `OpenAPIAsyncHTTPClient`; there is **no journal data path on device** — all journal git work happens server-side (`data.path` + `.shape-tree/`).
 
 ## Prerequisites
 
@@ -56,7 +56,7 @@ out of band.
 The `dev` JWT header carries the device label (defaults to the host name; editable in the
 Connection sheet). It's logged for breadcrumbs only — identity is the public key thumbprint.
 
-See the [server README](../shape-tree/README.md) for auth and trust-store details.
+See the [server README](../shape-tree-api/README.md) for auth and trust-store details.
 
 **Rebuild Xcode after changing ATS**: run `xcodegen generate` under `apps/ShapeTreeApp` whenever
 `project.yml` changes so the Info.plist picks up local-network HTTP allowances.
