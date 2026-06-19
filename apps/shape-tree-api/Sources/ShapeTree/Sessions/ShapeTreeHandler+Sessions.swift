@@ -24,10 +24,12 @@ extension ShapeTreeHandler {
       serverURL: llmURL,
       apiKey: llmToken,
       tools: tools,
-      workingDirectory: workingDirectory)
+      workingDirectory: workingDirectory,
+      reasoningEnabled: nil)
 
-    let agent = try ScribeAgent(configuration: config, systemPrompt: prompt)
-    let id = await store.create(agent: agent)
+    let sessionLog = Logger(label: "scribe.agent.session")
+    let agent = try ScribeAgent(configuration: config, logger: sessionLog)
+    let id = await store.create(agent: agent, systemPrompt: prompt)
 
     log.info("event=session.create id=\(id) model=\(agentModel)")
 
@@ -70,19 +72,21 @@ extension ShapeTreeHandler {
       return .notFound(.init(body: .json(Self.errorBody("Session not found."))))
     }
 
-    let turnLog = Logger(label: "scribe.agent.turn.stream.\(sessionId)")
-    let turnStream = await session.agent.prompt(body.message, log: turnLog)
+    let turnStream = session.agent.run(body.message, history: session.history)
 
     let lineStream = AsyncStream<Components.Schemas.CompletionStreamEvent> { continuation in
       Task { [sessionId, log] in
         do {
           for await event in turnStream.events {
-            continuation.yield(CompletionStreamTranscriptMapping.line(for: event))
+            if let line = CompletionStreamTranscriptMapping.line(for: event) {
+              continuation.yield(line)
+            }
           }
 
           let result = try await turnStream.result.value
+          await store.appendMessages(sessionId, result.newMessages)
           let assistantText =
-            result.messages.last(where: { $0.role == .assistant })?.content ?? ""
+            result.newMessages.last(where: { $0.role == .assistant })?.content ?? ""
 
           switch result.outcome {
           case .completed:
