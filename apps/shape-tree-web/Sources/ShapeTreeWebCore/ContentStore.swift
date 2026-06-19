@@ -29,8 +29,6 @@ public struct PostGroup: Sendable, Equatable {
 }
 
 public struct ContentStore: Sendable {
-  public static let indexSlug = "index"
-
   private let root: URL
   private let postsBySlug: [String: Post]
   public let posts: [Post]
@@ -47,7 +45,7 @@ public struct ContentStore: Sendable {
   }
 
   public var siteTitle: String {
-    postsBySlug[Self.indexSlug]?.title ?? "ShapeTree Web"
+    indexPost?.title ?? "ShapeTree Web"
   }
 
   public func post(slug: String) -> Post? {
@@ -55,11 +53,11 @@ public struct ContentStore: Sendable {
   }
 
   public var indexPost: Post? {
-    postsBySlug[Self.indexSlug]
+    posts.first { $0.isIndex }
   }
 
   public var publishedPosts: [Post] {
-    posts.filter { $0.slug != Self.indexSlug }
+    posts.filter { !$0.isIndex }
   }
 
   public var publishedPostGroups: [PostGroup] {
@@ -132,7 +130,8 @@ public struct ContentStore: Sendable {
           excerpt: frontMatter.excerpt,
           bodyMarkdown: body,
           bodyHTML: MarkdownRenderer.html(from: body, strippingTitle: title),
-          relativePath: relativePath
+          relativePath: relativePath,
+          isIndex: isIndexSlug(slug)
         )
       )
     }
@@ -144,6 +143,12 @@ public struct ContentStore: Sendable {
       .replacingOccurrences(of: "-", with: " ")
       .replacingOccurrences(of: "_", with: " ")
       .capitalized
+  }
+
+  private static let indexSlugs: Set<String> = ["home"]
+
+  private static func isIndexSlug(_ slug: String) -> Bool {
+    indexSlugs.contains(slug.lowercased())
   }
 
   private static func dateFromFilename(_ slug: String) -> Date? {

@@ -9,6 +9,7 @@ public struct Post: Sendable, Equatable, Identifiable {
   public var bodyMarkdown: String
   public var bodyHTML: String
   public var relativePath: String
+  public var isIndex: Bool
 
   public var id: String { slug }
 
@@ -20,7 +21,8 @@ public struct Post: Sendable, Equatable, Identifiable {
     excerpt: String? = nil,
     bodyMarkdown: String,
     bodyHTML: String,
-    relativePath: String
+    relativePath: String,
+    isIndex: Bool = false
   ) {
     self.slug = slug
     self.title = title
@@ -30,14 +32,15 @@ public struct Post: Sendable, Equatable, Identifiable {
     self.bodyMarkdown = bodyMarkdown
     self.bodyHTML = bodyHTML
     self.relativePath = relativePath
+    self.isIndex = isIndex
   }
 
   public var path: String {
-    slug == ContentStore.indexSlug ? "/" : "/posts/\(slug)"
+    isIndex ? "/" : "/posts/\(slug)"
   }
 
   public var contentURL: String {
-    slug == ContentStore.indexSlug
+    isIndex
       ? "/htmx/content/index"
       : "/htmx/content/posts/\(slug)"
   }

@@ -85,14 +85,15 @@ enum ShapeTreeWeb {
 
   private static func fallbackIndexPost() -> Post {
     Post(
-      slug: ContentStore.indexSlug,
+      slug: "index",
       title: "ShapeTree Web",
       date: .distantPast,
       tags: [],
       excerpt: nil,
       bodyMarkdown: "",
       bodyHTML: "",
-      relativePath: ""
+      relativePath: "",
+      isIndex: true
     )
   }
 }
