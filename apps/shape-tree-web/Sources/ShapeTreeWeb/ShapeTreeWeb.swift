@@ -19,11 +19,12 @@ enum ShapeTreeWeb {
     let host = try config.requiredString(forKey: "HOST")
     let port = try config.requiredInt(forKey: "PORT")
     let contentPath = try config.requiredString(forKey: "CONTENT_PATH")
+    let indexSlug = try config.requiredString(forKey: "INDEX_SLUG")
 
     let contentURL = URL(
       fileURLWithPath: contentPath, relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
-    let store = try ContentStore(contentDirectory: contentURL)
-    let initial = store.indexPost ?? store.publishedPosts.first ?? fallbackIndexPost()
+    let store = try ContentStore(contentDirectory: contentURL, indexSlug: indexSlug)
+    let initial = store.indexPost ?? store.publishedPosts.first ?? fallbackIndexPost(slug: indexSlug)
 
     let router = Router()
     router.get { _, _ in
@@ -45,7 +46,7 @@ enum ShapeTreeWeb {
 
     router.get("htmx/content/index") { request, _ in
       try HTMX.requireRequest(request)
-      let post = store.indexPost ?? fallbackIndexPost()
+      let post = store.indexPost ?? fallbackIndexPost(slug: indexSlug)
       let fragment = WebPages.contentFragment(for: post, store: store)
       return htmlFragmentResponse(fragment)
     }
@@ -83,9 +84,9 @@ enum ShapeTreeWeb {
     )
   }
 
-  private static func fallbackIndexPost() -> Post {
+  private static func fallbackIndexPost(slug: String) -> Post {
     Post(
-      slug: "index",
+      slug: slug,
       title: "ShapeTree Web",
       date: .distantPast,
       tags: [],

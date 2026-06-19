@@ -31,15 +31,17 @@ public struct PostGroup: Sendable, Equatable {
 public struct ContentStore: Sendable {
   private let root: URL
   private let postsBySlug: [String: Post]
+  private let indexSlug: String
   public let posts: [Post]
 
-  public init(contentDirectory: URL) throws {
+  public init(contentDirectory: URL, indexSlug: String = "Home") throws {
     guard FileManager.default.fileExists(atPath: contentDirectory.path) else {
       throw ContentStoreError.directoryNotFound(contentDirectory)
     }
 
     self.root = contentDirectory.standardizedFileURL
-    let loaded = try Self.loadPosts(from: contentDirectory)
+    self.indexSlug = indexSlug
+    let loaded = try Self.loadPosts(from: contentDirectory, indexSlug: indexSlug)
     self.posts = loaded.sorted { $0.date > $1.date }
     self.postsBySlug = Dictionary(uniqueKeysWithValues: loaded.map { ($0.slug, $0) })
   }
@@ -87,7 +89,7 @@ public struct ContentStore: Sendable {
     }
   }
 
-  private static func loadPosts(from root: URL) throws -> [Post] {
+  private static func loadPosts(from root: URL, indexSlug: String) throws -> [Post] {
     let fileManager = FileManager.default
     guard
       let enumerator = fileManager.enumerator(
@@ -131,7 +133,7 @@ public struct ContentStore: Sendable {
           bodyMarkdown: body,
           bodyHTML: MarkdownRenderer.html(from: body, strippingTitle: title),
           relativePath: relativePath,
-          isIndex: isIndexSlug(slug)
+          isIndex: slug.lowercased() == indexSlug.lowercased()
         )
       )
     }
@@ -143,12 +145,6 @@ public struct ContentStore: Sendable {
       .replacingOccurrences(of: "-", with: " ")
       .replacingOccurrences(of: "_", with: " ")
       .capitalized
-  }
-
-  private static let indexSlugs: Set<String> = ["home"]
-
-  private static func isIndexSlug(_ slug: String) -> Bool {
-    indexSlugs.contains(slug.lowercased())
   }
 
   private static func dateFromFilename(_ slug: String) -> Date? {
