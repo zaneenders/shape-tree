@@ -20,7 +20,8 @@ public struct PostGroup: Sendable, Equatable {
 
   public var label: String {
     guard let directory else { return "Root" }
-    return directory
+    return
+      directory
       .split(separator: "/")
       .map { ContentStore.humanizedName(String($0)) }
       .joined(separator: " / ")
@@ -75,7 +76,7 @@ public struct ContentStore: Sendable {
         return true
       case (_, nil):
         return false
-      case let (lhs?, rhs?):
+      case (let lhs?, let rhs?):
         return lhs.localizedCaseInsensitiveCompare(rhs) == .orderedAscending
       }
     }

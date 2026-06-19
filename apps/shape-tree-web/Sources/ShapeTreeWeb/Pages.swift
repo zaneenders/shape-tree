@@ -34,7 +34,7 @@ enum WebPages {
         contentURL: "/htmx/content/index",
         target: "main",
         name: store.siteTitle
-      ),
+      )
     ]
 
     for group in store.publishedPostGroups {

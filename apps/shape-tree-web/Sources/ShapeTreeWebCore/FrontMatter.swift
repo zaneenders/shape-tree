@@ -34,7 +34,8 @@ public enum FrontMatterParser: Sendable {
 
     let yaml = String(afterOpening[..<closingRange.lowerBound]).trimmingCharacters(in: .newlines)
     let bodyStart = closingRange.upperBound
-    let body = bodyStart < afterOpening.endIndex
+    let body =
+      bodyStart < afterOpening.endIndex
       ? String(afterOpening[bodyStart...]).trimmingCharacters(in: .newlines)
       : ""
 
@@ -80,7 +81,8 @@ public enum FrontMatterParser: Sendable {
           currentListKey = "tags"
           frontMatter.tags = []
         } else {
-          frontMatter.tags = value
+          frontMatter.tags =
+            value
             .split(separator: ",")
             .map { stripQuotes(String($0).trimmingCharacters(in: .whitespaces)) }
             .filter { !$0.isEmpty }
