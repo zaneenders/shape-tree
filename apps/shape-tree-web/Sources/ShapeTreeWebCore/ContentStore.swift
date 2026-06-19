@@ -116,7 +116,7 @@ public struct ContentStore: Sendable {
 
       let (frontMatter, body) = FrontMatterParser.split(source)
       let slug = fileURL.deletingPathExtension().lastPathComponent
-      let title = frontMatter.title ?? humanizedSlug(slug)
+      let title = frontMatter.title ?? humanizedName(slug)
       let date =
         frontMatter.date
         ?? dateFromFilename(slug)
@@ -144,10 +144,6 @@ public struct ContentStore: Sendable {
       .replacingOccurrences(of: "-", with: " ")
       .replacingOccurrences(of: "_", with: " ")
       .capitalized
-  }
-
-  private static func humanizedSlug(_ slug: String) -> String {
-    humanizedName(slug)
   }
 
   private static func dateFromFilename(_ slug: String) -> Date? {
