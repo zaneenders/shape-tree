@@ -1,6 +1,6 @@
 # shape-tree-web
 
-Markdown blog built on [Lorikeet](https://github.com/zaneenders/lorikeet) (typed HTML + HTMX) and Hummingbird. Point it at a directory of `.md` files and it serves a readable site with HTMX navigation.
+Markdown blog built on the [Lorikeet](https://github.com/zaneenders/lorikeet) HTML DSL (typed HTML + HTMX), [Hummingbird](https://github.com/hummingbird-project/hummingbird), and a Swift WASM client. Point it at a directory of `.md` files and it serves a readable site with HTMX-powered navigation — no JavaScript build step required.
 
 Build the swift WASM client, configure environment, then start the server.
 
