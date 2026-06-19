@@ -1,0 +1,52 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "127.0.0.1:11434:11434"
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/shape-tree-api/Dockerfile
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "8082"
+      DATA_PATH: /data
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_TOKEN: ""
+      AGENT_MODEL: gemma4:26b
+      AGENT_SYSTEM_PROMPT: "You are a helpful coding assistant."
+      AGENT_CONTEXT_WINDOW: "131072"
+      AGENT_CONTEXT_WINDOW_THRESHOLD: "0.85"
+      JOURNAL_COMMIT_AUTHOR_NAME: ShapeTree
+      JOURNAL_COMMIT_AUTHOR_EMAIL: shape-tree@localhost
+    volumes:
+      - shape_tree_data:/data
+      - ${HOME}/.ssh:/home/shape-tree/.ssh:ro
+    ports:
+      - "127.0.0.1:8082:8082"
+    restart: unless-stopped
+    depends_on:
+      - ollama
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/shape-tree-web/Dockerfile
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "8080"
+      CONTENT_PATH: /content
+      INDEX_SLUG: index
+    volumes:
+      - ./content:/content:ro
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
+  shape_tree_data:

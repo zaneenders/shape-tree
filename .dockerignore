@@ -1,0 +1,30 @@
+# Swift build artifacts
+.build/
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+
+# IDE
+.idea/
+.vscode/
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Environment
+.env
+*.env.local
+
+# Git
+.git/
+.gitignore
+.gitmodules
+
+# System
+.DS_Store
+Thumbs.db
+
+# App-specific
+*.shape-tree/
