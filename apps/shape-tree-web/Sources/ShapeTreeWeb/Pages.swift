@@ -163,10 +163,7 @@ enum WebPages {
   }
 
   private static func navClientScript() -> HTML {
-    guard NavClientAssetCatalog.isAvailable else {
-      return HTML.raw("<script defer hx-preserve=\"true\">\n\(nav_dismiss_js)\n</script>")
-    }
-    return HTML.raw(
+    HTML.raw(
       """
       <script type="module" hx-preserve="true">
       import { init } from "/assets/nav-client/index.js";
