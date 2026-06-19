@@ -13,7 +13,7 @@ let package = Package(
     .executable(name: "ShapeTree", targets: ["ShapeTree"]),
   ],
   dependencies: [
-    .package(url: "https://github.com/zaneenders/scribe.git", revision: "83dc1fc"),
+    .package(url: "https://github.com/zaneenders/scribe.git", revision: "fc5e7d4"),
     .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.24.0"),
     .package(url: "https://github.com/hummingbird-project/swift-openapi-hummingbird.git", from: "2.0.1"),
     .package(url: "https://github.com/apple/swift-openapi-generator.git", from: "1.0.0"),
