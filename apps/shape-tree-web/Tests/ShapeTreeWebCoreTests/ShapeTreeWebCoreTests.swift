@@ -33,6 +33,43 @@ import Testing
     #expect(frontMatter == FrontMatter())
     #expect(body == source)
   }
+
+  @Test func parsesIndexStyleFrontMatter() {
+    let source = """
+      ---
+      title: ShapeTree Web
+      ---
+
+      Intro paragraph.
+      """
+
+    let (frontMatter, body) = FrontMatterParser.split(source)
+
+    #expect(frontMatter.title == "ShapeTree Web")
+    #expect(body.hasPrefix("Intro paragraph."))
+  }
+
+  @Test func parsesFrontMatterWithCRLFLineEndings() {
+    let source =
+      "---\r\n"
+      + "title: Hello\r\n"
+      + "date: 2025-06-17\r\n"
+      + "tags:\r\n"
+      + "  - swift\r\n"
+      + "  - web\r\n"
+      + "excerpt: Short summary\r\n"
+      + "---\r\n"
+      + "\r\n"
+      + "# Body\r\n"
+
+    let (frontMatter, body) = FrontMatterParser.split(source)
+
+    #expect(frontMatter.title == "Hello")
+    #expect(frontMatter.tags == ["swift", "web"])
+    #expect(frontMatter.excerpt == "Short summary")
+    #expect(frontMatter.date != nil)
+    #expect(body.hasPrefix("# Body"))
+  }
 }
 
 @Suite struct ContentStoreTests {

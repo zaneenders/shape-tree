@@ -1,4 +1,5 @@
 import Foundation
+import Markdown
 
 public struct FrontMatter: Sendable, Equatable {
   public var title: String?
@@ -21,81 +22,186 @@ public struct FrontMatter: Sendable, Equatable {
 
 public enum FrontMatterParser: Sendable {
   /// Splits Jekyll-style `---` front matter from the Markdown body.
+  ///
+  /// Front matter is parsed from the markdown AST (thematic breaks and paragraphs),
+  /// so line endings are normalized by swift-markdown rather than hand-split strings.
   public static func split(_ source: String) -> (frontMatter: FrontMatter, body: String) {
-    let normalized = source.hasPrefix("\u{FEFF}") ? String(source.dropFirst()) : source
-    guard normalized.hasPrefix("---") else {
-      return (FrontMatter(), normalized)
-    }
+    let sourceWithoutBOM = source.hasPrefix("\u{FEFF}") ? String(source.dropFirst()) : source
+    var parser = FrontMatterDocumentParser()
+    parser.parse(Document(parsing: sourceWithoutBOM))
+    return parser.finish(source: sourceWithoutBOM)
+  }
+}
 
-    let afterOpening = normalized.dropFirst(3)
-    guard let closingRange = afterOpening.range(of: "\n---", options: [], locale: nil) else {
-      return (FrontMatter(), normalized)
-    }
+private struct FrontMatterDocumentParser {
+  var frontMatter = FrontMatter()
+  var bodyBlocks: [BlockMarkup] = []
 
-    let yaml = String(afterOpening[..<closingRange.lowerBound]).trimmingCharacters(in: .newlines)
-    let bodyStart = closingRange.upperBound
-    let body =
-      bodyStart < afterOpening.endIndex
-      ? String(afterOpening[bodyStart...]).trimmingCharacters(in: .newlines)
-      : ""
-
-    return (parseYAML(yaml), body)
+  private enum Phase {
+    case start
+    case meta
+    case body
   }
 
-  private static func parseYAML(_ yaml: String) -> FrontMatter {
-    var frontMatter = FrontMatter()
-    var currentListKey: String?
+  private var phase: Phase = .start
+  private var sawOpeningBreak = false
+  private var expectingTagsList = false
 
-    for rawLine in yaml.split(separator: "\n", omittingEmptySubsequences: false) {
-      let line = String(rawLine)
-      let trimmed = line.trimmingCharacters(in: .whitespaces)
-
-      if trimmed.isEmpty {
-        currentListKey = nil
-        continue
-      }
-
-      if trimmed.hasPrefix("- "), let key = currentListKey, key == "tags" {
-        let value = String(trimmed.dropFirst(2)).trimmingCharacters(in: .whitespaces)
-        if !value.isEmpty {
-          frontMatter.tags.append(stripQuotes(value))
-        }
-        continue
-      }
-
-      currentListKey = nil
-      guard let separator = trimmed.firstIndex(of: ":") else { continue }
-
-      let key = String(trimmed[..<separator]).trimmingCharacters(in: .whitespaces)
-      let value = String(trimmed[trimmed.index(after: separator)...]).trimmingCharacters(in: .whitespaces)
-
-      switch key {
-      case "title":
-        frontMatter.title = stripQuotes(value)
-      case "date":
-        frontMatter.date = parseDate(stripQuotes(value))
-      case "excerpt":
-        frontMatter.excerpt = stripQuotes(value)
-      case "tags":
-        if value.isEmpty {
-          currentListKey = "tags"
-          frontMatter.tags = []
+  mutating func parse(_ document: Document) {
+    for child in document.children {
+      switch phase {
+      case .start:
+        if child is ThematicBreak {
+          sawOpeningBreak = true
+          phase = .meta
         } else {
-          frontMatter.tags =
-            value
-            .split(separator: ",")
-            .map { stripQuotes(String($0).trimmingCharacters(in: .whitespaces)) }
-            .filter { !$0.isEmpty }
+          phase = .body
+          appendBodyBlock(child)
         }
-      default:
-        break
+      case .meta:
+        if child is ThematicBreak {
+          phase = .body
+          expectingTagsList = false
+        } else if let heading = child as? Heading {
+          // A closing `---` after a single metadata line is parsed as a setext
+          // heading underline, not a second thematic break.
+          parseMetadataLine(heading.plainText)
+          phase = .body
+          expectingTagsList = false
+        } else if expectingTagsList, let list = child as? UnorderedList {
+          parseTagsList(list)
+          expectingTagsList = false
+        } else if let paragraph = child as? Paragraph {
+          parseMetadataParagraph(paragraph)
+        }
+      case .body:
+        appendBodyBlock(child)
+      }
+    }
+  }
+
+  func finish(source: String) -> (FrontMatter, String) {
+    if !sawOpeningBreak || phase == .meta {
+      return (FrontMatter(), source)
+    }
+    let body =
+      bodyBlocks.isEmpty
+      ? ""
+      : Document(bodyBlocks).format().trimmingCharacters(in: .newlines)
+    return (frontMatter, body)
+  }
+
+  private mutating func appendBodyBlock(_ markup: any Markup) {
+    if let block = markup as? BlockMarkup {
+      bodyBlocks.append(block)
+    }
+  }
+
+  private mutating func parseMetadataParagraph(_ paragraph: Paragraph) {
+    for line in metadataLines(in: paragraph) {
+      parseMetadataLine(line)
+    }
+  }
+
+  private func metadataLines(in paragraph: Paragraph) -> [String] {
+    var lines: [String] = []
+    var current = ""
+
+    for child in paragraph.inlineChildren {
+      if child is SoftBreak || child is LineBreak {
+        lines.append(current)
+        current = ""
+      } else if let text = child as? Text {
+        current += text.string
       }
     }
 
-    return frontMatter
+    if !current.isEmpty {
+      lines.append(current)
+    }
+    return lines
   }
 
-  private static func stripQuotes(_ value: String) -> String {
+  private mutating func parseMetadataLine(_ line: String) {
+    let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.isEmpty {
+      expectingTagsList = false
+      return
+    }
+
+    guard let separator = trimmed.firstIndex(of: ":") else {
+      expectingTagsList = false
+      return
+    }
+
+    let key = String(trimmed[..<separator]).trimmingCharacters(in: .whitespaces)
+    let value = String(trimmed[trimmed.index(after: separator)...]).trimmingCharacters(in: .whitespaces)
+
+    switch key {
+    case "title":
+      expectingTagsList = false
+      frontMatter.title = stripQuotes(value)
+    case "date":
+      expectingTagsList = false
+      frontMatter.date = parseDate(stripQuotes(value))
+    case "excerpt":
+      expectingTagsList = false
+      frontMatter.excerpt = stripQuotes(value)
+    case "tags":
+      if value.isEmpty {
+        expectingTagsList = true
+        frontMatter.tags = []
+      } else {
+        expectingTagsList = false
+        frontMatter.tags =
+          value
+          .split(separator: ",")
+          .map { stripQuotes(String($0).trimmingCharacters(in: .whitespaces)) }
+          .filter { !$0.isEmpty }
+      }
+    default:
+      expectingTagsList = false
+    }
+  }
+
+  private mutating func parseTagsList(_ list: UnorderedList) {
+    for child in list.children {
+      guard let item = child as? ListItem else { continue }
+      for itemChild in item.children {
+        guard let paragraph = itemChild as? Paragraph else { continue }
+        for line in metadataLines(in: paragraph) {
+          let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+          if trimmed.isEmpty { continue }
+
+          if isMetadataLine(trimmed) {
+            parseMetadataLine(trimmed)
+            continue
+          }
+
+          let value =
+            trimmed.hasPrefix("- ")
+            ? String(trimmed.dropFirst(2)).trimmingCharacters(in: .whitespaces)
+            : trimmed
+          if !value.isEmpty {
+            frontMatter.tags.append(stripQuotes(value))
+          }
+        }
+      }
+    }
+  }
+
+  private func isMetadataLine(_ line: String) -> Bool {
+    guard let separator = line.firstIndex(of: ":") else { return false }
+    let key = String(line[..<separator]).trimmingCharacters(in: .whitespaces)
+    switch key {
+    case "title", "date", "tags", "excerpt":
+      return true
+    default:
+      return false
+    }
+  }
+
+  private func stripQuotes(_ value: String) -> String {
     guard value.count >= 2 else { return value }
     if (value.hasPrefix("\"") && value.hasSuffix("\"")) || (value.hasPrefix("'") && value.hasSuffix("'")) {
       return String(value.dropFirst().dropLast())
@@ -103,7 +209,7 @@ public enum FrontMatterParser: Sendable {
     return value
   }
 
-  private static func parseDate(_ value: String) -> Date? {
+  private func parseDate(_ value: String) -> Date? {
     let iso = ISO8601DateFormatter()
     iso.formatOptions = [.withFullDate]
     if let date = iso.date(from: value) {
