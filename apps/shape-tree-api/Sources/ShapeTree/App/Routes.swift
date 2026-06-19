@@ -22,7 +22,8 @@ func buildRoutes(
 ) throws -> Router<BasicRequestContext> {
   let router = Router(context: BasicRequestContext.self)
 
-  router.add(middleware: ShapeTreeJWTAuthMiddleware(store: authorizedKeys, replayCache: replayCache, authCache: authCache))
+  router.add(
+    middleware: ShapeTreeJWTAuthMiddleware(store: authorizedKeys, replayCache: replayCache, authCache: authCache))
 
   let handler = ShapeTreeHandler(
     store: store,
