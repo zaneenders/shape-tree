@@ -639,6 +639,34 @@ nav.site-nav.nav-shell:empty::after {
 
 /* ---- HTMX indicators ---- */
 
+#nav-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  cursor: default;
+}
+
+#nav-backdrop[hidden] {
+  display: none;
+}
+
+#main {
+  transition: opacity 0.12s ease;
+}
+
+#main.htmx-swapping,
+#main.htmx-settling {
+  opacity: 0.55;
+}
+
+#htmx-loading {
+  display: none;
+}
+
 .htmx-indicator {
   display: none;
   margin: 0.5rem 0;
@@ -648,9 +676,9 @@ nav.site-nav.nav-shell:empty::after {
 
 .htmx-request.htmx-indicator,
 .htmx-request .htmx-indicator {
-  display: block;
+  display: none;
 }
 
 #htmx-loading.htmx-request {
-  display: block;
+  display: none;
 }

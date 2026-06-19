@@ -15,6 +15,7 @@ enum WebPages {
         HTML.raw("<style hx-preserve=\"true\">\n\(site_css)\n</style>")
         HTML.raw("<script hx-preserve=\"true\">\n\(htmx_min_js)\n</script>")
         HTML.raw("<script hx-preserve=\"true\">\n\(htmx_head_support)\n</script>")
+        navClientScript()
       }
       HTML.tag(.body, attrs: [.hxExt("head-support")]) {
         HTMX.Attributes.lazyNavShell(get: "/htmx/content/nav")
@@ -159,6 +160,35 @@ enum WebPages {
         HTML.raw(post.bodyHTML)
       }
     }
+  }
+
+  private static func navClientScript() -> HTML {
+    guard NavClientAssetCatalog.isAvailable else {
+      return HTML.raw("<script defer hx-preserve=\"true\">\n\(nav_dismiss_js)\n</script>")
+    }
+    return HTML.raw(
+      """
+      <script type="module" hx-preserve="true">
+      import { init } from "/assets/nav-client/index.js";
+
+      if (!window.__shapeTreeNavDismiss) {
+        window.__shapeTreeNavDismiss = true;
+
+        async function start() {
+          await init({
+            module: fetch("/assets/nav-client/WASMClient.wasm", { cache: "no-store" }),
+          });
+        }
+
+        if (document.body) {
+          void start();
+        } else {
+          document.addEventListener("DOMContentLoaded", () => { void start(); });
+        }
+      }
+      </script>
+      """
+    )
   }
 
   private static func pageTitle(for post: Post, siteTitle: String) -> String {

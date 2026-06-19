@@ -46,7 +46,8 @@ let package = Package(
     .target(
       name: "ShapeTreeWebAssets",
       path: "Sources/ShapeTreeWebAssets",
-      sources: ["Assets.swift"],
+      sources: ["Assets.swift", "NavClientAssetCatalog.swift", "NavClientWasm.swift"],
+      resources: [.copy("NavClientWasm.wasm")],
       plugins: [
         .plugin(name: "EmbedWebAssets", package: "Lorikeet")
       ]

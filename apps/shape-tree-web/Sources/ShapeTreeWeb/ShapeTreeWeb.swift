@@ -60,6 +60,8 @@ enum ShapeTreeWeb {
       return htmlFragmentResponse(fragment)
     }
 
+    NavClientRoutes.register(on: router)
+
     let app = Application(
       router: router,
       configuration: .init(
