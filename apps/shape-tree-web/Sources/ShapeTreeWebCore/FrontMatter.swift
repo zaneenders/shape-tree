@@ -215,12 +215,6 @@ private struct FrontMatterDocumentParser {
     if let date = iso.date(from: value) {
       return date
     }
-
-    let civil = DateFormatter()
-    civil.calendar = Calendar(identifier: .gregorian)
-    civil.locale = Locale(identifier: "en_US_POSIX")
-    civil.timeZone = TimeZone(secondsFromGMT: 0)
-    civil.dateFormat = "yyyy-MM-dd"
-    return civil.date(from: value)
+    return DateFormatting.date(fromFilename: value)
   }
 }

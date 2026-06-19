@@ -121,7 +121,7 @@ enum WebPages {
               HTML.tag(.a, attrs: [.href(post.path)]) { post.title }
             }
             HTML.tag(.p, attrs: [.class("post-meta")]) {
-              formattedDate(post.date)
+              DateFormatting.displayString(from: post.date)
             }
             if let excerpt = post.excerpt, !excerpt.isEmpty {
               HTML.tag(.p, attrs: [.class("post-list-excerpt")]) { excerpt }
@@ -145,7 +145,7 @@ enum WebPages {
     article {
       h1 { post.title }
       HTML.tag(.p, attrs: [.class("post-meta")]) {
-        formattedDate(post.date)
+        DateFormatting.displayString(from: post.date)
       }
       if !post.tags.isEmpty {
         HTML.tag(.ul, attrs: [.class("post-tags")]) {
@@ -195,13 +195,4 @@ enum WebPages {
     return "\(post.title) · \(siteTitle)"
   }
 
-  private static func formattedDate(_ date: Date) -> String {
-    let formatter = DateFormatter()
-    formatter.calendar = Calendar(identifier: .gregorian)
-    formatter.locale = Locale(identifier: "en_US_POSIX")
-    formatter.timeZone = TimeZone(secondsFromGMT: 0)
-    formatter.dateStyle = .long
-    formatter.timeStyle = .none
-    return formatter.string(from: date)
-  }
 }

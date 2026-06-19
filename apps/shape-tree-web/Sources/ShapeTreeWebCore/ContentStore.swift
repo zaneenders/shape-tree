@@ -153,13 +153,7 @@ public struct ContentStore: Sendable {
   private static func dateFromFilename(_ slug: String) -> Date? {
     let prefix = slug.prefix(while: { $0.isNumber || $0 == "-" })
     guard prefix.count == 10 else { return nil }
-
-    let formatter = DateFormatter()
-    formatter.calendar = Calendar(identifier: .gregorian)
-    formatter.locale = Locale(identifier: "en_US_POSIX")
-    formatter.timeZone = TimeZone(secondsFromGMT: 0)
-    formatter.dateFormat = "yyyy-MM-dd"
-    return formatter.date(from: String(prefix))
+    return DateFormatting.date(fromFilename: String(prefix))
   }
 }
 
