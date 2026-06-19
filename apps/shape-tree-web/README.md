@@ -2,10 +2,12 @@
 
 Markdown blog built on [Lorikeet](https://github.com/zaneenders/lorikeet) (typed HTML + HTMX) and Hummingbird. Point it at a directory of `.md` files and it serves a readable site with HTMX navigation.
 
-Build the swift WASM client then start the server.
+Build the swift WASM client, configure environment, then start the server.
+
 ```bash
 cd apps/shape-tree-web
 ./Scripts/build-client.sh
+cp .env.example .env
 swift run ShapeTreeWeb
 ```
 
@@ -13,19 +15,21 @@ swift run ShapeTreeWeb
 
 ### Environment
 
-Copy `.env.example` to `.env` and set `CONTENT_PATH` to your markdown directory:
+Copy `.env.example` to `.env` and set the required variables:
 
 ```bash
 cp .env.example .env
 ```
 
-Environment variables:
+Environment variables (all required):
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `HOST` | `127.0.0.1` | Bind address |
-| `PORT` | `8080` | Listener port |
-| `CONTENT_PATH` | `Examples/content` | Directory of markdown files (scanned recursively) |
+| Variable | Purpose |
+|----------|---------|
+| `HOST` | Bind address |
+| `PORT` | Listener port |
+| `CONTENT_PATH` | Directory of markdown files (scanned recursively) |
+
+`.env.example` includes sample values for local development (`127.0.0.1`, `8080`, `Examples/content`).
 
 
 Markdown files support `---` front matter (`title`, `date`, `tags`, `excerpt`). An `index.md` file becomes the home page. Other files are listed as posts sorted by date. Files in subdirectories are grouped in navigation and on the index. Sample content lives in `Examples/content/`.
