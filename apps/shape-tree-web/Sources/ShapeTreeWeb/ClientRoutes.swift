@@ -35,22 +35,27 @@ enum ClientRoutes {
     switch entry {
     case .script(let body):
       return cachedResponse(
+        entry: entry,
         contentType: "application/javascript; charset=utf-8",
         body: head ? ByteBuffer() : ByteBuffer(string: body)
       )
     case .wasm(let bytes):
       return cachedResponse(
+        entry: entry,
         contentType: "application/wasm",
         body: head ? ByteBuffer() : ByteBuffer(bytes: bytes)
       )
     }
   }
 
-  private static func cachedResponse(contentType: String, body: ByteBuffer) -> Response {
-    let cacheControl =
-      contentType.contains("wasm")
-      ? "no-cache"
-      : "public, max-age=60"
+  private static func cachedResponse(entry: ClientAssetCatalog.Entry, contentType: String, body: ByteBuffer) -> Response {
+    let cacheControl: String
+    switch entry {
+    case .wasm:
+      cacheControl = "no-cache"
+    case .script:
+      cacheControl = "public, max-age=60"
+    }
     return Response(
       status: .ok,
       headers: [
