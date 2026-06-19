@@ -41,4 +41,10 @@ public struct Post: Sendable, Equatable, Identifiable {
       ? "/htmx/content/index"
       : "/htmx/content/posts/\(slug)"
   }
+
+  /// Parent directory within the content root, if any (e.g. `notes` for `notes/post.md`).
+  public var contentDirectory: String? {
+    let parent = (relativePath as NSString).deletingLastPathComponent
+    return parent.isEmpty ? nil : parent
+  }
 }

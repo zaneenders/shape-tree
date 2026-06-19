@@ -14,6 +14,19 @@ public enum ContentStoreError: Error, CustomStringConvertible, Sendable {
   }
 }
 
+public struct PostGroup: Sendable, Equatable {
+  public var directory: String?
+  public var posts: [Post]
+
+  public var label: String {
+    guard let directory else { return "Root" }
+    return directory
+      .split(separator: "/")
+      .map { ContentStore.humanizedName(String($0)) }
+      .joined(separator: " / ")
+  }
+}
+
 public struct ContentStore: Sendable {
   public static let indexSlug = "index"
 
@@ -46,6 +59,33 @@ public struct ContentStore: Sendable {
 
   public var publishedPosts: [Post] {
     posts.filter { $0.slug != Self.indexSlug }
+  }
+
+  public var publishedPostGroups: [PostGroup] {
+    var grouped: [String?: [Post]] = [:]
+    for post in publishedPosts {
+      grouped[post.contentDirectory, default: []].append(post)
+    }
+
+    let sortedKeys = grouped.keys.sorted { lhs, rhs in
+      switch (lhs, rhs) {
+      case (nil, nil):
+        return false
+      case (nil, _):
+        return true
+      case (_, nil):
+        return false
+      case let (lhs?, rhs?):
+        return lhs.localizedCaseInsensitiveCompare(rhs) == .orderedAscending
+      }
+    }
+
+    return sortedKeys.map { directory in
+      PostGroup(
+        directory: directory,
+        posts: (grouped[directory] ?? []).sorted { $0.date > $1.date }
+      )
+    }
   }
 
   private static func loadPosts(from root: URL) throws -> [Post] {
@@ -90,7 +130,7 @@ public struct ContentStore: Sendable {
           tags: frontMatter.tags,
           excerpt: frontMatter.excerpt,
           bodyMarkdown: body,
-          bodyHTML: MarkdownRenderer.html(from: body),
+          bodyHTML: MarkdownRenderer.html(from: body, strippingTitle: title),
           relativePath: relativePath
         )
       )
@@ -98,11 +138,15 @@ public struct ContentStore: Sendable {
     return posts
   }
 
-  private static func humanizedSlug(_ slug: String) -> String {
-    slug
+  static func humanizedName(_ value: String) -> String {
+    value
       .replacingOccurrences(of: "-", with: " ")
       .replacingOccurrences(of: "_", with: " ")
       .capitalized
+  }
+
+  private static func humanizedSlug(_ slug: String) -> String {
+    humanizedName(slug)
   }
 
   private static func dateFromFilename(_ slug: String) -> Date? {

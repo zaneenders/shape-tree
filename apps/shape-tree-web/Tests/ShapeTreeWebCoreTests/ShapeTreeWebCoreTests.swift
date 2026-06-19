@@ -45,10 +45,29 @@ import Testing
 
     let store = try ContentStore(contentDirectory: contentDirectory)
 
-    #expect(store.posts.count >= 2)
+    #expect(store.posts.count >= 6)
     #expect(store.indexPost?.title == "ShapeTree Web")
-    #expect(store.post(slug: "2025-06-17-hello-markdown")?.title == "Hello, Markdown")
+    #expect(store.post(slug: "style-guide")?.title == "Style Guide")
     #expect(store.publishedPosts.allSatisfy { $0.slug != ContentStore.indexSlug })
+  }
+
+  @Test func groupsPublishedPostsByDirectory() throws {
+    let contentDirectory = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Examples/content", isDirectory: true)
+
+    let store = try ContentStore(contentDirectory: contentDirectory)
+    let groups = store.publishedPostGroups
+
+    #expect(groups.contains { $0.directory == nil })
+    #expect(groups.contains { $0.directory == "notes" })
+    #expect(groups.contains { $0.directory == "guides" })
+    #expect(groups.contains { $0.directory == "fragments" })
+    #expect(groups.first?.directory == nil)
+    #expect(groups.first(where: { $0.directory == "notes" })?.label == "Notes")
+    #expect(groups.first(where: { $0.directory == "notes" })?.posts.count == 2)
   }
 }
 
@@ -57,5 +76,25 @@ import Testing
     let html = MarkdownRenderer.html(from: "# Title")
     #expect(html.contains("<h1>"))
     #expect(html.contains("Title"))
+  }
+
+  @Test func stripsLeadingTitleHeading() {
+    let markdown = "# Hello, Markdown\n\nBody text."
+    let html = MarkdownRenderer.html(from: markdown, strippingTitle: "Hello, Markdown")
+    #expect(!html.contains("<h1>"))
+    #expect(html.contains("Body text."))
+  }
+
+  @Test func keepsLeadingHeadingWhenTitleDiffers() {
+    let markdown = "# Something Else\n\nBody text."
+    let html = MarkdownRenderer.html(from: markdown, strippingTitle: "Hello, Markdown")
+    #expect(html.contains("<h1>"))
+    #expect(html.contains("Something Else"))
+  }
+
+  @Test func keepsLeadingHeadingWhenNotLevelOne() {
+    let markdown = "## Hello, Markdown\n\nBody text."
+    let html = MarkdownRenderer.html(from: markdown, strippingTitle: "Hello, Markdown")
+    #expect(html.contains("<h2>"))
   }
 }

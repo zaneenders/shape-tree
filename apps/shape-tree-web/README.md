@@ -1,6 +1,6 @@
 # shape-tree-web
 
-Jekyll-inspired markdown blog built on [Lorikeet](https://github.com/zaneenders/lorikeet) (typed HTML + HTMX) and Hummingbird. Point it at a directory of `.md` files and it serves a readable site with HTMX navigation.
+Markdown blog built on [Lorikeet](https://github.com/zaneenders/lorikeet) (typed HTML + HTMX) and Hummingbird. Point it at a directory of `.md` files and it serves a readable site with HTMX navigation.
 
 ```bash
 cd apps/shape-tree-web
@@ -27,7 +27,7 @@ Environment variables:
 | `PORT` | `8080` | Listener port |
 | `CONTENT_PATH` | `Examples/content` | Directory of markdown files (scanned recursively) |
 
-Markdown files support Jekyll-style `---` front matter (`title`, `date`, `tags`, `excerpt`). An `index.md` file becomes the home page; other files are listed as posts sorted by date. Sample content lives in `Examples/content/`.
+Markdown files support `---` front matter (`title`, `date`, `tags`, `excerpt`). An `index.md` file becomes the home page. Other files are listed as posts sorted by date. Files in subdirectories are grouped in navigation and on the index. Sample content lives in `Examples/content/`.
 
 ## Testing
 

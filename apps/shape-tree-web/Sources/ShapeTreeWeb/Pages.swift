@@ -17,16 +17,8 @@ enum WebPages {
         HTML.raw("<script hx-preserve=\"true\">\n\(htmx_head_support)\n</script>")
       }
       HTML.tag(.body, attrs: [.hxExt("head-support")]) {
-        HTML.tag(.div, attrs: [.class("site-header")]) {
-          HTML.tag(.h1, attrs: [.class("site-title")]) {
-            HTML.tag(.a, attrs: [.href("/")]) { store.siteTitle }
-          }
-          HTML.tag(.p, attrs: [.class("site-tagline")]) { "Markdown from a content directory" }
-        }
-        HTML.tag(.div, attrs: [.id("htmx-loading"), .class("htmx-indicator site-loading")]) {
-          "Loading…"
-        }
         HTMX.Attributes.lazyNavShell(get: "/htmx/content/nav")
+        HTML.raw(#"<div id="htmx-loading" class="htmx-indicator" aria-live="polite">Loading…</div>"#)
         HTML.tag(.main, attrs: [.id("main")]) {
           pageArticle(for: initial, store: store)
         }
@@ -40,19 +32,39 @@ enum WebPages {
         href: "/",
         contentURL: "/htmx/content/index",
         target: "main",
-        name: "Home"
+        name: store.siteTitle
       ),
     ]
 
-    for post in store.publishedPosts.prefix(12) {
-      items.append(
-        NavHTML.leaf(
-          href: post.path,
-          contentURL: post.contentURL,
-          target: "main",
-          name: post.title
+    for group in store.publishedPostGroups {
+      if let directory = group.directory {
+        let branchItems = group.posts.map { post in
+          NavHTML.leaf(
+            href: post.path,
+            contentURL: post.contentURL,
+            target: "main",
+            name: post.title
+          )
+        }
+        items.append(
+          NavHTML.branch(
+            id: navBranchID(for: directory),
+            name: group.label,
+            children: NavHTML.list(class: "nav-flyout", items: branchItems)
+          )
         )
-      )
+      } else {
+        for post in group.posts {
+          items.append(
+            NavHTML.leaf(
+              href: post.path,
+              contentURL: post.contentURL,
+              target: "main",
+              name: post.title
+            )
+          )
+        }
+      }
     }
 
     return NavHTML.styled(NavHTML.list(class: "nav-root", items: items))
@@ -81,24 +93,51 @@ enum WebPages {
           HTML.raw(bodyHTML)
         }
       }
-      HTML.tag(.ul, attrs: [.class("post-list")]) {
+      let groups = store.publishedPostGroups
+      if groups.count == 1, groups[0].directory == nil {
+        postList(for: groups[0].posts)
+      } else {
         HTML.fragment(
-          store.publishedPosts.map { post in
-            HTML.tag(.li, attrs: [.class("post-list-item")]) {
-              HTML.tag(.div, attrs: [.class("post-list-title")]) {
-                HTML.tag(.a, attrs: [.href(post.path)]) { post.title }
+          groups.map { group in
+            HTML.tag(.div, attrs: [.class("post-group")]) {
+              if group.directory != nil {
+                HTML.tag(.div, attrs: [.class("post-group-title")]) { group.label }
               }
-              HTML.tag(.p, attrs: [.class("post-meta")]) {
-                formattedDate(post.date)
-              }
-              if let excerpt = post.excerpt, !excerpt.isEmpty {
-                HTML.tag(.p, attrs: [.class("post-list-excerpt")]) { excerpt }
-              }
+              postList(for: group.posts)
             }
           }
         )
       }
     }
+  }
+
+  private static func postList(for posts: [Post]) -> HTML {
+    HTML.tag(.ul, attrs: [.class("post-list")]) {
+      HTML.fragment(
+        posts.map { post in
+          HTML.tag(.li, attrs: [.class("post-list-item")]) {
+            HTML.tag(.div, attrs: [.class("post-list-title")]) {
+              HTML.tag(.a, attrs: [.href(post.path)]) { post.title }
+            }
+            HTML.tag(.p, attrs: [.class("post-meta")]) {
+              formattedDate(post.date)
+            }
+            if let excerpt = post.excerpt, !excerpt.isEmpty {
+              HTML.tag(.p, attrs: [.class("post-list-excerpt")]) { excerpt }
+            }
+          }
+        }
+      )
+    }
+  }
+
+  private static func navBranchID(for directory: String) -> String {
+    let sanitized =
+      directory
+      .lowercased()
+      .replacingOccurrences(of: "/", with: "-")
+      .replacingOccurrences(of: " ", with: "-")
+    return "nav-\(sanitized)"
   }
 
   private static func postArticle(_ post: Post) -> HTML {
