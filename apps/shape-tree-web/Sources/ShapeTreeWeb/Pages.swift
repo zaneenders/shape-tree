@@ -21,7 +21,7 @@ enum WebPages {
         HTMX.Attributes.lazyNavShell(get: "/htmx/content/nav")
         HTML.raw(#"<div id="htmx-loading" class="htmx-indicator" aria-live="polite">Loading…</div>"#)
         HTML.tag(.main, attrs: [.id("main")]) {
-          pageArticle(for: initial, store: store)
+          pageArticle(for: initial)
         }
       }
     }
@@ -71,64 +71,28 @@ enum WebPages {
     return NavHTML.styled(NavHTML.list(class: "nav-root", items: items))
   }
 
-  static func pageArticle(for post: Post, store: ContentStore) -> HTML {
-    if post.slug == ContentStore.indexSlug {
-      return indexArticle(store: store, bodyHTML: post.bodyHTML)
+  static func pageArticle(for post: Post) -> HTML {
+    if post.isIndex {
+      return indexArticle(bodyHTML: post.bodyHTML)
     }
     return postArticle(post)
   }
 
   static func contentFragment(for post: Post, store: ContentStore) -> String {
     HTMX.contentFragment(
-      body: pageArticle(for: post, store: store).render(),
+      body: pageArticle(for: post).render(),
       baseHead: "",
       extraHead: HTML.tag(.title) { pageTitle(for: post, siteTitle: store.siteTitle) }
     )
   }
 
-  private static func indexArticle(store: ContentStore, bodyHTML: String) -> HTML {
+  private static func indexArticle(bodyHTML: String) -> HTML {
     article {
-      h1 { "Posts" }
       if !bodyHTML.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
         HTML.tag(.div, attrs: [.class("post-body")]) {
           HTML.raw(bodyHTML)
         }
       }
-      let groups = store.publishedPostGroups
-      if groups.count == 1, groups[0].directory == nil {
-        postList(for: groups[0].posts)
-      } else {
-        HTML.fragment(
-          groups.map { group in
-            HTML.tag(.div, attrs: [.class("post-group")]) {
-              if group.directory != nil {
-                HTML.tag(.div, attrs: [.class("post-group-title")]) { group.label }
-              }
-              postList(for: group.posts)
-            }
-          }
-        )
-      }
-    }
-  }
-
-  private static func postList(for posts: [Post]) -> HTML {
-    HTML.tag(.ul, attrs: [.class("post-list")]) {
-      HTML.fragment(
-        posts.map { post in
-          HTML.tag(.li, attrs: [.class("post-list-item")]) {
-            HTML.tag(.div, attrs: [.class("post-list-title")]) {
-              HTML.tag(.a, attrs: [.href(post.path)]) { post.title }
-            }
-            HTML.tag(.p, attrs: [.class("post-meta")]) {
-              DateFormatting.displayString(from: post.date)
-            }
-            if let excerpt = post.excerpt, !excerpt.isEmpty {
-              HTML.tag(.p, attrs: [.class("post-list-excerpt")]) { excerpt }
-            }
-          }
-        }
-      )
     }
   }
 
@@ -189,7 +153,7 @@ enum WebPages {
   }
 
   private static func pageTitle(for post: Post, siteTitle: String) -> String {
-    if post.slug == ContentStore.indexSlug {
+    if post.isIndex {
       return siteTitle
     }
     return "\(post.title) · \(siteTitle)"

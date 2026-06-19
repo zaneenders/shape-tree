@@ -85,7 +85,7 @@ import Testing
     #expect(store.posts.count >= 6)
     #expect(store.indexPost?.title == "ShapeTree Web")
     #expect(store.post(slug: "style-guide")?.title == "Style Guide")
-    #expect(store.publishedPosts.allSatisfy { $0.slug != ContentStore.indexSlug })
+    #expect(store.publishedPosts.allSatisfy { !$0.isIndex })
   }
 
   @Test func groupsPublishedPostsByDirectory() throws {

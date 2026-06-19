@@ -215,6 +215,9 @@ private struct FrontMatterDocumentParser {
     if let date = iso.date(from: value) {
       return date
     }
+    if let date = DateFormatting.date(fromShortFormat: value) {
+      return date
+    }
     return DateFormatting.date(fromFilename: value)
   }
 }

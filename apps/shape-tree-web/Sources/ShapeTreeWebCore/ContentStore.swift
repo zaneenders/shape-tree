@@ -29,25 +29,25 @@ public struct PostGroup: Sendable, Equatable {
 }
 
 public struct ContentStore: Sendable {
-  public static let indexSlug = "index"
-
   private let root: URL
   private let postsBySlug: [String: Post]
+  private let indexSlug: String
   public let posts: [Post]
 
-  public init(contentDirectory: URL) throws {
+  public init(contentDirectory: URL, indexSlug: String = "Home") throws {
     guard FileManager.default.fileExists(atPath: contentDirectory.path) else {
       throw ContentStoreError.directoryNotFound(contentDirectory)
     }
 
     self.root = contentDirectory.standardizedFileURL
-    let loaded = try Self.loadPosts(from: contentDirectory)
+    self.indexSlug = indexSlug
+    let loaded = try Self.loadPosts(from: contentDirectory, indexSlug: indexSlug)
     self.posts = loaded.sorted { $0.date > $1.date }
     self.postsBySlug = Dictionary(uniqueKeysWithValues: loaded.map { ($0.slug, $0) })
   }
 
   public var siteTitle: String {
-    postsBySlug[Self.indexSlug]?.title ?? "ShapeTree Web"
+    indexPost?.title ?? "ShapeTree Web"
   }
 
   public func post(slug: String) -> Post? {
@@ -55,11 +55,11 @@ public struct ContentStore: Sendable {
   }
 
   public var indexPost: Post? {
-    postsBySlug[Self.indexSlug]
+    posts.first { $0.isIndex }
   }
 
   public var publishedPosts: [Post] {
-    posts.filter { $0.slug != Self.indexSlug }
+    posts.filter { !$0.isIndex }
   }
 
   public var publishedPostGroups: [PostGroup] {
@@ -89,7 +89,7 @@ public struct ContentStore: Sendable {
     }
   }
 
-  private static func loadPosts(from root: URL) throws -> [Post] {
+  private static func loadPosts(from root: URL, indexSlug: String) throws -> [Post] {
     let fileManager = FileManager.default
     guard
       let enumerator = fileManager.enumerator(
@@ -132,7 +132,8 @@ public struct ContentStore: Sendable {
           excerpt: frontMatter.excerpt,
           bodyMarkdown: body,
           bodyHTML: MarkdownRenderer.html(from: body, strippingTitle: title),
-          relativePath: relativePath
+          relativePath: relativePath,
+          isIndex: slug.lowercased() == indexSlug.lowercased()
         )
       )
     }
