@@ -11,7 +11,7 @@ let package = Package(
     .executable(name: "ShapeTreeWeb", targets: ["ShapeTreeWeb"])
   ],
   dependencies: [
-    .package(url: "https://github.com/zaneenders/lorikeet.git", revision: "31904cb"),
+    .package(url: "https://github.com/zaneenders/lorikeet.git", revision: "ed579f7"),
     .package(url: "https://github.com/apple/swift-markdown.git", from: "0.7.0"),
     .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.24.0"),
     .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0"),
