@@ -4,46 +4,27 @@ Hummingbird server wrapping ScribeAgent.
 
 ## Configuration
 
-All non-`server.host` values are **required**. Create `shape-tree-config.json` in the working
-directory:
+All values are **required**. Copy `.env.example` to `.env` and edit:
 
-```json
-{
-  "server": {
-    "host": "127.0.0.1",
-    "port": 42069
-  },
-  "data": {
-    "path": "."
-  },
-  "ollama": {
-    "url": "http://127.0.0.1:11434",
-    "token": ""
-  },
-  "agent": {
-    "model": "gemma4:e2b",
-    "systemPrompt": "You are a helpful coding assistant.",
-    "contextWindow": 131072,
-    "contextWindowThreshold": 0.85
-  },
-  "journal": {
-    "commitAuthor": {
-      "name": "ShapeTree",
-      "email": "shape-tree@localhost"
-    }
-  }
-}
+```bash
+cp .env.example .env
 ```
 
-`server.port` is the listener port. `server.host` is the bind address — **defaults to `127.0.0.1`
-(loopback only)** when omitted. Set it to a specific LAN IP only when you intend to expose the
-server to other devices, and only behind TLS (the server speaks plain HTTP). Setting it to
-`0.0.0.0` logs a warning at startup. `data.path` is the **absolute or relative directory `R`** for
-all mutable ShapeTree files; relative paths (including `"."`) resolve against the server process
-working directory. Journal git state, `journal-subjects.json`, **and the ES256 trust store** live
-under `R/.shape-tree/`. For local development, set `data.path` to the repository root and ignore
-`.shape-tree/` via git (see repo `.gitignore`). `ollama.token` may be empty when no bearer token is
-required (e.g. local Ollama).
+| Variable | Description |
+|---|---|
+| `HOST` | Bind address — **defaults to `127.0.0.1` (loopback only)**. Set to a specific LAN IP only behind TLS. `0.0.0.0` logs a warning at startup. |
+| `PORT` | Listener port. |
+| `DATA_PATH` | Absolute or relative directory for mutable ShapeTree files; relative paths (including `.`) resolve against the server working directory. Journal git state, `journal-subjects.json`, and the ES256 trust store live under `R/.shape-tree/`. |
+| `OLLAMA_URL` | Ollama API base URL. |
+| `OLLAMA_TOKEN` | Ollama bearer token (may be empty for local Ollama). |
+| `AGENT_MODEL` | Ollama model identifier (e.g. `gemma4:e2b`). |
+| `AGENT_SYSTEM_PROMPT` | System prompt passed to the agent. |
+| `AGENT_CONTEXT_WINDOW` | Model context window size in tokens. |
+| `AGENT_CONTEXT_WINDOW_THRESHOLD` | Context utilisation threshold (0–1) that triggers pruning. |
+| `JOURNAL_COMMIT_AUTHOR_NAME` | Fallback git author name for journal commits. |
+| `JOURNAL_COMMIT_AUTHOR_EMAIL` | Fallback git author email for journal commits. |
+
+System environment variables override `.env` file values.
 
 ## Authentication: per-device ES256 keys
 
