@@ -46,6 +46,7 @@ let package = Package(
     .target(
       name: "ShapeTreeWebAssets",
       path: "Sources/ShapeTreeWebAssets",
+      exclude: ["nav-client"],
       sources: ["Assets.swift", "NavClientAssetCatalog.swift", "NavClientWasm.swift"],
       resources: [.copy("NavClientWasm.wasm")],
       plugins: [

@@ -3,76 +3,53 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CLIENT="$ROOT/WASMClient"
-OUT_JS="$ROOT/Sources/ShapeTreeWebAssets/nav-client"
-OUT_WASM="$ROOT/Sources/ShapeTreeWebAssets/NavClientWasm.wasm"
+ASSETS="$ROOT/Sources/ShapeTreeWebAssets"
+OUT_JS="$ASSETS/nav-client"
 BUILD_DIR="$CLIENT/.build/js"
+SDK="${SWIFT_WASM_SDK:-swift-6.3.2-RELEASE_wasm-embedded}"
 
 export PATH="${HOME}/.swiftly/bin:${PATH}"
 
-TAG="$(swiftc -print-target-info | python3 -c 'import json,sys; print(json.load(sys.stdin)["swiftCompilerTag"])')"
-
-SDK_CANDIDATES=("${TAG}_wasm-embedded" "swift-6.3.2-RELEASE_wasm-embedded")
-
-pick_sdk() {
-  local candidate
-  for candidate in "$@"; do
-    if swift sdk list 2>/dev/null | grep -qx "$candidate"; then
-      echo "$candidate"
-      return 0
-    fi
-  done
-  return 1
-}
-
-SDK_ID="$(pick_sdk "${SDK_CANDIDATES[@]}")" || {
-  cat >&2 <<EOF
-error: no embedded wasm Swift SDK found.
-
-Install the official bundle (matches Swift ${TAG}):
-
-  swift sdk install \\
-    https://download.swift.org/swift-6.3.2-release/wasm-sdk/swift-6.3.2-RELEASE/swift-6.3.2-RELEASE_wasm.artifactbundle.tar.gz \\
-    --checksum a61f0584c93283589f8b2f42db05c1f9a182b506c2957271402992655591dd7c
-EOF
-  exit 1
-}
-
-echo "Building WASMClient (Swift 6) with ${SDK_ID}..."
-rm -rf "$BUILD_DIR" "$CLIENT/.build/plugins/PackageToJS/outputs/js.tmp"
-(
-  cd "$CLIENT"
-  # Do not set JAVASCRIPTKIT_EXPERIMENTAL_EMBEDDED_WASM — it skips reactor linker
-  # flags and produces a command-mode module (_start) that cannot register JS listeners.
-  unset JAVASCRIPTKIT_EXPERIMENTAL_EMBEDDED_WASM
-  swift package \
-    --swift-sdk "$SDK_ID" \
-    --allow-writing-to-package-directory \
-    js --use-cdn --output "$BUILD_DIR" --configuration release --debug-info-format none
-)
-
-WASM_SRC="$BUILD_DIR/WASMClient.wasm"
-if [[ ! -f "$WASM_SRC" ]]; then
-  echo "error: wasm output missing at ${WASM_SRC}" >&2
+if ! swift sdk list 2>/dev/null | grep -qx "$SDK"; then
+  echo "error: wasm SDK '$SDK' not installed (see README → Swift WASM)" >&2
   exit 1
 fi
 
-BYTES="$(wc -c < "$WASM_SRC" | tr -d ' ')"
-echo "Wasm size before extra opt: $(numfmt --to=iec-i --suffix=B "$BYTES" 2>/dev/null || echo "${BYTES} bytes")"
-
-if command -v wasm-opt >/dev/null; then
-  wasm-opt -Oz --strip-debug --strip-producers "$WASM_SRC" -o "$WASM_SRC"
-  BYTES="$(wc -c < "$WASM_SRC" | tr -d ' ')"
-  echo "Wasm size after wasm-opt -Oz: $(numfmt --to=iec-i --suffix=B "$BYTES" 2>/dev/null || echo "${BYTES} bytes")"
-else
+if ! command -v wasm-opt >/dev/null; then
   echo "error: wasm-opt not found (brew install binaryen)" >&2
   exit 1
 fi
 
-rm -rf "$OUT_JS"
-mkdir -p "$OUT_JS"
-cp -R "$BUILD_DIR"/* "$OUT_JS"/
-cp "$WASM_SRC" "$OUT_WASM"
+echo "Building WASMClient with ${SDK}..."
+rm -rf "$BUILD_DIR" "$CLIENT/.build/plugins/PackageToJS/outputs/js.tmp"
+(
+  cd "$CLIENT"
+  # Reactor mode — required so the module can register JS listeners (not command/_start).
+  unset JAVASCRIPTKIT_EXPERIMENTAL_EMBEDDED_WASM
+  swift package \
+    --swift-sdk "$SDK" \
+    --allow-writing-to-package-directory \
+    js --output "$BUILD_DIR" --configuration release --debug-info-format none
+)
 
-echo "Wrote JavaScript modules to ${OUT_JS}"
-echo "Wrote wasm resource to ${OUT_WASM}"
-echo "Run 'swift build' in apps/shape-tree-web to embed assets and serve /assets/nav-client/*"
+WASM="$BUILD_DIR/WASMClient.wasm"
+if [[ ! -f "$WASM" ]]; then
+  echo "error: wasm output missing at ${WASM}" >&2
+  exit 1
+fi
+
+wasm-opt -Oz --strip-debug --strip-producers "$WASM" -o "$WASM"
+
+rm -rf "$OUT_JS"
+mkdir -p "$OUT_JS/platforms"
+cp "$BUILD_DIR/index.js" "$BUILD_DIR/instantiate.js" "$BUILD_DIR/runtime.js" "$OUT_JS/"
+cp "$BUILD_DIR/platforms/browser.js" "$OUT_JS/platforms/"
+cp "$WASM" "$ASSETS/NavClientWasm.wasm"
+
+# WASI shim is committed under Sources/ShapeTreeWebAssets/Vendor/ and served locally.
+perl -pi -e "s|'\\@bjorn3/browser_wasi_shim'|'../browser_wasi_shim.js'|g" \
+  "$OUT_JS/platforms/browser.js"
+
+echo "Wrote nav-client JS to ${OUT_JS}"
+echo "Wrote ${ASSETS}/NavClientWasm.wasm"
+echo "Run: swift build && swift run ShapeTreeWeb"

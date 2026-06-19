@@ -24,6 +24,8 @@ public enum NavClientAssetCatalog {
       return .script(nav_client_runtime_js)
     case "platforms/browser.js":
       return .script(nav_client_platforms_browser_js)
+    case "browser_wasi_shim.js":
+      return .script(Vendor_browser_wasi_shim_js)
     default:
       return nil
     }

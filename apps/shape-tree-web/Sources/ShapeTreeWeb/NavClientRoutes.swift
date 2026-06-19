@@ -15,6 +15,7 @@ enum NavClientRoutes {
       "instantiate.js",
       "runtime.js",
       "platforms/browser.js",
+      "browser_wasi_shim.js",
     ] {
       let route = RouterPath("\(basePath)/\(relativePath)")
       router.get(route) { request, _ in
