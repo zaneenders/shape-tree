@@ -44,6 +44,8 @@ swift sdk install \
   --checksum a61f0584c93283589f8b2f42db05c1f9a182b506c2957271402992655591dd7c
 
 brew install binaryen   # for wasm-opt to reduce binary size
+# Linux (apt):
+# sudo apt install binaryen
 chmod +x Scripts/build-client.sh
 ./Scripts/build-client.sh
 ```
