@@ -43,7 +43,7 @@ public struct Sit: Sendable {
   /// detached daemons with no `HOME` gitconfig), so ``addCommitPush``'s `commit` step cannot fail for that reason.
   ///
   /// When a value must be supplied, ``fallbackCommitName`` / ``fallbackCommitEmail`` are written (typically
-  /// mirrored from ``shape-tree-config.json`` optional `journal.commitAuthor` keys).
+  /// mirrored from the `.env` `JOURNAL_COMMIT_AUTHOR_NAME` / `JOURNAL_COMMIT_AUTHOR_EMAIL` keys).
   public func ensureCommitAuthorIfUnset(
     cwd: FilePath,
     log: Logger,

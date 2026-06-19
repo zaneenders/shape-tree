@@ -7,25 +7,25 @@ import Logging
 enum ShapeTree {
   static func main() async throws {
     let log = Logger(label: "shape-tree.server")
-    let configPath = "shape-tree-config.json"
+    let config = ConfigReader(providers: [
+      EnvironmentVariablesProvider(),
+      try await EnvironmentVariablesProvider(
+        environmentFilePath: ".env",
+        allowMissing: true
+      ),
+    ])
 
-    let fileProvider = try await FileProvider<JSONSnapshot>(filePath: .init(configPath))
-    let reader = ConfigReader(providers: [fileProvider])
-
-    let port = try await reader.fetchRequiredInt(forKey: ConfigKeys.serverPort)
-    let host = try await reader.fetchRequiredString(forKey: ConfigKeys.serverHost)
-    let ollamaURL = try await reader.fetchRequiredString(forKey: ConfigKeys.ollamaURL)
-    let ollamaToken = try await reader.fetchRequiredString(forKey: ConfigKeys.ollamaToken)
-    let agentModel = try await reader.fetchRequiredString(forKey: ConfigKeys.agentModel)
-    let systemPrompt = try await reader.fetchRequiredString(forKey: ConfigKeys.systemPrompt)
-    let contextWindow = try await reader.fetchRequiredInt(forKey: ConfigKeys.contextWindow)
-    let contextWindowThreshold = try await reader.fetchRequiredDouble(forKey: ConfigKeys.contextWindowThreshold)
-    let dataPathRaw = try await reader.fetchRequiredString(forKey: ConfigKeys.dataPath)
-
-    let journalCommitFallbackName = try await reader.fetchRequiredString(
-      forKey: ConfigKeys.journalCommitAuthorName)
-    let journalCommitFallbackEmail = try await reader.fetchRequiredString(
-      forKey: ConfigKeys.journalCommitAuthorEmail)
+    let host = try config.requiredString(forKey: "HOST")
+    let port = try config.requiredInt(forKey: "PORT")
+    let dataPathRaw = try config.requiredString(forKey: "DATA_PATH")
+    let ollamaURL = try config.requiredString(forKey: "OLLAMA_URL")
+    let ollamaToken = try config.requiredString(forKey: "OLLAMA_TOKEN")
+    let agentModel = try config.requiredString(forKey: "AGENT_MODEL")
+    let systemPrompt = try config.requiredString(forKey: "AGENT_SYSTEM_PROMPT")
+    let contextWindow = try config.requiredInt(forKey: "AGENT_CONTEXT_WINDOW")
+    let contextWindowThreshold = try config.requiredDouble(forKey: "AGENT_CONTEXT_WINDOW_THRESHOLD")
+    let journalCommitFallbackName = try config.requiredString(forKey: "JOURNAL_COMMIT_AUTHOR_NAME")
+    let journalCommitFallbackEmail = try config.requiredString(forKey: "JOURNAL_COMMIT_AUTHOR_EMAIL")
 
     let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
     let resolvedDataRoot = ShapeTreeDataLayout.resolveDataRoot(rawPath: dataPathRaw, cwd: cwd)
