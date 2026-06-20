@@ -31,3 +31,8 @@ into Grafana for continuous profiling.
 See each subproject's README for `.env` details, the ES256 device-key trust model, and
 platform-specific build steps.
 
+> **Note for `server-tower` deployments:** The standalone `docker-compose.yml` in this repo uses
+> in-memory Jaeger storage, so traces are lost when the Jaeger container restarts. The production
+> orchestration in [`server-tower`](https://github.com/zaneenders/server-tower) overrides this to
+> use Badger local storage with a 90-day trace retention period.
+
