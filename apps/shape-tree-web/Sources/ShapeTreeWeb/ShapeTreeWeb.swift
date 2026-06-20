@@ -2,7 +2,6 @@ import Configuration
 import Foundation
 import HTML
 import HTMX
-import HTTPTypes
 import Hummingbird
 import Logging
 import NIOCore
@@ -40,17 +39,6 @@ enum ShapeTreeWeb {
         TracingMiddleware()
         MetricsMiddleware()
       }
-    }
-
-    router.get("ip") { request, _ -> Response in
-      guard let ip = publicIP(from: request) else {
-        throw HTTPError(.notFound, message: "Could not determine public IP")
-      }
-      return Response(
-        status: .ok,
-        headers: [.contentType: "text/plain; charset=utf-8"],
-        body: .init(byteBuffer: ByteBuffer(string: ip))
-      )
     }
 
     router.get { _, _ in
@@ -139,27 +127,4 @@ enum ShapeTreeWeb {
       isIndex: true
     )
   }
-}
-
-extension HTTPField.Name {
-  static let xForwardedFor = Self("X-Forwarded-For")!
-  static let cfConnectingIP = Self("CF-Connecting-IP")!
-  static let xRealIp = Self("X-Real-Ip")!
-}
-
-/// Extracts the public client IP from proxy headers added by Cloudflare/Caddy.
-/// Falls back through `X-Forwarded-For`, `CF-Connecting-IP`, and `X-Real-Ip`.
-private func publicIP(from request: Request) -> String? {
-  if let forwarded = request.headers[.xForwardedFor] {
-    return forwarded.split(separator: ",").first.map {
-      String($0).trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-  }
-  if let cf = request.headers[.cfConnectingIP] {
-    return cf
-  }
-  if let realIp = request.headers[.xRealIp] {
-    return realIp
-  }
-  return nil
 }
