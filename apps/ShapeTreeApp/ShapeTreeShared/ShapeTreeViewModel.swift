@@ -26,7 +26,7 @@ public final class ShapeTreeViewModel {
     try decode().error.message
   }
 
-  public static let serverURL = "http://localhost:42069"
+  public static let serverURL = "http://localhost:8082"
 
   public var messages: [ChatMessage] = []
   public var inputText: String = ""

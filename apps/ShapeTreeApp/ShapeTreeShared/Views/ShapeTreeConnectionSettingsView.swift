@@ -113,7 +113,7 @@ struct ShapeTreeSettingsView: View {
 
   private var serverSection: some View {
     Section {
-      TextField("http://localhost:42069", text: $draftURL)
+      TextField("http://localhost:8082", text: $draftURL)
         .textContentType(.URL)
         #if os(iOS)
       .textInputAutocapitalization(.never)
