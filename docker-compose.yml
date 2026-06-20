@@ -49,6 +49,19 @@ services:
     networks:
       - observability
 
+  parca:
+    image: ghcr.io/ordo-one/swift-parca:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7070:7070"
+    volumes:
+      - parca-data:/data
+    command:
+      - "--symbolizer-external-addr-2-line-path=/usr/local/bin/addr2line-swift"
+      - "--enable-persistence"
+    networks:
+      - observability
+
   prometheus:
     image: prom/prometheus:v3.2.1
     restart: unless-stopped
@@ -71,17 +84,20 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
+      - GRAFANA_PARCA_URL=http://parca:7070
     volumes:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
       - jaeger
+      - parca
     networks:
       - observability
 
 volumes:
   shape_tree_data:
+  parca-data:
 
 networks:
   app:

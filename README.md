@@ -17,6 +17,7 @@ and a static-ish blog.
 # api        -> http://127.0.0.1:42067
 # web        -> http://127.0.0.1:42069
 # jaeger     -> http://127.0.0.1:16686   (traces)
+# parca      -> http://127.0.0.1:7070    (profiles)
 # prometheus -> http://127.0.0.1:9090    (metrics)
 # grafana    -> http://127.0.0.1:3000    (admin / admin)
 ```
@@ -24,7 +25,8 @@ and a static-ish blog.
 `scripts/docker-build.sh` cross-compiles the Swift binaries for the host arch (it also builds the
 web WASM client), then runs `docker compose build`. The compose file mounts the API's data directory
 and the web example content read-only, so a built clone starts end-to-end. Both apps export
-OpenTelemetry traces to Jaeger and Prometheus-format metrics on their admin ports.
+OpenTelemetry traces to Jaeger and Prometheus-format metrics on their admin ports; Parca is wired
+into Grafana for continuous profiling.
 
 See each subproject's README for `.env` details, the ES256 device-key trust model, and
 platform-specific build steps.
