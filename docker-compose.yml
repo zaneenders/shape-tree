@@ -8,7 +8,7 @@ services:
     volumes:
       - ./apps/shape-tree-api/:/data
     ports:
-      - "127.0.0.1:8082:8082"
+      - "127.0.0.1:42067:42067"
     restart: unless-stopped
 
   web:
@@ -20,7 +20,7 @@ services:
     volumes:
       - ./apps/shape-tree-web/Examples:/Examples:ro
     ports:
-      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:42069:42069"
     restart: unless-stopped
 
 volumes:

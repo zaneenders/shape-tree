@@ -10,5 +10,5 @@ USER shape-tree
 WORKDIR /data
 VOLUME /data
 
-EXPOSE 8082
+EXPOSE 42067
 CMD ["ShapeTree"]

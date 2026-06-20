@@ -29,7 +29,7 @@ Environment variables (all required):
 | `PORT` | Listener port |
 | `CONTENT_PATH` | Directory of markdown files (scanned recursively) |
 
-`.env.example` includes sample values for local development (`127.0.0.1`, `8080`, `Examples/content`).
+`.env.example` includes sample values for local development (`127.0.0.1`, `42069`, `Examples/content`).
 
 
 Markdown files support `---` front matter (`title`, `date`, `tags`, `excerpt`). An `index.md` file becomes the home page. Other files are listed as posts sorted by date. Files in subdirectories are grouped in navigation and on the index. Sample content lives in `Examples/content/`.

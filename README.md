@@ -14,8 +14,8 @@ and a static-ish blog.
 
 ```bash
 ./scripts/docker-build.sh && docker compose up --build
-# api  -> http://127.0.0.1:8082
-# web  -> http://127.0.0.1:8080
+# api  -> http://127.0.0.1:42067
+# web  -> http://127.0.0.1:42069
 ```
 
 The compose file mounts the API's data directory and the web example content read-only, so a clean

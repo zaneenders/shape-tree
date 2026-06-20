@@ -10,5 +10,5 @@ RUN adduser -D -h /home/web web
 USER web
 WORKDIR /data
 
-EXPOSE 8080
+EXPOSE 42069
 CMD ["ShapeTreeWeb"]
