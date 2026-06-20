@@ -39,16 +39,11 @@ echo "=== Building ShapeTree API (Linux) ==="
 cd "$ROOT/apps/shape-tree-api"
 swift build -c release --swift-sdk "$SDK" --product ShapeTree
 
-WEB_BINARY="apps/shape-tree-web/.build/${SDK}/release/ShapeTreeWeb"
-WEB_RESOURCES="apps/shape-tree-web/.build/${SDK}/release/shape-tree-web_ShapeTreeWebAssets.resources"
-API_BINARY="apps/shape-tree-api/.build/${SDK}/release/ShapeTree"
-
 cd "$ROOT"
-echo "=== docker compose build (passing $SDK binary paths) ==="
-docker compose build \
-  --build-arg API_BINARY_PATH="$API_BINARY" \
-  --build-arg WEB_BINARY_PATH="$WEB_BINARY" \
-  --build-arg WEB_RESOURCES_PATH="$WEB_RESOURCES"
+# The Dockerfiles auto-select the binary matching the build arch via BuildKit's
+# TARGETARCH (defaults to the host arch). No per-arch build args needed.
+echo "=== docker compose build (arch: $HOST_ARCH) ==="
+docker compose build
 
 echo ""
 echo "Built. Next:  docker compose up -d"

@@ -3,11 +3,6 @@ services:
     build:
       context: .
       dockerfile: apps/shape-tree-api/Dockerfile
-      args:
-        # Overridden by scripts/docker-build.sh, which auto-detects the host arch.
-        # Defaults target arm64 (aarch64) so `docker compose up --build` works on
-        # Apple Silicon. Pass x86_64-swift-linux-musl paths for Intel hosts.
-        API_BINARY_PATH: apps/shape-tree-api/.build/aarch64-swift-linux-musl/release/ShapeTree
     env_file:
       - apps/shape-tree-api/.env.example
     environment:
@@ -28,9 +23,6 @@ services:
     build:
       context: .
       dockerfile: apps/shape-tree-web/Dockerfile
-      args:
-        WEB_BINARY_PATH: apps/shape-tree-web/.build/aarch64-swift-linux-musl/release/ShapeTreeWeb
-        WEB_RESOURCES_PATH: apps/shape-tree-web/.build/aarch64-swift-linux-musl/release/shape-tree-web_ShapeTreeWebAssets.resources
     env_file:
       - apps/shape-tree-web/.env.example
     environment:
