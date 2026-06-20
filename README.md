@@ -4,7 +4,7 @@
 
 ```
 apps/
-├── shape-tree/       ← Swift package (server + client library)
+├── shape-tree-api/   ← Swift package (server + client library)
 ├── shape-tree-web/   ← Swift package (markdown blog)
 └── ShapeTreeApp/     ← iOS & macOS chat app
 ```
