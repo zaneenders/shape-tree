@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: apps/shape-tree-api/Dockerfile
+    env_file:
+      - apps/shape-tree-api/.env.example
     environment:
       HOST: "0.0.0.0"
       PORT: "8082"
@@ -26,13 +28,15 @@ services:
     build:
       context: .
       dockerfile: apps/shape-tree-web/Dockerfile
+    env_file:
+      - apps/shape-tree-web/.env.example
     environment:
       HOST: "0.0.0.0"
       PORT: "8080"
       CONTENT_PATH: /content
       INDEX_SLUG: Home
     volumes:
-      - ./content:/content:ro
+      - ./apps/shape-tree-web/Examples/content:/content:ro
     ports:
       - "127.0.0.1:8080:8080"
     restart: unless-stopped
