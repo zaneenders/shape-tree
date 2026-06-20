@@ -34,5 +34,6 @@ platform-specific build steps.
 > **Note for `server-tower` deployments:** The standalone `docker-compose.yml` in this repo uses
 > in-memory Jaeger storage, so traces are lost when the Jaeger container restarts. The production
 > orchestration in [`server-tower`](https://github.com/zaneenders/server-tower) overrides this to
-> use Badger local storage with a 90-day trace retention period.
+> use Badger local storage with a 90-day trace retention period. The standalone compose also omits
+> `parca-agent`; `server-tower` adds it so Parca CPU profiles are actually collected.
 
