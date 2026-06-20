@@ -18,9 +18,18 @@ func buildRoutes(
   llmToken: String?,
   contextWindow: Int,
   contextWindowThreshold: Double,
-  workingDirectory: String
+  workingDirectory: String,
+  otel: OtelSettings? = nil
 ) throws -> Router<BasicRequestContext> {
   let router = Router(context: BasicRequestContext.self)
+
+  if let otel, !otel.disabled {
+    _ = PrometheusMetrics.registry
+    router.addMiddleware {
+      TracingMiddleware()
+      MetricsMiddleware()
+    }
+  }
 
   router.add(
     middleware: ShapeTreeJWTAuthMiddleware(store: authorizedKeys, replayCache: replayCache, authCache: authCache))
