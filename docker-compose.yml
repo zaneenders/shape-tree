@@ -19,6 +19,20 @@ services:
       - app
       - observability
 
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: shape_tree
+      POSTGRES_PASSWORD: shape_tree
+      POSTGRES_DB: shape_tree
+    volumes:
+      - shape_tree_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    networks:
+      - app
+
   web:
     build:
       context: .
@@ -27,6 +41,11 @@ services:
       - apps/shape-tree-web/.env.example
     environment:
       OTEL_EXPORTER_OTLP_BASE_ENDPOINT: http://jaeger:4318
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: shape_tree
+      PGPASSWORD: shape_tree
+      PGDATABASE: shape_tree
     volumes:
       - ./apps/shape-tree-web/Examples:/Examples:ro
     ports:
@@ -35,6 +54,7 @@ services:
     restart: unless-stopped
     depends_on:
       - jaeger
+      - postgres
     networks:
       - app
       - observability

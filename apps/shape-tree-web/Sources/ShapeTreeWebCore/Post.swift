@@ -10,6 +10,7 @@ public struct Post: Sendable, Equatable, Identifiable {
   public var bodyHTML: String
   public var relativePath: String
   public var isIndex: Bool
+  public var isPrivate: Bool
 
   public var id: String { slug }
 
@@ -22,7 +23,8 @@ public struct Post: Sendable, Equatable, Identifiable {
     bodyMarkdown: String,
     bodyHTML: String,
     relativePath: String,
-    isIndex: Bool = false
+    isIndex: Bool = false,
+    isPrivate: Bool = false
   ) {
     self.slug = slug
     self.title = title
@@ -33,6 +35,7 @@ public struct Post: Sendable, Equatable, Identifiable {
     self.bodyHTML = bodyHTML
     self.relativePath = relativePath
     self.isIndex = isIndex
+    self.isPrivate = isPrivate
   }
 
   public var path: String {

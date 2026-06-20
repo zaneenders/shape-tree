@@ -106,6 +106,41 @@ import Testing
     #expect(groups.first(where: { $0.directory == "notes" })?.label == "Notes")
     #expect(groups.first(where: { $0.directory == "notes" })?.posts.count == 2)
   }
+
+  @Test func hidesPrivateDirectories() throws {
+    let temporaryDirectory = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: temporaryDirectory.appendingPathComponent("Private", isDirectory: true),
+      withIntermediateDirectories: true
+    )
+    let publicPost = "---\ntitle: Public Post\n---\nHello."
+    let privatePost = "---\ntitle: Secret Post\n---\nSecret."
+    try publicPost.write(
+      to: temporaryDirectory.appendingPathComponent("Public.md"),
+      atomically: true,
+      encoding: .utf8
+    )
+    try privatePost.write(
+      to: temporaryDirectory.appendingPathComponent("Private/Secret.md"),
+      atomically: true,
+      encoding: .utf8
+    )
+
+    let store = try ContentStore(
+      contentDirectory: temporaryDirectory,
+      privateDirectories: ["Private"]
+    )
+
+    #expect(store.posts.count == 2)
+    #expect(store.post(slug: "Public")?.isPrivate == false)
+    #expect(store.post(slug: "Secret")?.isPrivate == true)
+    #expect(store.publishedPosts.contains { $0.slug == "Public" })
+    #expect(!store.publishedPosts.contains { $0.slug == "Secret" })
+    #expect(store.publishedPostGroups.allSatisfy { $0.directory != "Private" })
+
+    try FileManager.default.removeItem(at: temporaryDirectory)
+  }
 }
 
 @Suite struct MarkdownRendererTests {

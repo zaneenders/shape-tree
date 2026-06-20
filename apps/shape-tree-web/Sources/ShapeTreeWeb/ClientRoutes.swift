@@ -6,7 +6,7 @@ import ShapeTreeWebAssets
 enum ClientRoutes {
   private static let basePath = "assets/client"
 
-  static func register(on router: Router<BasicRequestContext>) {
+  static func register<Context: RequestContext>(on router: Router<Context>) {
     guard ClientAssetCatalog.isAvailable else { return }
 
     for relativePath in [
@@ -48,7 +48,9 @@ enum ClientRoutes {
     }
   }
 
-  private static func cachedResponse(entry: ClientAssetCatalog.Entry, contentType: String, body: ByteBuffer) -> Response {
+  private static func cachedResponse(
+    entry: ClientAssetCatalog.Entry, contentType: String, body: ByteBuffer
+  ) -> Response {
     let cacheControl: String
     switch entry {
     case .wasm:

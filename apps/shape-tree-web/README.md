@@ -31,6 +31,25 @@ Environment variables (all required):
 
 `.env.example` includes sample values for local development (`127.0.0.1`, `42069`, `Examples/content`).
 
+### Optional: email login and private directories
+
+To enable passwordless email login for protected content, set all `PG*` variables and run with the included `postgres` service (see `docker-compose.yml`). SMTP settings are required to actually send login links; without them the server logs each login link but does not send email.
+
+| Variable | Purpose |
+|----------|---------|
+| `SITE_URL` | Public URL used in login links (defaults to `http://HOST:PORT`) |
+| `AUTH_PRIVATE_DIRECTORIES` | Comma-separated content directories to protect (e.g. `Private,Notes/Secret`) |
+| `PGHOST` / `PGPORT` / `PGUSER` / `PGPASSWORD` / `PGDATABASE` | Postgres connection |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM` | SMTP relay for login links |
+
+Add allowed users with:
+
+```bash
+swift run ShapeTreeWeb --add-user user@example.com
+```
+
+Posts inside a private directory are hidden from navigation and require signing in to view.
+
 
 Markdown files support `---` front matter (`title`, `date`, `tags`, `excerpt`). An `index.md` file becomes the home page. Other files are listed as posts sorted by date. Files in subdirectories are grouped in navigation and on the index. Sample content lives in `Examples/content/`.
 
