@@ -2,6 +2,7 @@ import Configuration
 import Foundation
 import Hummingbird
 import Logging
+import NIOCore
 
 @main
 enum ShapeTree {
@@ -17,6 +18,8 @@ enum ShapeTree {
 
     let host = try config.requiredString(forKey: "HOST")
     let port = try config.requiredInt(forKey: "PORT")
+    let adminHost = try config.requiredString(forKey: "ADMIN_HOST")
+    let adminPort = try config.requiredInt(forKey: "ADMIN_PORT")
     let dataPathRaw = try config.requiredString(forKey: "DATA_PATH")
     let ollamaURL = try config.requiredString(forKey: "OLLAMA_URL")
     let ollamaToken = try config.requiredString(forKey: "OLLAMA_TOKEN")
@@ -26,6 +29,7 @@ enum ShapeTree {
     let contextWindowThreshold = try config.requiredDouble(forKey: "AGENT_CONTEXT_WINDOW_THRESHOLD")
     let journalCommitFallbackName = try config.requiredString(forKey: "JOURNAL_COMMIT_AUTHOR_NAME")
     let journalCommitFallbackEmail = try config.requiredString(forKey: "JOURNAL_COMMIT_AUTHOR_EMAIL")
+    let otel = try OtelSettings.load(from: config)
 
     let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
     let resolvedDataRoot = ShapeTreeDataLayout.resolveDataRoot(rawPath: dataPathRaw, cwd: cwd)
@@ -57,25 +61,47 @@ enum ShapeTree {
       llmToken: ollamaToken,
       contextWindow: contextWindow,
       contextWindowThreshold: contextWindowThreshold,
-      workingDirectory: resolvedDataRoot.path
+      workingDirectory: resolvedDataRoot.path,
+      otel: otel
     )
 
-    let app = Application(
+    var app = Application(
       router: router,
-      configuration: .init(address: .hostname(host, port: port)))
+      configuration: .init(
+        address: .hostname(host, port: port),
+        serverName: "ShapeTree"
+      ),
+      logger: log
+    )
 
-    log.info(
+    _ = PrometheusMetrics.registry
+
+    let adminApp = buildAdminApplication(
+      host: adminHost,
+      port: adminPort,
+      serviceName: otel.serviceName,
+      logger: app.logger
+    )
+    app.addServices(adminApp)
+
+    if !otel.disabled {
+      app.addServices(try OtelTracing.bootstrap(settings: otel, logger: app.logger))
+    }
+
+    app.logger.info(
       """
       event=server.start \
       address=\(host):\(port) \
+      admin=\(adminHost):\(adminPort) \
       data_root=\(layout.dataRoot.path) \
       authorized_keys=\(layout.authorizedKeysDirectory.path) \
       ollama=\(ollamaURL) \
-      model=\(agentModel)
+      model=\(agentModel) \
+      otel_disabled=\(otel.disabled)
       """)
 
     if host == "0.0.0.0" {
-      log.warning(
+      app.logger.warning(
         """
         event=server.lan_bind_warning \
         message="server.host=0.0.0.0 exposes the listener on every interface; \

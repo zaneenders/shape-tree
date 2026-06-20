@@ -15,6 +15,10 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-markdown.git", from: "0.7.0"),
     .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.24.0"),
     .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0"),
+    .package(url: "https://github.com/apple/swift-metrics.git", from: "2.5.0"),
+    .package(url: "https://github.com/swift-server/swift-prometheus.git", from: "2.0.0"),
+    .package(
+      url: "https://github.com/swift-otel/swift-otel.git", exact: "1.2.1", traits: ["OTLPHTTP"]),
   ],
   targets: [
     .target(
@@ -37,6 +41,9 @@ let package = Package(
         .product(name: "HTMXExtras", package: "Lorikeet"),
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "Configuration", package: "swift-configuration"),
+        .product(name: "Metrics", package: "swift-metrics"),
+        .product(name: "Prometheus", package: "swift-prometheus"),
+        .product(name: "OTel", package: "swift-otel"),
       ],
       swiftSettings: [
         .swiftLanguageMode(.v6),

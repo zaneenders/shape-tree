@@ -3,12 +3,14 @@ import Foundation
 import HTML
 import HTMX
 import Hummingbird
+import Logging
 import NIOCore
 import ShapeTreeWebCore
 
 @main
 enum ShapeTreeWeb {
   static func main() async throws {
+    let log = Logger(label: "shape-tree-web.server")
     let config = ConfigReader(providers: [
       EnvironmentVariablesProvider(),
       try await EnvironmentVariablesProvider(
@@ -16,10 +18,14 @@ enum ShapeTreeWeb {
         allowMissing: true
       ),
     ])
+
     let host = try config.requiredString(forKey: "HOST")
     let port = try config.requiredInt(forKey: "PORT")
+    let adminHost = try config.requiredString(forKey: "ADMIN_HOST")
+    let adminPort = try config.requiredInt(forKey: "ADMIN_PORT")
     let contentPath = try config.requiredString(forKey: "CONTENT_PATH")
     let indexSlug = try config.requiredString(forKey: "INDEX_SLUG")
+    let otel = try OtelSettings.load(from: config)
 
     let contentURL = URL(
       fileURLWithPath: contentPath, relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
@@ -27,6 +33,14 @@ enum ShapeTreeWeb {
     let initial = store.indexPost ?? store.publishedPosts.first ?? fallbackIndexPost(slug: indexSlug)
 
     let router = Router()
+    if !otel.disabled {
+      _ = PrometheusMetrics.registry
+      router.addMiddleware {
+        TracingMiddleware()
+        MetricsMiddleware()
+      }
+    }
+
     router.get { _, _ in
       WebPages.shell(store: store, initial: initial).makeHTMLResponse()
     }
@@ -63,15 +77,31 @@ enum ShapeTreeWeb {
 
     ClientRoutes.register(on: router)
 
-    let app = Application(
+    var app = Application(
       router: router,
       configuration: .init(
         address: .hostname(host, port: port),
         serverName: "ShapeTreeWeb"
-      )
+      ),
+      logger: log
     )
+
+    let adminApp = buildAdminApplication(
+      host: adminHost,
+      port: adminPort,
+      serviceName: otel.serviceName,
+      logger: app.logger
+    )
+    app.addServices(adminApp)
+
+    if !otel.disabled {
+      app.addServices(try OtelTracing.bootstrap(settings: otel, logger: app.logger))
+    }
+
     app.logger.info("Serving \(store.posts.count) markdown file(s) from \(contentURL.path)")
     app.logger.info("Listening on http://\(host):\(port)")
+    app.logger.info("Admin server listening on http://\(adminHost):\(adminPort)")
+    app.logger.info("OpenTelemetry disabled=\(otel.disabled)")
 
     try await app.runService()
   }
