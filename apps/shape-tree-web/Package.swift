@@ -60,9 +60,7 @@ let package = Package(
       name: "ShapeTreeWebAuth",
       dependencies: [
         "ShapeTreeWebCore",
-        "ShapeTreeWebAssets",
         "ShapeTreeWebEmail",
-        .product(name: "HTML", package: "Lorikeet"),
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "HummingbirdAuth", package: "hummingbird-auth"),
         .product(name: "PostgresNIO", package: "postgres-nio"),

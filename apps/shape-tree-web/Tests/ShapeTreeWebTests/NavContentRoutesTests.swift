@@ -50,6 +50,7 @@ import Testing
         #expect(payload.siteTitle == "ShapeTree Web")
         #expect(payload.viewer.isAuthenticated == false)
         #expect(payload.signIn?.href == "/login")
+        #expect(payload.signIn?.spa == true)
         #expect(payload.home.slug == "Home")
         #expect(payload.groups.flatMap(\.items).contains { $0.slug == "style-guide" })
       }

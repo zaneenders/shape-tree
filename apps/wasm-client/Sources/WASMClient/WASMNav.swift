@@ -44,6 +44,14 @@ private func registerListeners(on document: JSValue) {
       return .undefined
     }
 
+    if let loginLink = target.closest!("a.nav-login-link").object {
+      _ = event.preventDefault?()
+      WASMNav.log("login nav link")
+      loadLogin(next: nil, pushState: true)
+      closeAll(in: document)
+      return .undefined
+    }
+
     if let wasmLink = target.closest!("a.nav-wasm-link").object {
       _ = event.preventDefault?()
       if let slug = wasmDataset(wasmLink, key: "wasmSlug") {

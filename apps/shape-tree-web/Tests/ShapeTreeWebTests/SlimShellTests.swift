@@ -62,4 +62,72 @@ import Testing
     #expect(html.contains("<main id=\"main\"></main>"))
     #expect(!html.contains("<h1>404</h1>"))
   }
+
+  @Test func loginShellBootsClientSideLogin() throws {
+    let contentDir = FileManager.default.temporaryDirectory
+      .appendingPathComponent("slim-shell-login-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: contentDir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: contentDir) }
+
+    try "---\ntitle: Home\n---\n".write(
+      to: contentDir.appendingPathComponent("Home.md"),
+      atomically: true,
+      encoding: .utf8
+    )
+
+    let store = try ContentStore(
+      contentDirectory: contentDir,
+      indexSlug: "Home",
+      loginSlug: "login"
+    )
+
+    let html = WebPages.shell(
+      store: store,
+      homeSlug: "Home",
+      documentTitle: "Sign in · \(store.siteTitle)",
+      bootLogin: true,
+      loginNext: "/posts/secret"
+    ).render()
+
+    #expect(html.contains("data-boot-login=\"true\""))
+    #expect(html.contains("data-login-next=\"/posts/secret\""))
+    #expect(html.contains("<main id=\"main\"></main>"))
+    #expect(!html.contains("Send link"))
+  }
+
+  @Test func verifyShellBootsClientSideConfirm() throws {
+    let contentDir = FileManager.default.temporaryDirectory
+      .appendingPathComponent("slim-shell-verify-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: contentDir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: contentDir) }
+
+    try "---\ntitle: Home\n---\n".write(
+      to: contentDir.appendingPathComponent("Home.md"),
+      atomically: true,
+      encoding: .utf8
+    )
+
+    let store = try ContentStore(
+      contentDirectory: contentDir,
+      indexSlug: "Home",
+      loginSlug: "login"
+    )
+
+    let html = WebPages.shell(
+      store: store,
+      homeSlug: "Home",
+      documentTitle: "Confirm sign in · \(store.siteTitle)",
+      bootVerify: true,
+      verifyToken: "test-token",
+      verifyNext: "/posts/secret"
+    ).render()
+
+    #expect(html.contains("data-boot-verify=\"true\""))
+    #expect(html.contains("data-verify-token=\"test-token\""))
+    #expect(html.contains("data-verify-next=\"/posts/secret\""))
+    #expect(html.contains("/assets/client/bootstrap.js"))
+    #expect(html.contains("<main id=\"main\"></main>"))
+    #expect(!html.contains("<h1>Confirm sign in</h1>"))
+    #expect(!html.contains("auth.css"))
+  }
 }

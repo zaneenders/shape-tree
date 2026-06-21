@@ -171,8 +171,9 @@ struct LoginFlowIntegrationTests: ~Copyable {
           body: ByteBuffer(string: loginBody)
         ) { response in
           #expect(response.status == .ok)
+          #expect(response.headers[.contentType] == "application/json; charset=utf-8")
           let body = String(buffer: response.body)
-          #expect(body.contains("Check your email"))
+          #expect(body.contains("\"ok\":true"))
         }
 
         // 4. Poll IMAP for the login email and extract the token.
@@ -200,14 +201,16 @@ struct LoginFlowIntegrationTests: ~Copyable {
           return
         }
 
-        // 5. GET /auth/verify shows the confirm page.
+        // 5. GET /auth/verify returns the slim shell with token for client-side confirm UI.
         try await client.execute(
           uri: "/auth/verify?token=\(rawToken)&next=/posts/\(secretSlug)",
           method: .get
         ) { response in
           #expect(response.status == .ok)
           let body = String(buffer: response.body)
-          #expect(body.contains("Confirm sign in"))
+          #expect(body.contains("data-boot-verify=\"true\""))
+          #expect(body.contains("data-verify-token=\"\(rawToken)\""))
+          #expect(body.contains("/assets/client/bootstrap.js"))
         }
 
         // 6. POST /auth/verify with token.
@@ -217,12 +220,15 @@ struct LoginFlowIntegrationTests: ~Copyable {
           uri: "/auth/verify",
           method: .post,
           headers: [
-            .contentType: "application/x-www-form-urlencoded"
+            .contentType: "application/x-www-form-urlencoded",
+            .accept: "application/json",
           ],
           body: ByteBuffer(string: verifyBody)
         ) { response in
-          #expect(response.status == .seeOther)
-          #expect(response.headers[.location] == "/posts/\(secretSlug)")
+          #expect(response.status == .ok)
+          #expect(response.headers[.contentType] == "application/json; charset=utf-8")
+          let body = String(buffer: response.body)
+          #expect(body.contains("/posts/\(secretSlug)?signed-in=1"))
           if let setCookie = response.headers[.setCookie] {
             sessionCookie = Self.parseSessionCookie(setCookie)
           }

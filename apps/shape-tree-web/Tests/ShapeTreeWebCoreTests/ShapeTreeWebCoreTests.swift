@@ -237,6 +237,7 @@ import Testing
     #expect(response.viewer.email == nil)
     #expect(response.signIn?.href == "/login")
     #expect(response.signIn?.label == "Sign in")
+    #expect(response.signIn?.spa == true)
     #expect(!response.groups.contains { $0.directory == "Private" })
     #expect(response.groups.flatMap(\.items).contains { $0.slug == "Public" })
     #expect(!response.groups.flatMap(\.items).contains { $0.slug == "Secret" })
@@ -321,6 +322,65 @@ import Testing
       privateDirectories: ["Private"]
     )
     return (store, temporaryDirectory)
+  }
+}
+
+@Suite struct LoginContentResponseTests {
+  @Test func stripsLoginPlaceholderFromBody() throws {
+    let contentDir = FileManager.default.temporaryDirectory
+      .appendingPathComponent("login-content-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: contentDir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: contentDir) }
+
+    try """
+    ---
+    title: Sign in
+    ---
+    Welcome back.
+
+    {{login}}
+    """.write(to: contentDir.appendingPathComponent("login.md"), atomically: true, encoding: .utf8)
+
+    try "---\ntitle: Home\n---\n".write(
+      to: contentDir.appendingPathComponent("Home.md"),
+      atomically: true,
+      encoding: .utf8
+    )
+
+    let store = try ContentStore(
+      contentDirectory: contentDir,
+      indexSlug: "Home",
+      loginSlug: "login"
+    )
+
+    let response = store.loginContentResponse(next: "/posts/secret")
+    #expect(response.title == "Sign in")
+    #expect(response.next == "/posts/secret")
+    #expect(!response.bodyHTML.contains("{{login}}"))
+    #expect(response.bodyHTML.contains("Welcome back"))
+  }
+
+  @Test func fallbackWhenNoLoginPost() throws {
+    let contentDir = FileManager.default.temporaryDirectory
+      .appendingPathComponent("login-fallback-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: contentDir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: contentDir) }
+
+    try "---\ntitle: Home\n---\n".write(
+      to: contentDir.appendingPathComponent("Home.md"),
+      atomically: true,
+      encoding: .utf8
+    )
+
+    let store = try ContentStore(
+      contentDirectory: contentDir,
+      indexSlug: "Home",
+      loginSlug: "login"
+    )
+
+    let response = store.loginContentResponse(next: nil)
+    #expect(response.title == "Sign in")
+    #expect(response.bodyHTML.contains("Enter your email"))
   }
 }
 

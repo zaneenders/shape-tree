@@ -12,7 +12,12 @@ enum WebPages {
     homeSlug: String,
     documentTitle: String? = nil,
     wasmBoot: (slug: String, title: String)? = nil,
-    bootNotFound: Bool = false
+    bootNotFound: Bool = false,
+    bootLogin: Bool = false,
+    loginNext: String? = nil,
+    bootVerify: Bool = false,
+    verifyToken: String? = nil,
+    verifyNext: String? = nil
   ) -> HTML {
     var bodyAttrs: [HTMLAttr] = []
     bodyAttrs.append(.flag("data-home-slug=\"\(htmlAttrEscape(homeSlug))\""))
@@ -24,6 +29,21 @@ enum WebPages {
     }
     if bootNotFound {
       bodyAttrs.append(.flag("data-boot-not-found=\"true\""))
+    }
+    if bootLogin {
+      bodyAttrs.append(.flag("data-boot-login=\"true\""))
+      if let loginNext, !loginNext.isEmpty {
+        bodyAttrs.append(.flag("data-login-next=\"\(htmlAttrEscape(loginNext))\""))
+      }
+    }
+    if bootVerify {
+      bodyAttrs.append(.flag("data-boot-verify=\"true\""))
+      if let verifyToken, !verifyToken.isEmpty {
+        bodyAttrs.append(.flag("data-verify-token=\"\(htmlAttrEscape(verifyToken))\""))
+      }
+      if let verifyNext, !verifyNext.isEmpty {
+        bodyAttrs.append(.flag("data-verify-next=\"\(htmlAttrEscape(verifyNext))\""))
+      }
     }
 
     let titleText = documentTitle ?? store.siteTitle

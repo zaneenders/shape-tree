@@ -55,17 +55,12 @@ package enum AuthRoutes {
     to router: Router<C>,
     auth: AuthServices,
     rateLimiter: LoginRateLimiter,
-    siteTitle: String,
-    loginPost: Post? = nil
+    spaLoginPage: @Sendable @escaping (String?) -> Response,
+    spaVerifyPage: @Sendable @escaping (String?, String?) -> Response
   ) where C.Identity == User, C.Session == UUID {
     router.get("login") { request, _ in
       let next = request.uri.queryParameters.get("next")
-      return AuthPages.login(
-        next: next,
-        siteURL: auth.siteURL,
-        siteTitle: siteTitle,
-        loginPost: loginPost
-      )
+      return spaLoginPage(next)
     }
 
     router.post("auth/login") { request, context async throws -> Response in
@@ -76,12 +71,12 @@ package enum AuthRoutes {
 
       guard let email = AuthEmail.validatedEmail(fields["email"] ?? "") else {
         context.logger.warning("Rejected malformed login email from \(ip)")
-        return AuthPages.checkEmail(siteURL: auth.siteURL, siteTitle: siteTitle)
+        return loginSubmittedJSON()
       }
 
       guard await rateLimiter.allow(ip: ip) else {
         context.logger.warning("Login rate limited for \(email) from \(ip)")
-        return AuthPages.checkEmail(siteURL: auth.siteURL, siteTitle: siteTitle)
+        return loginSubmittedJSON()
       }
 
       let (rawToken, tokenHash) = LoginTokenService.generate()
@@ -106,27 +101,20 @@ package enum AuthRoutes {
         }
       }
 
-      return AuthPages.checkEmail(siteURL: auth.siteURL, siteTitle: siteTitle)
+      return loginSubmittedJSON()
     }
 
     router.get("auth/verify") { request, _ async -> Response in
-      guard let token = request.uri.queryParameters.get("token"), !token.isEmpty else {
-        return AuthPages.verifyFailed(siteURL: auth.siteURL, siteTitle: siteTitle)
-      }
+      let token = request.uri.queryParameters.get("token")
       let next = AuthEmail.safeNextPath(request.uri.queryParameters.get("next"))
-      return AuthPages.verifyConfirm(
-        token: token,
-        next: next,
-        siteURL: auth.siteURL,
-        siteTitle: siteTitle
-      )
+      return spaVerifyPage(token, next)
     }
 
     router.post("auth/verify") { request, context async throws -> Response in
       let body = try await request.body.collect(upTo: 16 * 1024)
       let fields = FormParser.parseURLForm(String(buffer: body))
       guard let rawToken = fields["token"], !rawToken.isEmpty else {
-        return AuthPages.verifyFailed(siteURL: auth.siteURL, siteTitle: siteTitle)
+        return verifyFailedJSON()
       }
 
       let tokenHash = LoginTokenService.hash(rawToken)
@@ -134,16 +122,14 @@ package enum AuthRoutes {
         let userID = try await auth.database.consumeLoginToken(hash: tokenHash, logger: context.logger),
         let user = try await auth.database.user(id: userID, logger: context.logger)
       else {
-        return AuthPages.verifyFailed(siteURL: auth.siteURL, siteTitle: siteTitle)
+        return verifyFailedJSON()
       }
 
       context.sessions.setSession(user.id, expiresIn: auth.settings.sessionTTL)
 
-      let redirect = AuthEmail.safeNextPath(fields["next"]) ?? "/"
-      return Response(
-        status: .seeOther,
-        headers: [.location: redirect],
-        body: .init())
+      let next = AuthEmail.safeNextPath(fields["next"]) ?? "/"
+      let redirect = AuthEmail.signedInRedirect(to: next)
+      return verifySuccessJSON(redirect: redirect)
     }
 
     router.post("auth/logout") { _, context async throws -> Response in
@@ -181,6 +167,37 @@ package enum AuthRoutes {
         """
     )
     try await SMTPClient.send(email: email, settings: smtp.connection)
+  }
+
+  private static func loginSubmittedJSON() -> Response {
+    Response(
+      status: .ok,
+      headers: [
+        .contentType: "application/json; charset=utf-8",
+        .cacheControl: "private, no-store",
+      ],
+      body: .init(byteBuffer: ByteBuffer(string: "{\"ok\":true}"))
+    )
+  }
+
+  private static func verifySuccessJSON(redirect: String) -> Response {
+    let payload = (try? JSONEncoder().encode(["redirect": redirect])) ?? Data("{\"redirect\":\"/\"}".utf8)
+    return Response(
+      status: .ok,
+      headers: [
+        .contentType: "application/json; charset=utf-8",
+        .cacheControl: "private, no-store",
+      ],
+      body: .init(byteBuffer: ByteBuffer(data: payload))
+    )
+  }
+
+  private static func verifyFailedJSON() -> Response {
+    Response(
+      status: .badRequest,
+      headers: [.contentType: "application/json; charset=utf-8"],
+      body: .init(byteBuffer: ByteBuffer(string: "{\"failed\":true}"))
+    )
   }
 
 }

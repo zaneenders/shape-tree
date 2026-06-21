@@ -86,11 +86,33 @@ extension ShapeTreeWeb {
       to: router,
       auth: auth,
       rateLimiter: rateLimiter,
-      siteTitle: store.siteTitle,
-      loginPost: store.loginPost
+      spaLoginPage: { next in
+        let safeNext = AuthEmail.safeNextPath(next)
+        return WebPages.shell(
+          store: store,
+          homeSlug: homeSlug,
+          documentTitle: "Sign in · \(store.siteTitle)",
+          bootLogin: true,
+          loginNext: safeNext
+        ).makeHTMLResponse()
+      },
+      spaVerifyPage: { token, next in
+        let verifyToken = token.flatMap { $0.isEmpty ? nil : $0 }
+        return WebPages.shell(
+          store: store,
+          homeSlug: homeSlug,
+          documentTitle: verifyToken == nil
+            ? "Sign in failed · \(store.siteTitle)"
+            : "Confirm sign in · \(store.siteTitle)",
+          bootVerify: true,
+          verifyToken: verifyToken,
+          verifyNext: next
+        ).makeHTMLResponse()
+      }
     )
 
     NavContentRoutes.register(on: router, store: store)
+    LoginContentRoutes.register(on: router, store: store)
 
     WasmPostRoutes.register(on: router, store: store, homeSlug: homeSlug)
 

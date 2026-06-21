@@ -39,6 +39,9 @@ enum WasmPostRoutes {
     else {
       throw HTTPError(.notFound)
     }
+    if post.isLogin {
+      throw HTTPError(.notFound)
+    }
     guard let wasm = PostWasmAsset.wasm(forSlug: post.slug) else {
       throw HTTPError(.notFound)
     }
@@ -70,6 +73,20 @@ enum WasmPostRoutes {
         )
       }
       return WebPages.notFoundResponse(store: store, homeSlug: homeSlug)
+    }
+    if post.isLogin {
+      let location = "/login"
+      if head {
+        return Response(
+          status: .seeOther,
+          headers: [.location: location],
+          body: .init(byteBuffer: ByteBuffer())
+        )
+      }
+      return Response(
+        status: .seeOther,
+        headers: [.location: location],
+        body: .init())
     }
     if head {
       return Response(

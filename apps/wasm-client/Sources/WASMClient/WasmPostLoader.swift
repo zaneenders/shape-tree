@@ -26,3 +26,17 @@ func loadWasmPost(slug: String, title: String?, pushState: Bool, path: String?) 
     JSValue.object(options)
   )
 }
+
+func loadLogin(next: String?, pushState: Bool) {
+  guard let shapeTree = JSObject.global.shapeTree.object else {
+    WASMNav.log("shapeTree.loadLogin unavailable")
+    return
+  }
+
+  let options = JSObject()
+  options.pushState = .boolean(pushState)
+  if let next {
+    options.next = .string(JSString(next))
+  }
+  _ = shapeTree.loadLogin!(JSValue.object(options))
+}

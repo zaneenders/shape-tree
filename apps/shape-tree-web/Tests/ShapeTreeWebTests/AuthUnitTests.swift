@@ -116,6 +116,12 @@ import Testing
   @Test func safeNextPathRejectsEmpty() {
     #expect(AuthEmail.safeNextPath("") == nil)
   }
+
+  @Test func signedInRedirectAppendsQueryParam() {
+    #expect(AuthEmail.signedInRedirect(to: "/") == "/?signed-in=1")
+    #expect(AuthEmail.signedInRedirect(to: "/posts/secret") == "/posts/secret?signed-in=1")
+    #expect(AuthEmail.signedInRedirect(to: "/posts/secret?foo=bar") == "/posts/secret?foo=bar&signed-in=1")
+  }
 }
 
 @Suite struct SMTPMessageEncodingTests {

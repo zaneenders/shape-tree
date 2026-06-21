@@ -43,10 +43,13 @@ public struct NavContentGroup: Codable, Sendable, Equatable {
 public struct NavSignInAction: Codable, Sendable, Equatable {
   public var href: String
   public var label: String
+  /// When true, the client loads sign-in in `#main` instead of a full navigation.
+  public var spa: Bool
 
-  public init(href: String, label: String) {
+  public init(href: String, label: String, spa: Bool = true) {
     self.href = href
     self.label = label
+    self.spa = spa
   }
 }
 
