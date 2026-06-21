@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Build configuration: "debug" or "release"
+BUILD_CONFIG="debug"
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Pick the Swift static-Linux SDK matching the host arch so the resulting
@@ -9,12 +12,12 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # inside swift-otel's HTTP client init.
 HOST_ARCH="$(uname -m)"
 case "$HOST_ARCH" in
-  arm64|aarch64) SDK="aarch64-swift-linux-musl" ;;
-  x86_64)        SDK="x86_64-swift-linux-musl" ;;
-  *)
-    echo "Unsupported host arch: $HOST_ARCH" >&2
-    exit 1
-    ;;
+arm64 | aarch64) SDK="aarch64-swift-linux-musl" ;;
+x86_64) SDK="x86_64-swift-linux-musl" ;;
+*)
+  echo "Unsupported host arch: $HOST_ARCH" >&2
+  exit 1
+  ;;
 esac
 
 if ! swift sdk list 2>/dev/null | grep -q "static-linux"; then
@@ -33,17 +36,21 @@ if [[ -f Scripts/build-client.sh ]]; then
 fi
 
 echo "=== Building ShapeTreeWeb (Linux) ==="
-swift build -c release --swift-sdk "$SDK" --product ShapeTreeWeb
+swift build -c "$BUILD_CONFIG" --swift-sdk "$SDK" --product ShapeTreeWeb
 
 echo "=== Building ShapeTree API (Linux) ==="
 cd "$ROOT/apps/shape-tree-api"
-swift build -c release --swift-sdk "$SDK" --product ShapeTree
+swift build -c "$BUILD_CONFIG" --swift-sdk "$SDK" --product ShapeTree
 
 cd "$ROOT"
 # The Dockerfiles auto-select the binary matching the build arch via BuildKit's
 # TARGETARCH (defaults to the host arch). No per-arch build args needed.
-echo "=== docker compose build (arch: $HOST_ARCH) ==="
-docker compose build
+echo "=== docker compose build (arch: $HOST_ARCH, config: $BUILD_CONFIG) ==="
+docker compose build --build-arg "BUILD_CONFIG=$BUILD_CONFIG"
+
+if [[ "${1:-}" == "up" ]]; then
+  exec docker compose up "${@:2}"
+fi
 
 echo ""
-echo "Built. Next:  docker compose up -d"
+echo "Built. Next:  ./scripts/docker-build.sh up"

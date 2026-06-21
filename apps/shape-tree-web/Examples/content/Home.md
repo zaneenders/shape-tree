@@ -7,3 +7,5 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. This demo site is built
 Set `CONTENT_PATH` to any folder of `.md` files. Subdirectories become navigation groups and index sections.
 
 Start with the **Style Guide** for typography, links, lists, code, and blockquotes.
+
+Members can [sign in](/login) to view private posts.

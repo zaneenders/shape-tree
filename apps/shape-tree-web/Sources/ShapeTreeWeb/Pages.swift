@@ -7,27 +7,23 @@ import ShapeTreeWebCore
 
 enum WebPages {
   static func shell(store: ContentStore, initial: Post) -> HTML {
-    HTML.tag(.html) {
-      HTML.tag(.head) {
-        HTML.raw(#"<meta charset="utf-8">"#)
-        HTML.void(.meta, attrs: [.name("viewport"), .content("width=device-width, initial-scale=1")])
-        HTML.tag(.title) { pageTitle(for: initial, siteTitle: store.siteTitle) }
-        HTML.raw("<style hx-preserve=\"true\">\n\(site_css)\n</style>")
-        HTML.raw("<script hx-preserve=\"true\">\n\(htmx_min_js)\n</script>")
-        HTML.raw("<script hx-preserve=\"true\">\n\(htmx_head_support)\n</script>")
-        navClientScript()
-      }
-      HTML.tag(.body, attrs: [.hxExt("head-support")]) {
-        HTMX.Attributes.lazyNavShell(get: "/htmx/content/nav")
-        HTML.raw(#"<div id="htmx-loading" class="htmx-indicator" aria-live="polite">Loading…</div>"#)
-        HTML.tag(.main, attrs: [.id("main")]) {
-          pageArticle(for: initial)
-        }
+    document(bodyAttrs: [.hxExt("head-support")]) {
+      meta(attrs: [.charset("utf-8"), .name("viewport"), .content("width=device-width, initial-scale=1")])
+      HTML.tag(.title) { pageTitle(for: initial, siteTitle: store.siteTitle) }
+      style(attrs: [.hxPreserve]) { HTML.raw(site_css) }
+      script(attrs: [.hxPreserve]) { HTML.raw(htmx_min_js) }
+      script(attrs: [.hxPreserve]) { HTML.raw(htmx_head_support) }
+      navClientScript()
+    } body: {
+      HTMX.Attributes.lazyNavShell(get: "/htmx/content/nav")
+      div(attrs: [.id("htmx-loading"), .class("htmx-indicator"), .ariaLive("polite")]) { "Loading…" }
+      main(attrs: [.id("main")]) {
+        pageArticle(for: initial)
       }
     }
   }
 
-  static func navigation(store: ContentStore) -> HTML {
+  static func navigation(store: ContentStore, isAuthenticated: Bool = false) -> HTML {
     var items: [HTML] = [
       NavHTML.leaf(
         href: "/",
@@ -37,7 +33,13 @@ enum WebPages {
       )
     ]
 
-    for group in store.publishedPostGroups {
+    if !isAuthenticated {
+      items.append(
+        NavHTML.leaf(href: "/login", name: "Sign in")
+      )
+    }
+
+    for group in store.postGroups(includingPrivate: isAuthenticated) {
       if let directory = group.directory {
         let branchItems = group.posts.map { post in
           NavHTML.leaf(
@@ -89,7 +91,7 @@ enum WebPages {
   private static func indexArticle(bodyHTML: String) -> HTML {
     article {
       if !bodyHTML.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-        HTML.tag(.div, attrs: [.class("post-body")]) {
+        div(attrs: [.class("post-body")]) {
           HTML.raw(bodyHTML)
         }
       }
@@ -108,48 +110,46 @@ enum WebPages {
   private static func postArticle(_ post: Post) -> HTML {
     article {
       h1 { post.title }
-      HTML.tag(.p, attrs: [.class("post-meta")]) {
+      p(attrs: [.class("post-meta")]) {
         DateFormatting.displayString(from: post.date)
       }
       if !post.tags.isEmpty {
-        HTML.tag(.ul, attrs: [.class("post-tags")]) {
-          HTML.fragment(
-            post.tags.map { tag in
-              HTML.tag(.li, attrs: [.class("post-tag")]) { tag }
-            }
-          )
+        ul(attrs: [.class("post-tags")]) {
+          for tag in post.tags {
+            li(attrs: [.class("post-tag")]) { tag }
+          }
         }
       }
-      HTML.tag(.div, attrs: [.class("post-body")]) {
+      div(attrs: [.class("post-body")]) {
         HTML.raw(post.bodyHTML)
       }
     }
   }
 
   private static func navClientScript() -> HTML {
-    HTML.raw(
-      """
-      <script type="module" hx-preserve="true">
-      import { init } from "/assets/client/index.js";
+    script(attrs: [.type("module"), .hxPreserve]) {
+      HTML.raw(
+        """
+        import { init } from "/assets/client/index.js";
 
-      if (!window.__shapeTreeNavDismiss) {
-        window.__shapeTreeNavDismiss = true;
+        if (!window.__shapeTreeNavDismiss) {
+          window.__shapeTreeNavDismiss = true;
 
-        async function start() {
-          await init({
-            module: fetch("/assets/client/WASMClient.wasm", { cache: "no-store" }),
-          });
+          async function start() {
+            await init({
+              module: fetch("/assets/client/WASMClient.wasm", { cache: "no-store" }),
+            });
+          }
+
+          if (document.body) {
+            void start();
+          } else {
+            document.addEventListener("DOMContentLoaded", () => { void start(); });
+          }
         }
-
-        if (document.body) {
-          void start();
-        } else {
-          document.addEventListener("DOMContentLoaded", () => { void start(); });
-        }
-      }
-      </script>
-      """
-    )
+        """
+      )
+    }
   }
 
   private static func pageTitle(for post: Post, siteTitle: String) -> String {

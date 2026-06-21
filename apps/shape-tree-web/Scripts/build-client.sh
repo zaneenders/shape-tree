@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-CLIENT="$ROOT/WASMClient"
+CLIENT="$ROOT/../wasm-client"
 ASSETS="$ROOT/Sources/ShapeTreeWebAssets"
 OUT_JS="$ASSETS/client"
 BUILD_DIR="$CLIENT/.build/js"
@@ -20,7 +20,7 @@ if ! command -v wasm-opt >/dev/null; then
   exit 1
 fi
 
-echo "Building WASMClient with ${SDK}..."
+echo "Building WASM client with ${SDK}..."
 rm -rf "$BUILD_DIR" "$CLIENT/.build/plugins/PackageToJS/outputs/js.tmp"
 (
   cd "$CLIENT"
