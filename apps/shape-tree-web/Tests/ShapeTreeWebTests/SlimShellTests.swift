@@ -30,6 +30,7 @@ import Testing
     #expect(html.contains("/assets/client/bootstrap.js"))
     #expect(!html.contains("htmx.org"))
     #expect(!html.contains("hx-get"))
+    #expect(html.contains("id=\"site-loading\""))
     #expect(html.contains("data-home-slug=\"Home\""))
   }
 

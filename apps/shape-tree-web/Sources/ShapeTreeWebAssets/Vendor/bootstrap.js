@@ -9,8 +9,10 @@ function readSiteTitle() {
 }
 
 function setLoading(active) {
-  const indicator = document.getElementById("htmx-loading");
-  indicator?.classList.toggle("htmx-request", active);
+  const indicator = document.getElementById("site-loading");
+  const main = document.getElementById("main");
+  indicator?.classList.toggle("is-loading", active);
+  main?.classList.toggle("is-loading", active);
 }
 
 function navBranchID(directory) {

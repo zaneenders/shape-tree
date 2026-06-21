@@ -71,28 +71,9 @@ struct PrivateWasmPostTests {
   }
 
   @Test
-  func notFoundFragmentContainsExpectedCopy() throws {
-    let contentDir = FileManager.default.temporaryDirectory
-      .appendingPathComponent("not-found-fragment-\(UUID().uuidString)", isDirectory: true)
-    try FileManager.default.createDirectory(at: contentDir, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: contentDir) }
-
-    try "---\ntitle: Home\n---\n".write(
-      to: contentDir.appendingPathComponent("Home.md"),
-      atomically: true,
-      encoding: .utf8
-    )
-
-    let store = try ContentStore(
-      contentDirectory: contentDir,
-      indexSlug: "Home",
-      loginSlug: "login",
-      privateDirectories: []
-    )
-
-    let fragment = WebPages.notFoundFragment(store: store)
-    #expect(fragment.contains("<h1>404</h1>"))
-    #expect(fragment.contains("Page not found."))
-    #expect(fragment.contains("Not Found · \(store.siteTitle)"))
+  func notFoundArticleContainsExpectedCopy() throws {
+    let html = WebPages.notFoundArticle().render()
+    #expect(html.contains("<h1>404</h1>"))
+    #expect(html.contains("Page not found."))
   }
 }

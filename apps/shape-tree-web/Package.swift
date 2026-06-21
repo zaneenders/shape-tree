@@ -84,8 +84,6 @@ let package = Package(
         "ShapeTreeWebAssets",
         "ShapeTreeWebAuth",
         .product(name: "HTML", package: "Lorikeet"),
-        .product(name: "HTMX", package: "Lorikeet"),
-        .product(name: "HTMXExtras", package: "Lorikeet"),
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "NIOCore", package: "swift-nio"),
         .product(name: "Configuration", package: "swift-configuration"),

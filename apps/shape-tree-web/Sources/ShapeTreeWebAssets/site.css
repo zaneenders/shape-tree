@@ -637,7 +637,7 @@ nav.site-nav.nav-shell:empty::after {
   }
 }
 
-/* ---- HTMX indicators ---- */
+/* ---- Loading indicator ---- */
 
 #nav-backdrop {
   position: fixed;
@@ -658,27 +658,17 @@ nav.site-nav.nav-shell:empty::after {
   transition: opacity 0.12s ease;
 }
 
-#main.htmx-swapping,
-#main.htmx-settling {
+#main.is-loading {
   opacity: 0.55;
 }
 
-#htmx-loading {
-  display: none;
-}
-
-.htmx-indicator {
+#site-loading {
   display: none;
   margin: 0.5rem 0;
   color: var(--text-color-alt);
   font-size: 0.9em;
 }
 
-.htmx-request.htmx-indicator,
-.htmx-request .htmx-indicator {
-  display: none;
-}
-
-#htmx-loading.htmx-request {
-  display: none;
+#site-loading.is-loading {
+  display: block;
 }

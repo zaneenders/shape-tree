@@ -144,22 +144,17 @@ struct LoginFlowIntegrationTests: ~Copyable {
       let app = Application(router: router)
 
       try await app.test(.router) { client in
-        let htmxHeader = HTTPField.Name("HX-Request")!
-
         // 1. Unauthenticated: private post returns 404 (hidden, not redirected).
         try await client.execute(uri: "/posts/\(secretSlug)", method: .get) { response in
           #expect(response.status == .notFound)
         }
 
         // 2. Unauthenticated: nav omits private content.
-        try await client.execute(
-          uri: "/htmx/content/nav",
-          method: .get,
-          headers: [htmxHeader: "true"]
-        ) { response in
+        try await client.execute(uri: "/api/get-nav-content", method: .get) { response in
           #expect(response.status == .ok)
           let body = String(buffer: response.body)
-          #expect(!body.contains(contentMarker))
+          let payload = try JSONDecoder().decode(NavContentResponse.self, from: Data(body.utf8))
+          #expect(!payload.groups.flatMap(\.items).contains { $0.slug == secretSlug })
         }
 
         // 3. Trigger login email.
@@ -252,13 +247,14 @@ struct LoginFlowIntegrationTests: ~Copyable {
 
         // 8. Authenticated: nav now includes private content.
         try await client.execute(
-          uri: "/htmx/content/nav",
+          uri: "/api/get-nav-content",
           method: .get,
-          headers: [htmxHeader: "true", .cookie: sessionCookie]
+          headers: [.cookie: sessionCookie]
         ) { response in
           #expect(response.status == .ok)
           let body = String(buffer: response.body)
-          #expect(body.contains(contentMarker))
+          let payload = try JSONDecoder().decode(NavContentResponse.self, from: Data(body.utf8))
+          #expect(payload.groups.flatMap(\.items).contains { $0.slug == secretSlug })
         }
       }
     }
