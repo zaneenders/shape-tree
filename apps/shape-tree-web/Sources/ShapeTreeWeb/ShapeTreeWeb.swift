@@ -3,25 +3,15 @@ import Foundation
 import HTML
 import HTMX
 import Hummingbird
-import HummingbirdAuth
 import Logging
 import NIOCore
-import PostgresNIO
+import ShapeTreeWebAuth
 import ShapeTreeWebCore
 
 @main
 enum ShapeTreeWeb {
   static func main() async throws {
     let log = Logger(label: "shape-tree-web.server")
-
-    if let addUserIndex = CommandLine.arguments.firstIndex(of: "--add-user") {
-      guard addUserIndex + 1 < CommandLine.arguments.count else {
-        log.error("Usage: ShapeTreeWeb --add-user <email>")
-        return
-      }
-      try await addUser(email: CommandLine.arguments[addUserIndex + 1], logger: log)
-      return
-    }
 
     let secretKeys = SecretsSpecifier<String, String>.specific([
       "PGPASSWORD", "SMTP_PASSWORD",
@@ -35,6 +25,16 @@ enum ShapeTreeWeb {
       ),
     ])
 
+    if let addUserIndex = CommandLine.arguments.firstIndex(of: "--add-user") {
+      guard addUserIndex + 1 < CommandLine.arguments.count else {
+        log.error("Usage: ShapeTreeWeb --add-user <email>")
+        return
+      }
+      try await AuthCLI.addUser(
+        email: CommandLine.arguments[addUserIndex + 1], logger: log)
+      return
+    }
+
     let host = try config.requiredString(forKey: "HOST")
     let port = try config.requiredInt(forKey: "PORT")
     let adminHost = try config.requiredString(forKey: "ADMIN_HOST")
@@ -47,7 +47,8 @@ enum ShapeTreeWeb {
       config.string(forKey: "AUTH_PRIVATE_DIRECTORIES")
     )
 
-    let auth = try await buildAuthServices(from: config, siteURL: siteURL, logger: log)
+    let authBundle = try await AuthServices.bootstrap(
+      from: config, siteURL: siteURL, logger: log)
 
     let contentURL = URL(
       fileURLWithPath: contentPath, relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
@@ -72,7 +73,7 @@ enum ShapeTreeWeb {
       store: store,
       initial: initial,
       indexSlug: indexSlug,
-      auth: auth.services
+      auth: authBundle.services
     )
 
     var app = Application(
@@ -91,13 +92,11 @@ enum ShapeTreeWeb {
       logger: app.logger
     )
     app.addServices(adminApp)
+    authBundle.addServices(to: &app)
 
-    app.addServices(auth.postgresClient)
     let startupLogger = app.logger
     app.beforeServerStarts {
-      try await Migrations.run(client: auth.postgresClient, logger: startupLogger)
-      try await auth.services.database.deleteExpiredLoginTokens(logger: startupLogger)
-      try await auth.persistDriver.tidyExpired()
+      try await authBundle.runStartupTasks(logger: startupLogger)
     }
 
     if !otel.disabled {
@@ -115,41 +114,6 @@ enum ShapeTreeWeb {
     try await app.runService()
   }
 
-  private static func addUser(email rawEmail: String, logger: Logger) async throws {
-    let email = AuthMiddleware.normalizedEmail(rawEmail)
-    guard email.contains("@") else {
-      logger.error("Invalid email: \(rawEmail)")
-      return
-    }
-
-    let secretKeys = SecretsSpecifier<String, String>.specific([
-      "PGPASSWORD", "SMTP_PASSWORD",
-    ])
-    let config = ConfigReader(providers: [
-      EnvironmentVariablesProvider(secretsSpecifier: secretKeys),
-      try await EnvironmentVariablesProvider(
-        environmentFilePath: ".env",
-        allowMissing: true,
-        secretsSpecifier: secretKeys
-      ),
-    ])
-
-    let postgresSettings = try PostgresSettings.load(from: config)
-    let client = PostgresClient(configuration: postgresSettings.configuration)
-    try await withThrowingTaskGroup(of: Void.self) { group in
-      group.addTask { await client.run() }
-      try await Migrations.run(client: client, logger: logger)
-      let database = PostgresAuthDatabase(client: client)
-      if let existing = try await database.user(email: email, logger: logger) {
-        logger.notice("User already exists: \(existing.email) (\(existing.id))")
-      } else {
-        let user = try await database.createUser(email: email, logger: logger)
-        logger.notice("Added user: \(user.email) (\(user.id))")
-      }
-      group.cancelAll()
-    }
-  }
-
   static func configureRouter(
     _ router: Router<AppRequestContext>,
     store: ContentStore,
@@ -158,22 +122,6 @@ enum ShapeTreeWeb {
     auth: AuthServices,
     rateLimiter: LoginRateLimiter = LoginRateLimiter()
   ) {
-    let sessionConfig = SessionMiddlewareConfiguration(
-      sessionCookieParameters: .init(
-        name: "SESSION_ID",
-        secure: auth.secureCookies,
-        sameSite: .lax
-      ),
-      defaultSessionExpiration: auth.settings.sessionTTL
-    )
-    router.addMiddleware {
-      SessionMiddleware(storage: auth.persist, configuration: sessionConfig)
-      SessionAuthenticator(context: AppRequestContext.self) {
-        (userID: UUID, context: UserRepositoryContext) async throws -> User? in
-        try await auth.database.user(id: userID, logger: context.logger)
-      }
-    }
-
     router.get { _, _ in
       WebPages.shell(store: store, initial: initial).makeHTMLResponse()
     }
@@ -237,42 +185,6 @@ enum ShapeTreeWeb {
     ClientRoutes.register(on: router)
   }
 
-  private static func buildAuthServices(
-    from config: ConfigReader,
-    siteURL: String,
-    logger: Logger
-  ) async throws -> AuthServicesBundle {
-    do {
-      let postgresSettings = try PostgresSettings.load(from: config)
-      let client = PostgresClient(configuration: postgresSettings.configuration)
-      let authSettings = AuthSettings.load(from: config)
-      let smtp = SMTPSettings.load(from: config)
-      guard let smtp else {
-        throw ShapeTreeSetupError.authSetup(
-          "SMTP is required when Postgres auth is configured. Set SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, and SMTP_FROM in .env or the environment."
-        )
-      }
-      let secureCookies = URL(string: siteURL)?.scheme == "https"
-
-      let persist = PostgresPersistDriver(client: client, logger: logger)
-      let database = PostgresAuthDatabase(client: client)
-      return AuthServicesBundle(
-        services: AuthServices(
-          database: database,
-          persist: persist,
-          settings: authSettings,
-          smtp: smtp,
-          siteURL: siteURL,
-          secureCookies: secureCookies
-        ),
-        persistDriver: persist,
-        postgresClient: client
-      )
-    } catch {
-      throw ShapeTreeSetupError.authSetup("\(error)")
-    }
-  }
-
   private static func parsePrivateDirectories(_ raw: String?) -> Set<String> {
     guard let raw else { return [] }
     let dirs = raw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
@@ -300,10 +212,4 @@ enum ShapeTreeWeb {
       isIndex: true
     )
   }
-}
-
-private struct AuthServicesBundle: Sendable {
-  let services: AuthServices
-  let persistDriver: PostgresPersistDriver
-  let postgresClient: PostgresClient
 }

@@ -1,15 +1,15 @@
 import Configuration
 import Foundation
 
-struct SMTPSettings: Sendable {
-  let connection: SMTPConnectionSettings
-  let fromAddress: String
+package struct SMTPSettings: Sendable {
+  package let connection: SMTPConnectionSettings
+  package let fromAddress: String
 
-  static func load(from config: ConfigReader) -> SMTPSettings? {
+  package static func load(from config: ConfigReader) -> SMTPSettings? {
     load(from: mergedEnvironment(config: config))
   }
 
-  static func loadFromEnvironment() -> SMTPSettings? {
+  package static func loadFromEnvironment() -> SMTPSettings? {
     load(from: mergedEnvironment())
   }
 
@@ -124,7 +124,7 @@ struct SMTPSettings: Sendable {
     return values
   }
 
-  func makeEmail(to recipient: String, subject: String, body: String) -> OutgoingEmail {
+  package func makeEmail(to recipient: String, subject: String, body: String) -> OutgoingEmail {
     OutgoingEmail(
       senderEmail: fromAddress,
       recipientEmail: recipient,
@@ -133,7 +133,7 @@ struct SMTPSettings: Sendable {
     )
   }
 
-  func makeTestEmail(to recipient: String, subject: String, body: String) -> OutgoingEmail {
+  package func makeTestEmail(to recipient: String, subject: String, body: String) -> OutgoingEmail {
     makeEmail(to: recipient, subject: subject, body: body)
   }
 }

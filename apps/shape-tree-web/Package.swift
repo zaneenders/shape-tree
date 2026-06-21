@@ -40,24 +40,56 @@ let package = Package(
         .treatAllWarnings(as: .error),
       ]
     ),
+    .target(
+      name: "ShapeTreeWebEmail",
+      dependencies: [
+        .product(name: "NIOCore", package: "swift-nio"),
+        .product(name: "NIOPosix", package: "swift-nio"),
+        .product(name: "NIOExtras", package: "swift-nio-extras"),
+        .product(name: "NIOFoundationCompat", package: "swift-nio"),
+        .product(name: "NIOIMAP", package: "swift-nio-imap"),
+        .product(name: "NIOSSL", package: "swift-nio-ssl"),
+        .product(name: "Configuration", package: "swift-configuration"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+        .treatAllWarnings(as: .error),
+      ]
+    ),
+    .target(
+      name: "ShapeTreeWebAuth",
+      dependencies: [
+        "ShapeTreeWebCore",
+        "ShapeTreeWebAssets",
+        "ShapeTreeWebEmail",
+        .product(name: "HTML", package: "Lorikeet"),
+        .product(name: "Hummingbird", package: "hummingbird"),
+        .product(name: "HummingbirdAuth", package: "hummingbird-auth"),
+        .product(name: "PostgresNIO", package: "postgres-nio"),
+        .product(name: "NIOCore", package: "swift-nio"),
+        .product(name: "NIOSSL", package: "swift-nio-ssl"),
+        .product(name: "Crypto", package: "swift-crypto"),
+        .product(name: "Configuration", package: "swift-configuration"),
+      ],
+      swiftSettings: [
+        .swiftLanguageMode(.v6),
+        .treatAllWarnings(as: .error),
+      ],
+      plugins: [
+        .plugin(name: "PostgresModelsPlugin", package: "swift-postgres-models")
+      ]
+    ),
     .executableTarget(
       name: "ShapeTreeWeb",
       dependencies: [
         "ShapeTreeWebCore",
         "ShapeTreeWebAssets",
+        "ShapeTreeWebAuth",
         .product(name: "HTML", package: "Lorikeet"),
         .product(name: "HTMX", package: "Lorikeet"),
         .product(name: "HTMXExtras", package: "Lorikeet"),
         .product(name: "Hummingbird", package: "hummingbird"),
-        .product(name: "HummingbirdAuth", package: "hummingbird-auth"),
-        .product(name: "PostgresNIO", package: "postgres-nio"),
         .product(name: "NIOCore", package: "swift-nio"),
-        .product(name: "NIOPosix", package: "swift-nio"),
-        .product(name: "NIOExtras", package: "swift-nio-extras"),
-        .product(name: "NIOIMAP", package: "swift-nio-imap"),
-        .product(name: "NIOSSL", package: "swift-nio-ssl"),
-        .product(name: "NIOFoundationCompat", package: "swift-nio"),
-        .product(name: "Crypto", package: "swift-crypto"),
         .product(name: "Configuration", package: "swift-configuration"),
         .product(name: "Metrics", package: "swift-metrics"),
         .product(name: "Prometheus", package: "swift-prometheus"),
@@ -66,9 +98,6 @@ let package = Package(
       swiftSettings: [
         .swiftLanguageMode(.v6),
         .treatAllWarnings(as: .error),
-      ],
-      plugins: [
-        .plugin(name: "PostgresModelsPlugin", package: "swift-postgres-models")
       ]
     ),
     .target(
@@ -94,6 +123,8 @@ let package = Package(
       dependencies: [
         "ShapeTreeWeb",
         "ShapeTreeWebCore",
+        "ShapeTreeWebAuth",
+        "ShapeTreeWebEmail",
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "HummingbirdTesting", package: "hummingbird"),
         .product(name: "HummingbirdAuth", package: "hummingbird-auth"),

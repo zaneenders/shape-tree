@@ -11,6 +11,8 @@ import ShapeTreeWebCore
 import Testing
 
 @testable import ShapeTreeWeb
+@testable import ShapeTreeWebAuth
+@testable import ShapeTreeWebEmail
 
 /// Suite-level gate: enabled when `SMTP_INTEGRATION_TEST=true` and SMTP/IMAP
 /// credentials are available in the environment or `.env`.

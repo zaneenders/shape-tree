@@ -1,7 +1,8 @@
 import Foundation
 import Testing
 
-@testable import ShapeTreeWeb
+@testable import ShapeTreeWebAuth
+@testable import ShapeTreeWebEmail
 
 @Suite struct LoginTokenServiceTests {
   @Test func generateProducesBase64URLToken() {

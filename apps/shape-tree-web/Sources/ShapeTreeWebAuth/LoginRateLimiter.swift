@@ -1,6 +1,6 @@
 import Foundation
 
-actor LoginRateLimiter: Sendable {
+package actor LoginRateLimiter: Sendable {
   private struct Key: Hashable {
     let email: String
     let ip: String
@@ -10,7 +10,7 @@ actor LoginRateLimiter: Sendable {
   private let window: Duration
   private let maxAttempts: Int
 
-  init(window: Duration = .seconds(60), maxAttempts: Int = 3) {
+  package init(window: Duration = .seconds(60), maxAttempts: Int = 3) {
     self.window = window
     self.maxAttempts = maxAttempts
   }

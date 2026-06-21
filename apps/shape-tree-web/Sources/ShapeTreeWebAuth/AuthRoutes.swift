@@ -4,6 +4,7 @@ import HummingbirdAuth
 import Logging
 import NIOCore
 import ShapeTreeWebCore
+import ShapeTreeWebEmail
 
 enum FormParser {
   static func parseURLForm(_ body: String) -> [String: String] {
@@ -23,14 +24,30 @@ enum FormParser {
   }
 }
 
-enum AuthRoutes {
-  static func addRoutes<C: AuthRequestContext & SessionRequestContext & RemoteAddressRequestContext>(
+package enum AuthRoutes {
+  package static func addRoutes<C: AuthRequestContext & SessionRequestContext & RemoteAddressRequestContext>(
     to router: Router<C>,
     auth: AuthServices,
     rateLimiter: LoginRateLimiter,
     siteTitle: String,
     loginPost: Post? = nil
   ) where C.Identity == User, C.Session == UUID {
+    let sessionConfig = SessionMiddlewareConfiguration(
+      sessionCookieParameters: .init(
+        name: "SESSION_ID",
+        secure: auth.secureCookies,
+        sameSite: .lax
+      ),
+      defaultSessionExpiration: auth.settings.sessionTTL
+    )
+    router.addMiddleware {
+      SessionMiddleware(storage: auth.persist, configuration: sessionConfig)
+      SessionAuthenticator(context: C.self) {
+        (userID: UUID, context: UserRepositoryContext) async throws -> User? in
+        try await auth.database.user(id: userID, logger: context.logger)
+      }
+    }
+
     router.get("login") { request, _ in
       let next = request.uri.queryParameters.get("next")
       return AuthPages.login(
