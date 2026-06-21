@@ -3,12 +3,8 @@ import Foundation
 
 enum LoginTokenService {
   static func generate() -> (raw: String, hash: String) {
-    var bytes = [UInt8](repeating: 0, count: 32)
-    let status = bytes.withUnsafeMutableBytes { buffer in
-      SecRandomCopyBytes(kSecRandomDefault, 32, buffer.baseAddress!)
-    }
-    precondition(status == errSecSuccess)
-    let raw = base64URLEncode(Data(bytes))
+    let key = SymmetricKey(size: .bits256)
+    let raw = base64URLEncode(key.withUnsafeBytes { Data($0) })
     let hash = sha256Hex(raw)
     return (raw, hash)
   }

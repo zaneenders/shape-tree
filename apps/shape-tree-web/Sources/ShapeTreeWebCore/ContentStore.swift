@@ -32,12 +32,14 @@ public struct ContentStore: Sendable {
   private let root: URL
   private let postsBySlug: [String: Post]
   private let indexSlug: String
+  private let loginSlug: String
   private let privateDirectories: Set<String>
   public let posts: [Post]
 
   public init(
     contentDirectory: URL,
     indexSlug: String = "Home",
+    loginSlug: String = "login",
     privateDirectories: Set<String> = []
   ) throws {
     guard FileManager.default.fileExists(atPath: contentDirectory.path) else {
@@ -46,10 +48,12 @@ public struct ContentStore: Sendable {
 
     self.root = contentDirectory.standardizedFileURL
     self.indexSlug = indexSlug
+    self.loginSlug = loginSlug
     self.privateDirectories = privateDirectories
     let loaded = try Self.loadPosts(
       from: contentDirectory,
       indexSlug: indexSlug,
+      loginSlug: loginSlug,
       privateDirectories: privateDirectories
     )
     self.posts = loaded.sorted { $0.date > $1.date }
@@ -68,13 +72,32 @@ public struct ContentStore: Sendable {
     posts.first { $0.isIndex }
   }
 
+  public var loginPost: Post? {
+    posts.first { $0.isLogin }
+  }
+
   public var publishedPosts: [Post] {
-    posts.filter { !$0.isIndex && !$0.isPrivate }
+    posts.filter { !$0.isIndex && !$0.isLogin && !$0.isPrivate }
   }
 
   public var publishedPostGroups: [PostGroup] {
+    postGroups(includingPrivate: false)
+  }
+
+  /// Post groups for navigation. Private posts are included only when
+  /// `includingPrivate` is true (i.e. the viewer is authenticated).
+  public func postGroups(includingPrivate: Bool) -> [PostGroup] {
+    let visible = posts.filter { post in
+      guard !post.isIndex && !post.isLogin else { return false }
+      if post.isPrivate { return includingPrivate }
+      return true
+    }
+    return Self.groupPosts(visible)
+  }
+
+  private static func groupPosts(_ posts: [Post]) -> [PostGroup] {
     var grouped: [String?: [Post]] = [:]
-    for post in publishedPosts {
+    for post in posts {
       grouped[post.contentDirectory, default: []].append(post)
     }
 
@@ -102,6 +125,7 @@ public struct ContentStore: Sendable {
   private static func loadPosts(
     from root: URL,
     indexSlug: String,
+    loginSlug: String,
     privateDirectories: Set<String>
   ) throws -> [Post] {
     let fileManager = FileManager.default
@@ -133,6 +157,7 @@ public struct ContentStore: Sendable {
       let title = frontMatter.title ?? humanizedName(slug)
       let directory = (relativePath as NSString).deletingLastPathComponent
       let isPrivate = !directory.isEmpty && privateDirectories.contains(directory)
+      let isLogin = slug.lowercased() == loginSlug.lowercased()
       let date =
         frontMatter.date
         ?? dateFromFilename(slug)
@@ -150,6 +175,7 @@ public struct ContentStore: Sendable {
           bodyHTML: MarkdownRenderer.html(from: body, strippingTitle: title),
           relativePath: relativePath,
           isIndex: slug.lowercased() == indexSlug.lowercased(),
+          isLogin: isLogin,
           isPrivate: isPrivate
         )
       )

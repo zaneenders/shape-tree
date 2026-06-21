@@ -42,7 +42,7 @@ enum ShapeTreeWeb {
     let contentPath = try config.requiredString(forKey: "CONTENT_PATH")
     let indexSlug = try config.requiredString(forKey: "INDEX_SLUG")
     let otel = try OtelSettings.load(from: config)
-    let siteURL = config.string(forKey: "SITE_URL") ?? "http://\(host):\(port)"
+    let siteURL = config.string(forKey: "SITE_URL") ?? "http://localhost:\(port)"
     let privateDirectories = parsePrivateDirectories(
       config.string(forKey: "AUTH_PRIVATE_DIRECTORIES")
     )
@@ -89,8 +89,14 @@ enum ShapeTreeWeb {
 
     router.get("posts/:slug") { request, context in
       let slug = try context.parameters.require("slug")
-      guard let post = store.post(slug: slug), !post.isPrivate else {
+      guard let post = store.post(slug: slug) else {
         throw HTTPError(.notFound)
+      }
+      if post.isLogin {
+        return Response(
+          status: .seeOther,
+          headers: [.location: "/login"],
+          body: .init())
       }
       if post.isPrivate, context.identity == nil {
         return AuthMiddleware.unauthenticatedResponse(request: request, next: request.uri.path)
@@ -98,9 +104,12 @@ enum ShapeTreeWeb {
       return WebPages.shell(store: store, initial: post).makeHTMLResponse()
     }
 
-    router.get("htmx/content/nav") { request, _ in
+    router.get("htmx/content/nav") { request, context in
       try HTMX.requireRequest(request)
-      return WebPages.navigation(store: store).makeHTMLResponse()
+      return WebPages.navigation(
+        store: store,
+        isAuthenticated: context.identity != nil
+      ).makeHTMLResponse()
     }
 
     router.get("htmx/content/index") { request, _ in
@@ -113,7 +122,10 @@ enum ShapeTreeWeb {
     router.get("htmx/content/posts/:slug") { request, context in
       try HTMX.requireRequest(request)
       let slug = try context.parameters.require("slug")
-      guard let post = store.post(slug: slug), !post.isPrivate else {
+      guard let post = store.post(slug: slug) else {
+        throw HTTPError(.notFound)
+      }
+      if post.isLogin {
         throw HTTPError(.notFound)
       }
       if post.isPrivate, context.identity == nil {
@@ -128,7 +140,8 @@ enum ShapeTreeWeb {
       to: router,
       auth: auth.services,
       rateLimiter: rateLimiter,
-      siteTitle: store.siteTitle
+      siteTitle: store.siteTitle,
+      loginPost: store.loginPost
     )
 
     ClientRoutes.register(on: router)
@@ -218,6 +231,11 @@ enum ShapeTreeWeb {
       let client = PostgresClient(configuration: postgresSettings.configuration)
       let authSettings = AuthSettings.load(from: config)
       let smtp = SMTPSettings.load(from: config)
+      guard let smtp else {
+        throw ShapeTreeSetupError.authSetup(
+          "SMTP is required when Postgres auth is configured. Set SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, and SMTP_FROM in .env or the environment."
+        )
+      }
       let secureCookies = URL(string: siteURL)?.scheme == "https"
       let privateDirectories = parsePrivateDirectories(
         config.string(forKey: "AUTH_PRIVATE_DIRECTORIES")

@@ -1,29 +1,36 @@
 import Foundation
 import Hummingbird
+import ShapeTreeWebCore
 
 enum AuthPages {
-  static func login(next: String?, siteURL: String, siteTitle: String) -> Response {
-    let nextField: String
-    if let next, !next.isEmpty {
-      let escaped = escapeHTML(next)
-      nextField = #"<input type="hidden" name="next" value="\#(escaped)">"#
+  static func login(
+    next: String?,
+    siteURL: String,
+    siteTitle: String,
+    loginPost: Post? = nil
+  ) -> Response {
+    let formHTML = loginFormHTML(next: next)
+    let body: String
+    if let loginPost {
+      let rendered = substituteLoginForm(in: loginPost.bodyHTML, formHTML: formHTML)
+      body = """
+        <article>
+          <h1>\(escapeHTML(loginPost.title))</h1>
+          \(rendered)
+        </article>
+        """
     } else {
-      nextField = ""
-    }
-    let html = pageShell(
-      title: "Sign in | \(siteTitle)",
-      body: """
+      body = """
         <article>
           <h1>Sign in</h1>
           <p>Enter your email and we will send you a sign-in link.</p>
-          <form method="post" action="/auth/login">
-            <label for="email">Email</label>
-            <input id="email" name="email" type="email" autocomplete="email" required>
-            \(nextField)
-            <button type="submit">Send link</button>
-          </form>
+          \(formHTML)
         </article>
-        """,
+        """
+    }
+    let html = pageShell(
+      title: "Sign in | \(siteTitle)",
+      body: body,
       siteTitle: siteTitle
     )
     return html.makeHTMLResponse()
@@ -44,8 +51,14 @@ enum AuthPages {
     return html.makeHTMLResponse()
   }
 
-  static func verifyConfirm(token: String, siteURL: String, siteTitle: String) -> Response {
+  static func verifyConfirm(token: String, next: String?, siteURL: String, siteTitle: String) -> Response {
     let escaped = escapeHTML(token)
+    let nextField: String
+    if let next, !next.isEmpty {
+      nextField = #"<input type="hidden" name="next" value="\#(escapeHTML(next))">"#
+    } else {
+      nextField = ""
+    }
     let html = pageShell(
       title: "Confirm sign in | \(siteTitle)",
       body: """
@@ -54,6 +67,7 @@ enum AuthPages {
           <p>Click below to finish signing in on this device.</p>
           <form method="post" action="/auth/verify">
             <input type="hidden" name="token" value="\(escaped)">
+            \(nextField)
             <button type="submit">Sign in</button>
           </form>
         </article>
@@ -109,6 +123,36 @@ enum AuthPages {
       .replacingOccurrences(of: "\"", with: "&quot;")
       .replacingOccurrences(of: "<", with: "&lt;")
       .replacingOccurrences(of: ">", with: "&gt;")
+  }
+
+  private static func loginFormHTML(next: String?) -> String {
+    let nextField: String
+    if let next, !next.isEmpty {
+      let escaped = escapeHTML(next)
+      nextField = #"<input type="hidden" name="next" value="\#(escaped)">"#
+    } else {
+      nextField = ""
+    }
+    return """
+      <form method="post" action="/auth/login">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" required>
+        \(nextField)
+        <button type="submit">Send link</button>
+      </form>
+      """
+  }
+
+  /// Substitutes the login form into a rendered markdown body at the `{{login}}`
+  /// marker. When the marker is absent the form is appended to the body.
+  private static func substituteLoginForm(in bodyHTML: String, formHTML: String) -> String {
+    let placeholder = "{{login}}"
+    if bodyHTML.contains(placeholder) {
+      return bodyHTML
+        .replacingOccurrences(of: "<p>\(placeholder)</p>", with: formHTML)
+        .replacingOccurrences(of: placeholder, with: formHTML)
+    }
+    return bodyHTML + "\n" + formHTML
   }
 }
 

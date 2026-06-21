@@ -27,7 +27,7 @@ enum WebPages {
     }
   }
 
-  static func navigation(store: ContentStore) -> HTML {
+  static func navigation(store: ContentStore, isAuthenticated: Bool = false) -> HTML {
     var items: [HTML] = [
       NavHTML.leaf(
         href: "/",
@@ -37,7 +37,17 @@ enum WebPages {
       )
     ]
 
-    for group in store.publishedPostGroups {
+    if !isAuthenticated {
+      items.append(
+        .element(
+          .li, [.class("nav-leaf")],
+          [
+            .tag(.a, attrs: [.class("nav-link"), .href("/login")]) { .text("Sign in") }
+          ])
+      )
+    }
+
+    for group in store.postGroups(includingPrivate: isAuthenticated) {
       if let directory = group.directory {
         let branchItems = group.posts.map { post in
           NavHTML.leaf(

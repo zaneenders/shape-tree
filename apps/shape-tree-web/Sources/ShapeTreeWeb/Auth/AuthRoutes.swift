@@ -3,6 +3,7 @@ import Hummingbird
 import HummingbirdAuth
 import Logging
 import NIOCore
+import ShapeTreeWebCore
 
 enum FormParser {
   static func parseURLForm(_ body: String) -> [String: String] {
@@ -27,11 +28,17 @@ enum AuthRoutes {
     to router: Router<C>,
     auth: AuthServices,
     rateLimiter: LoginRateLimiter,
-    siteTitle: String
+    siteTitle: String,
+    loginPost: Post? = nil
   ) where C.Identity == User, C.Session == UUID {
     router.get("login") { request, _ in
       let next = request.uri.queryParameters.get("next")
-      return AuthPages.login(next: next, siteURL: auth.siteURL, siteTitle: siteTitle)
+      return AuthPages.login(
+        next: next,
+        siteURL: auth.siteURL,
+        siteTitle: siteTitle,
+        loginPost: loginPost
+      )
     }
 
     router.post("auth/login") { request, context async throws -> Response in
@@ -55,19 +62,16 @@ enum AuthRoutes {
           expiresAt: expiresAt,
           logger: context.logger
         )
-        if let smtp = auth.smtp {
-          try await sendLoginEmail(
-            smtp: smtp,
-            to: user.email,
-            siteURL: auth.siteURL,
-            rawToken: rawToken
-          )
-        } else {
-          context.logger.notice("SMTP not configured; login link for \(user.email) not sent")
-        }
+        try await sendLoginEmail(
+          smtp: auth.smtp,
+          to: user.email,
+          siteURL: auth.siteURL,
+          rawToken: rawToken,
+          next: next,
+          tokenTTLMinutes: auth.settings.tokenTTLMinutes
+        )
       }
 
-      _ = next
       return AuthPages.checkEmail(siteURL: auth.siteURL, siteTitle: siteTitle)
     }
 
@@ -75,7 +79,13 @@ enum AuthRoutes {
       guard let token = request.uri.queryParameters.get("token"), !token.isEmpty else {
         return AuthPages.verifyFailed(siteURL: auth.siteURL, siteTitle: siteTitle)
       }
-      return AuthPages.verifyConfirm(token: token, siteURL: auth.siteURL, siteTitle: siteTitle)
+      let next = AuthMiddleware.safeNextPath(request.uri.queryParameters.get("next"))
+      return AuthPages.verifyConfirm(
+        token: token,
+        next: next,
+        siteURL: auth.siteURL,
+        siteTitle: siteTitle
+      )
     }
 
     router.post("auth/verify") { request, context async throws -> Response in
@@ -122,9 +132,15 @@ enum AuthRoutes {
     smtp: SMTPSettings,
     to recipient: String,
     siteURL: String,
-    rawToken: String
+    rawToken: String,
+    next: String?,
+    tokenTTLMinutes: Int
   ) async throws {
-    let link = "\(siteURL)/auth/verify?token=\(rawToken)"
+    var link = "\(siteURL)/auth/verify?token=\(rawToken)"
+    if let next, !next.isEmpty {
+      let encoded = next.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? next
+      link += "&next=\(encoded)"
+    }
     let email = smtp.makeEmail(
       to: recipient,
       subject: "Sign in to \(siteURL)",
@@ -133,7 +149,7 @@ enum AuthRoutes {
 
         \(link)
 
-        This link expires in 15 minutes and can only be used once.
+        This link expires in \(tokenTTLMinutes) minutes and can only be used once.
         If you did not request this email, you can ignore it.
         """
     )
@@ -141,14 +157,14 @@ enum AuthRoutes {
   }
 
   private static func sameOrigin(request: Request, siteURL: String) -> Bool {
-    guard let siteHost = URL(string: siteURL)?.host else { return true }
+    guard let siteHost = URL(string: siteURL)?.host else { return false }
     if let origin = request.headers[.origin], let originHost = URL(string: origin)?.host {
       return originHost == siteHost
     }
     if let referer = request.headers[.referer], let refererHost = URL(string: referer)?.host {
       return refererHost == siteHost
     }
-    return true
+    return false
   }
 }
 

@@ -7,8 +7,7 @@ enum AuthMiddleware {
     guard let next, !next.isEmpty, next.hasPrefix("/"), !next.hasPrefix("//") else {
       return "/login"
     }
-    let encoded =
-      next.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? next
+    let encoded = next.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? next
     return "/login?next=\(encoded)"
   }
 

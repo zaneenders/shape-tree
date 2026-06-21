@@ -18,8 +18,7 @@ import Testing
 /// ```
 @Suite
 struct EmailRoundTripIntegrationTests {
-  @Test(.enabled(if: Self.integrationEnabled()))
-  func roundTripsProbeEmailThroughSMTPAndIMAP() async throws {
+  @Test func roundTripsProbeEmailThroughSMTPAndIMAP() async throws {
     let values = SMTPSettings.mergedEnvironment()
     guard let smtpSettings = SMTPSettings.loadFromEnvironment() else {
       Issue.record("SMTP settings missing despite integration gate")

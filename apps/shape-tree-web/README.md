@@ -2,23 +2,24 @@
 
 Markdown blog built on the [Lorikeet](https://github.com/zaneenders/lorikeet) HTML DSL (typed HTML + HTMX), [Hummingbird](https://github.com/hummingbird-project/hummingbird), and a Swift WASM client. Point it at a directory of `.md` files and it serves a readable site with HTMX-powered navigation — no JavaScript build step required.
 
-Build the swift WASM client, configure environment, then start the server.
+Build the swift WASM client, then start the server using the bundled `.env.example` (no `.env` needed to try it out):
 
 ```bash
 cd apps/shape-tree-web
 ./Scripts/build-client.sh
-cp .env.example .env
-swift run ShapeTreeWeb
 ```
 
 ## Setup 
 
 ### Environment
 
-Copy `.env.example` to `.env` and set the required variables:
+For local development, source `.env.example` directly into your shell:
+
+Only create a `.env` file when deploying or when you need values that differ from the defaults (e.g. Postgres/SMTP for login):
 
 ```bash
 cp .env.example .env
+# edit .env with your real values
 ```
 
 Environment variables (all required):
@@ -49,6 +50,10 @@ swift run ShapeTreeWeb --add-user user@example.com
 ```
 
 Posts inside a private directory are hidden from navigation and require signing in to view.
+
+### Optional: custom login page
+
+By default the `/login` page is a built-in form. To brand it with your own copy, add a `login.md` file to your content directory (the slug defaults to `login`, matched case-insensitively). The file's front matter `title` becomes the heading and its rendered body wraps the login form. Place a `{{login}}` marker anywhere in the body to control where the email field is rendered; if the marker is absent the form is appended to the body. The login post is excluded from the index and navigation, and `/posts/login` redirects to `/login`. When no `login.md` exists, the built-in shell is used.
 
 
 Markdown files support `---` front matter (`title`, `date`, `tags`, `excerpt`). An `index.md` file becomes the home page. Other files are listed as posts sorted by date. Files in subdirectories are grouped in navigation and on the index. Sample content lives in `Examples/content/`.

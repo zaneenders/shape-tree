@@ -7,8 +7,7 @@ protocol AuthDatabase: Sendable {
   func user(email: String, logger: Logger) async throws -> User?
   func user(id: UUID, logger: Logger) async throws -> User?
   func createUser(email: String, logger: Logger) async throws -> User
-  func createLoginToken(userID: UUID, tokenHash: String, expiresAt: Date, logger: Logger)
-    async throws
+  func createLoginToken(userID: UUID, tokenHash: String, expiresAt: Date, logger: Logger) async throws
   func loginToken(hash: String, logger: Logger) async throws -> (id: UUID, userID: UUID)?
   func deleteLoginToken(id: UUID, logger: Logger) async throws
   func deleteExpiredLoginTokens(logger: Logger) async throws
