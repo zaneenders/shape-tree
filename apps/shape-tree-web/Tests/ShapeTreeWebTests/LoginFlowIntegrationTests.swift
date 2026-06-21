@@ -112,7 +112,6 @@ struct LoginFlowIntegrationTests {
         secureCookies: false,
         privateDirectories: ["Private"]
       )
-      let rateLimiter = LoginRateLimiter()
 
       let router = Router(context: AppRequestContext.self)
       ShapeTreeWeb.configureRouter(
@@ -120,8 +119,7 @@ struct LoginFlowIntegrationTests {
         store: store,
         initial: initial,
         indexSlug: "Home",
-        auth: auth,
-        rateLimiter: rateLimiter
+        auth: auth
       )
 
       let app = Application(router: router)

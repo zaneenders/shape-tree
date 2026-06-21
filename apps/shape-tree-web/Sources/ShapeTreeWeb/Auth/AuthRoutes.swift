@@ -24,10 +24,9 @@ enum FormParser {
 }
 
 enum AuthRoutes {
-  static func addRoutes<C: AuthRequestContext & SessionRequestContext & RemoteAddressRequestContext>(
+  static func addRoutes<C: AuthRequestContext & SessionRequestContext>(
     to router: Router<C>,
     auth: AuthServices,
-    rateLimiter: LoginRateLimiter,
     siteTitle: String,
     loginPost: Post? = nil
   ) where C.Identity == User, C.Session == UUID {
@@ -46,12 +45,6 @@ enum AuthRoutes {
       let fields = FormParser.parseURLForm(String(buffer: body))
       let email = AuthMiddleware.normalizedEmail(fields["email"] ?? "")
       let next = AuthMiddleware.safeNextPath(fields["next"])
-      let ip = context.remoteAddress?.ipAddress ?? "unknown"
-
-      guard await rateLimiter.allow(email: email, ip: ip) else {
-        context.logger.warning("Login rate limited for \(email)")
-        return AuthPages.checkEmail(siteURL: auth.siteURL, siteTitle: siteTitle)
-      }
 
       if let user = try await auth.database.user(email: email, logger: context.logger) {
         let (rawToken, tokenHash) = LoginTokenService.generate()
@@ -165,18 +158,5 @@ enum AuthRoutes {
       return refererHost == siteHost
     }
     return false
-  }
-}
-
-extension SocketAddress {
-  fileprivate var ipAddress: String? {
-    switch self {
-    case .v4(let addr):
-      return addr.host
-    case .v6(let addr):
-      return addr.host
-    case .unixDomainSocket:
-      return nil
-    }
   }
 }

@@ -67,14 +67,12 @@ enum ShapeTreeWeb {
       }
     }
 
-    let rateLimiter = LoginRateLimiter()
     ShapeTreeWeb.configureRouter(
       router,
       store: store,
       initial: initial,
       indexSlug: indexSlug,
-      auth: auth.services,
-      rateLimiter: rateLimiter
+      auth: auth.services
     )
 
     var app = Application(
@@ -157,8 +155,7 @@ enum ShapeTreeWeb {
     store: ContentStore,
     initial: Post,
     indexSlug: String,
-    auth: AuthServices,
-    rateLimiter: LoginRateLimiter
+    auth: AuthServices
   ) {
     let sessionConfig = SessionMiddlewareConfiguration(
       sessionCookieParameters: .init(
@@ -231,7 +228,6 @@ enum ShapeTreeWeb {
     AuthRoutes.addRoutes(
       to: router,
       auth: auth,
-      rateLimiter: rateLimiter,
       siteTitle: store.siteTitle,
       loginPost: store.loginPost
     )
