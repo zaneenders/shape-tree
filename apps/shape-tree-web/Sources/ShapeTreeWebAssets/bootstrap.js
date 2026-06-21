@@ -361,8 +361,8 @@ const shapeTree = {
         history.pushState({ wasmSlug: slug, title: pageTitle }, "", postPath);
       }
     } catch (err) {
-      main.innerHTML = `<p style="color:red">WASM load failed: ${err.message}</p>`;
-      console.error("[wasm-post] load failed", err);
+      main.innerHTML = `<p style="color:red">Content load failed: ${err.message}</p>`;
+      console.error("[wasm-post] content load failed", err);
     } finally {
       setLoading(false);
     }

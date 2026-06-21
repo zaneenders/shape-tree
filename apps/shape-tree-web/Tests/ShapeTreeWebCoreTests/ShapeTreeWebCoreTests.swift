@@ -259,6 +259,16 @@ import Testing
     #expect(response.groups.flatMap(\.items).contains { $0.slug == "Secret" })
   }
 
+  @Test func excludesLoginFromEmbeddedWasmSlugs() throws {
+    let (store, url) = try makePrivateStore()
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    let wasmSlugs = store.navWasmSlugs(fromEmbedded: ["Public", "Secret", "login"])
+    #expect(!wasmSlugs.contains("login"))
+    #expect(wasmSlugs.contains("Public"))
+    #expect(wasmSlugs.contains("Secret"))
+  }
+
   @Test func marksWasmAvailabilityAndHref() throws {
     let (store, url) = try makePrivateStore()
     defer { try? FileManager.default.removeItem(at: url) }

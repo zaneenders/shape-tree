@@ -9,6 +9,10 @@ OUT_JS="$ASSETS/client"
 BUILD_DIR="$CLIENT/.build/js"
 SDK="${SWIFT_WASM_SDK:-swift-6.3.2-RELEASE_wasm-embedded}"
 
+CONTENT_PATH="${CONTENT_PATH:-/Users/zane/Content}"
+INDEX_SLUG="${INDEX_SLUG:-Home}"
+LOGIN_SLUG="${LOGIN_SLUG:-Login}"
+
 export PATH="${HOME}/.swiftly/bin:${PATH}"
 
 if ! swift sdk list 2>/dev/null | grep -qx "$SDK"; then
@@ -20,6 +24,35 @@ if ! command -v wasm-opt >/dev/null; then
   echo "error: wasm-opt not found (brew install binaryen)" >&2
   exit 1
 fi
+
+slug_lower() {
+  echo "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+should_skip_wasm_for_slug() {
+  local slug="$1"
+  [[ "$(slug_lower "$slug")" == "$(slug_lower "$LOGIN_SLUG")" ]]
+}
+
+patch_client_index_js() {
+  local file="$1"
+  if [[ ! -f "$file" ]]; then
+    echo "error: ${file} missing" >&2
+    exit 1
+  fi
+  # PackageToJS emits a default fetch for the product wasm; bootstrap.js always passes module.
+  perl -0777 -pi -e '
+    s/if \(!module\) \{\s*module = fetch\(new URL\([^)]+\)\)\s*\}/if (!module) {\n    throw new Error("init requires options.module");\n  }/s
+  ' "$file"
+}
+
+copy_page_js_runtime() {
+  local src_dir="$1"
+  cp "$src_dir/instantiate.js" "$src_dir/runtime.js" "$OUT_JS/"
+  cp "$src_dir/platforms/browser.js" "$OUT_JS/platforms/"
+  perl -pi -e "s|'\\@bjorn3/browser_wasi_shim'|'../browser_wasi_shim.js'|g" \
+    "$OUT_JS/platforms/browser.js"
+}
 
 echo "Building WASMNav with ${SDK}..."
 rm -rf "$BUILD_DIR" "$CLIENT/.build/plugins/PackageToJS/outputs/js.tmp"
@@ -45,8 +78,8 @@ rm -rf "$OUT_JS"
 mkdir -p "$OUT_JS/platforms"
 cp "$BUILD_DIR/index.js" "$BUILD_DIR/instantiate.js" "$BUILD_DIR/runtime.js" "$OUT_JS/"
 cp "$BUILD_DIR/platforms/browser.js" "$OUT_JS/platforms/"
-cp "$ASSETS/Vendor/bootstrap.js" "$OUT_JS/bootstrap.js"
 cp "$WASM" "$ASSETS/WASMNav.wasm"
+patch_client_index_js "$OUT_JS/index.js"
 
 # WASI shim is committed under Sources/ShapeTreeWebAssets/Vendor/ and served locally.
 perl -pi -e "s|'\\@bjorn3/browser_wasi_shim'|'../browser_wasi_shim.js'|g" \
@@ -57,7 +90,6 @@ echo "Wrote ${ASSETS}/WASMNav.wasm"
 
 # --- Per-page WASM: generate one .wasm per markdown file ---
 
-CONTENT_PATH="${CONTENT_PATH:-/Users/zane/Content}"
 GEN_PKG="$POST_PKG/Generator"
 PAGES_DIR="$POST_PKG/Sources/Pages"
 MANIFEST="$POST_PKG/.build/manifest.txt"
@@ -70,7 +102,7 @@ echo "Building ContentGenerator..."
 )
 GENERATOR="$GEN_PKG/.build/release/ContentGenerator"
 
-echo "Generating per-page Swift sources..."
+echo "Generating per-page Swift sources from ${CONTENT_PATH}..."
 rm -rf "$PAGES_DIR"
 mkdir -p "$PAGES_DIR"
 mkdir -p "$POST_PKG/.build"
@@ -80,13 +112,33 @@ while IFS= read -r f; do
   MD_FILES+=("$f")
 done < <(find "$CONTENT_PATH" -name "*.md" -type f | sort)
 
-"$GENERATOR" "$PAGES_DIR" "$POST_PKG/Package.swift" "$MANIFEST" "${MD_FILES[@]}"
+BUILD_MD_FILES=()
+SKIPPED_SLUGS=()
+for f in "${MD_FILES[@]}"; do
+  slug="$(basename "$f" .md)"
+  if should_skip_wasm_for_slug "$slug"; then
+    SKIPPED_SLUGS+=("$slug")
+    continue
+  fi
+  BUILD_MD_FILES+=("$f")
+done
+
+if [[ ${#SKIPPED_SLUGS[@]} -gt 0 ]]; then
+  echo "Skipping wasm build for login slug(s): ${SKIPPED_SLUGS[*]}"
+fi
+
+if [[ ${#BUILD_MD_FILES[@]} -eq 0 ]]; then
+  echo "error: no markdown files to build under ${CONTENT_PATH}" >&2
+  exit 1
+fi
+
+"$GENERATOR" "$PAGES_DIR" "$POST_PKG/Package.swift" "$MANIFEST" "${BUILD_MD_FILES[@]}"
 
 echo "Building per-page WASM modules..."
 rm -rf "$WASM_POSTS_DIR"
 mkdir -p "$WASM_POSTS_DIR"
 
-FIRST_JS_DIR=""
+PAGE_JS_DIR=""
 while IFS='=' read -r target slug; do
   [[ -z "$target" || -z "$slug" ]] && continue
   echo "  Building $slug..."
@@ -108,22 +160,15 @@ while IFS='=' read -r target slug; do
 
   wasm-opt -Oz --strip-debug --strip-producers "$PAGE_WASM" -o "$PAGE_WASM"
   cp "$PAGE_WASM" "$WASM_POSTS_DIR/$slug.wasm"
-
-  if [[ -z "$FIRST_JS_DIR" ]]; then
-    FIRST_JS_DIR="$PAGE_BUILD_DIR"
-  fi
+  PAGE_JS_DIR="$PAGE_BUILD_DIR"
 done < "$MANIFEST"
 
-# Copy JS shim (shared by all page wasms) from the first build output
-if [[ -n "$FIRST_JS_DIR" ]]; then
-  cp "$FIRST_JS_DIR/index.js" "$FIRST_JS_DIR/instantiate.js" "$FIRST_JS_DIR/runtime.js" "$OUT_JS/"
-  cp "$FIRST_JS_DIR/platforms/browser.js" "$OUT_JS/platforms/"
-  cp "$ASSETS/Vendor/bootstrap.js" "$OUT_JS/bootstrap.js"
-  perl -pi -e "s|'\\@bjorn3/browser_wasi_shim'|'../browser_wasi_shim.js'|g" \
-    "$OUT_JS/platforms/browser.js"
+# Shared JS runtime for page wasm — keep WASMNav index.js (do not overwrite).
+if [[ -n "$PAGE_JS_DIR" ]]; then
+  copy_page_js_runtime "$PAGE_JS_DIR"
 fi
 
 PAGE_COUNT=$(ls "$WASM_POSTS_DIR"/*.wasm 2>/dev/null | wc -l | tr -d ' ')
-echo "Wrote $PAGE_COUNT per-page wasm(s) to ${WASM_POSTS_DIR}"
+echo "Wrote $PAGE_COUNT per-page wasm(s) to ${WASM_POSTS_DIR} (index slug: ${INDEX_SLUG})"
 
 echo "Run: swift build && swift run ShapeTreeWeb"

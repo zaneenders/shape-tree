@@ -19,7 +19,7 @@ public enum ClientAssetCatalog {
     case "index.js":
       return .script(client_index_js)
     case "bootstrap.js":
-      return .script(Vendor_bootstrap_js)
+      return .script(bootstrap_js)
     case "instantiate.js":
       return .script(client_instantiate_js)
     case "runtime.js":

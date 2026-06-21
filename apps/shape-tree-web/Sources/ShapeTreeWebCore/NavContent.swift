@@ -77,6 +77,16 @@ public struct NavContentResponse: Codable, Sendable, Equatable {
 }
 
 extension ContentStore {
+  /// Slugs that have embedded page wasm and should be linked as SPA wasm routes in nav.
+  public func navWasmSlugs(fromEmbedded embedded: Set<String>) -> Set<String> {
+    guard !embedded.isEmpty else { return [] }
+    return Set(
+      posts
+        .filter { !$0.isLogin && embedded.contains($0.slug) }
+        .map(\.slug)
+    )
+  }
+
   /// Builds the nav JSON payload using the same visibility rules as server-rendered navigation.
   public func navContentResponse(viewer: NavViewer, wasmSlugs: Set<String>) -> NavContentResponse {
     let index = indexPost

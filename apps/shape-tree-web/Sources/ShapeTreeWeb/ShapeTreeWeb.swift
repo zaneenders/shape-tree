@@ -39,6 +39,7 @@ enum ShapeTreeWeb {
     let adminPort = try config.requiredInt(forKey: "ADMIN_PORT")
     let contentPath = try config.requiredString(forKey: "CONTENT_PATH")
     let indexSlug = try config.requiredString(forKey: "INDEX_SLUG")
+    let loginSlug = config.string(forKey: "LOGIN_SLUG", default: "Login")
     let otel = try OtelSettings.load(from: config)
     let siteURL = try config.requiredString(forKey: "SITE_URL")
     let privateDirectories = parsePrivateDirectories(
@@ -53,7 +54,7 @@ enum ShapeTreeWeb {
     let store = try ContentStore(
       contentDirectory: contentURL,
       indexSlug: indexSlug,
-      loginSlug: "Login",
+      loginSlug: loginSlug,
       privateDirectories: privateDirectories
     )
 

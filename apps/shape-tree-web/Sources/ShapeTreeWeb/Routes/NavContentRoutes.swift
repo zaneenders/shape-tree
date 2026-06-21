@@ -12,7 +12,7 @@ enum NavContentRoutes {
         isAuthenticated: context.identity != nil,
         email: context.identity?.email
       )
-      let wasmSlugs = Set(PostWasmAsset.availableSlugs)
+      let wasmSlugs = store.navWasmSlugs(fromEmbedded: Set(PostWasmAsset.availableSlugs))
       let payload = store.navContentResponse(viewer: viewer, wasmSlugs: wasmSlugs)
       return try jsonResponse(payload)
     }
