@@ -2,6 +2,7 @@ import ShapeTreeWebAssets
 import Testing
 
 @Suite
+/// Requires embedded `WasmPosts` from `./Scripts/build-client.sh`.
 struct PostWasmAssetTests {
   @Test
   func servesKnownSlugWhenWasmPostsAreEmbedded() {

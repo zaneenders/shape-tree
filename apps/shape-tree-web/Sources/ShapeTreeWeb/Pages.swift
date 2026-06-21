@@ -2,6 +2,7 @@ import Foundation
 import HTML
 import HTMX
 import HTMXExtras
+import Hummingbird
 import ShapeTreeWebAssets
 import ShapeTreeWebCore
 
@@ -121,6 +122,53 @@ enum WebPages {
     )
   }
 
+  static func notFound(store: ContentStore) -> HTML {
+    document(bodyAttrs: [.hxExt("head-support")]) {
+      meta(attrs: [.charset("utf-8"), .name("viewport"), .content("width=device-width, initial-scale=1")])
+      HTML.tag(.title, attrs: [.flag("data-site-title=\"\(htmlAttrEscape(store.siteTitle))\"")]) {
+        "Not Found · \(store.siteTitle)"
+      }
+      style(attrs: [.hxPreserve]) { HTML.raw(site_css) }
+      script(attrs: [.hxPreserve]) { HTML.raw(htmx_min_js) }
+      script(attrs: [.hxPreserve]) { HTML.raw(htmx_head_support) }
+      navClientScript()
+    } body: {
+      HTMX.Attributes.lazyNavShell(get: "/htmx/content/nav")
+      div(attrs: [.id("htmx-loading"), .class("htmx-indicator"), .ariaLive("polite")]) { "Loading…" }
+      main(attrs: [.id("main")]) {
+        notFoundArticle()
+      }
+    }
+  }
+
+  static func notFoundResponse(store: ContentStore) -> Response {
+    notFound(store: store).makeHTMLResponse(.notFound)
+  }
+
+  static func notFoundFragment(store: ContentStore) -> String {
+    HTMX.contentFragment(
+      body: notFoundArticle().render(),
+      baseHead: "",
+      extraHead: HTML.tag(.title) { "Not Found · \(store.siteTitle)" }
+    )
+  }
+
+  static func notFoundArticle() -> HTML {
+    article {
+      h1 { "404" }
+      p { "Page not found." }
+    }
+  }
+
+  static func post(forSlug rawSlug: String, store: ContentStore) -> Post? {
+    let slug = PostWasmAsset.slugCandidates(for: rawSlug).first ?? rawSlug
+    return store.post(slug: slug)
+  }
+
+  static func canView(_ post: Post, isAuthenticated: Bool) -> Bool {
+    !post.isPrivate || isAuthenticated
+  }
+
   private static func indexArticle(bodyHTML: String) -> HTML {
     article {
       if !bodyHTML.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -174,23 +222,49 @@ enum WebPages {
         }
 
         const shapeTree = {
+          async loadNotFound({ pushState = true, path = location.pathname } = {}) {
+            const indicator = document.getElementById("htmx-loading");
+            indicator?.classList.add("htmx-request");
+            try {
+              await htmx.ajax("GET", "/htmx/content/not-found", {
+                target: "#main",
+                swap: "innerHTML",
+                headers: { "HX-Request": "true" },
+              });
+              document.title = pageTitleFromSite(readSiteTitle(), "Not Found");
+              if (pushState) {
+                history.pushState({ notFound: true, path }, "", path);
+              }
+            } finally {
+              indicator?.classList.remove("htmx-request");
+            }
+          },
+
           async loadWasmPost(slug, { pushState = true, title = null } = {}) {
             const main = document.getElementById("main");
             const indicator = document.getElementById("htmx-loading");
             if (!main) return;
             main.innerHTML = "<p>Loading…</p>";
             indicator?.classList.add("htmx-request");
+            const wasmPath = `/wasm/wasms/${encodeURIComponent(slug)}`;
+            const postPath = `/wasm/posts/${encodeURIComponent(slug)}`;
             try {
-              await init({
-                module: fetch(`/wasm/wasms/${encodeURIComponent(slug)}`, { cache: "no-store" }),
-              });
+              const response = await fetch(wasmPath, { cache: "no-store" });
+              if (response.status === 404) {
+                await shapeTree.loadNotFound({ pushState, path: postPath });
+                return;
+              }
+              if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+              }
+              await init({ module: response });
               const pageTitle = title ?? slug;
               document.title = pageTitleFromSite(readSiteTitle(), pageTitle);
               if (pushState) {
                 history.pushState(
                   { wasmSlug: slug, title: pageTitle },
                   "",
-                  `/wasm/posts/${encodeURIComponent(slug)}`
+                  postPath
                 );
               }
             } catch (err) {
@@ -211,6 +285,11 @@ enum WebPages {
             void shapeTree.loadWasmPost(state.wasmSlug, {
               pushState: false,
               title: state.title ?? null,
+            });
+          } else if (state?.notFound) {
+            void shapeTree.loadNotFound({
+              pushState: false,
+              path: state.path ?? location.pathname,
             });
           }
         });

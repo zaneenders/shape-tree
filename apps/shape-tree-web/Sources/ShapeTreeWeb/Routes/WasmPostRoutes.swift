@@ -10,10 +10,10 @@ enum WasmPostRoutes {
     guard PostWasmAsset.isAvailable else { return }
 
     router.get("wasm/wasms/:slug") { _, context in
-      try wasmBytesResponse(context: context)
+      try wasmBytesResponse(context: context, store: store)
     }
     router.head("wasm/wasms/:slug") { _, context in
-      try wasmBytesResponse(context: context, head: true)
+      try wasmBytesResponse(context: context, store: store, head: true)
     }
 
     router.get("wasm/posts/:slug") { _, context in
@@ -24,9 +24,18 @@ enum WasmPostRoutes {
     }
   }
 
-  private static func wasmBytesResponse(context: AppRequestContext, head: Bool = false) throws -> Response {
+  private static func wasmBytesResponse(
+    context: AppRequestContext,
+    store: ContentStore,
+    head: Bool = false
+  ) throws -> Response {
     let rawSlug = try context.parameters.require("slug")
-    guard let wasm = PostWasmAsset.wasm(forSlug: rawSlug) else {
+    guard let post = WebPages.post(forSlug: rawSlug, store: store),
+      WebPages.canView(post, isAuthenticated: context.identity != nil)
+    else {
+      throw HTTPError(.notFound)
+    }
+    guard let wasm = PostWasmAsset.wasm(forSlug: post.slug) else {
       throw HTTPError(.notFound)
     }
     return Response(
@@ -45,12 +54,17 @@ enum WasmPostRoutes {
     head: Bool = false
   ) throws -> Response {
     let rawSlug = try context.parameters.require("slug")
-    let slug = PostWasmAsset.slugCandidates(for: rawSlug).first ?? rawSlug
-    guard let post = store.post(slug: slug) else {
-      throw HTTPError(.notFound)
-    }
-    if post.isPrivate, context.identity == nil {
-      throw HTTPError(.notFound)
+    guard let post = WebPages.post(forSlug: rawSlug, store: store),
+      WebPages.canView(post, isAuthenticated: context.identity != nil)
+    else {
+      if head {
+        return Response(
+          status: .notFound,
+          headers: [.contentType: "text/html; charset=utf-8"],
+          body: .init(byteBuffer: ByteBuffer())
+        )
+      }
+      return WebPages.notFoundResponse(store: store)
     }
     if head {
       return Response(
@@ -62,7 +76,7 @@ enum WasmPostRoutes {
     return WebPages.shell(
       store: store,
       initial: post,
-      wasmBoot: (slug: slug, title: post.title)
+      wasmBoot: (slug: post.slug, title: post.title)
     ).makeHTMLResponse()
   }
 }

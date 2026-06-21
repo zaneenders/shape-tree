@@ -24,7 +24,7 @@ extension ShapeTreeWeb {
     router.get("posts/:slug") { request, context in
       let slug = try context.parameters.require("slug")
       guard let post = store.post(slug: slug) else {
-        throw HTTPError(.notFound)
+        return WebPages.notFoundResponse(store: store)
       }
       if post.isLogin {
         return Response(
@@ -33,7 +33,7 @@ extension ShapeTreeWeb {
           body: .init())
       }
       if post.isPrivate, context.identity == nil {
-        throw HTTPError(.notFound)
+        return WebPages.notFoundResponse(store: store)
       }
       return WebPages.shell(store: store, initial: post).makeHTMLResponse()
     }
@@ -53,17 +53,22 @@ extension ShapeTreeWeb {
       return htmlFragmentResponse(fragment)
     }
 
+    router.get("htmx/content/not-found") { request, _ in
+      try HTMX.requireRequest(request)
+      return htmlFragmentResponse(WebPages.notFoundFragment(store: store))
+    }
+
     router.get("htmx/content/posts/:slug") { request, context in
       try HTMX.requireRequest(request)
       let slug = try context.parameters.require("slug")
       guard let post = store.post(slug: slug) else {
-        throw HTTPError(.notFound)
+        return htmlFragmentResponse(WebPages.notFoundFragment(store: store))
       }
       if post.isLogin {
-        throw HTTPError(.notFound)
+        return htmlFragmentResponse(WebPages.notFoundFragment(store: store))
       }
       if post.isPrivate, context.identity == nil {
-        throw HTTPError(.notFound)
+        return htmlFragmentResponse(WebPages.notFoundFragment(store: store))
       }
       let fragment = WebPages.contentFragment(for: post, store: store)
       return htmlFragmentResponse(fragment)

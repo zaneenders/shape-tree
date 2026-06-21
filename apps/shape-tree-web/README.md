@@ -9,6 +9,16 @@ cd apps/shape-tree-web
 ./Scripts/build-client.sh
 ```
 
+### Tests
+
+```bash
+swift test
+```
+
+Wasm-related tests (`PrivateWasmPostTests`, `PostWasmAssetTests`) need embedded artifacts from `./Scripts/build-client.sh`. If you run `swift test` without that step, those tests record an issue and skip the wasm assertions rather than failing the whole suite.
+
+Integration tests for email login require Postgres and SMTP — see `LoginFlowIntegrationTests` in the test source.
+
 ## Setup 
 
 ### Environment

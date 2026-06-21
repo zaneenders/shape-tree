@@ -80,7 +80,11 @@ import Testing
       .deletingLastPathComponent()
       .appendingPathComponent("Examples/content", isDirectory: true)
 
-    let store = try ContentStore(contentDirectory: contentDirectory)
+    let store = try ContentStore(
+      contentDirectory: contentDirectory,
+      indexSlug: "Home",
+      loginSlug: "login"
+    )
 
     #expect(store.posts.count >= 6)
     #expect(store.indexPost?.title == "ShapeTree Web")
@@ -97,7 +101,11 @@ import Testing
       .deletingLastPathComponent()
       .appendingPathComponent("Examples/content", isDirectory: true)
 
-    let store = try ContentStore(contentDirectory: contentDirectory)
+    let store = try ContentStore(
+      contentDirectory: contentDirectory,
+      indexSlug: "Home",
+      loginSlug: "login"
+    )
     let groups = store.publishedPostGroups
 
     #expect(groups.contains { $0.directory == nil })
@@ -129,7 +137,11 @@ import Testing
       encoding: .utf8
     )
 
-    let store = try ContentStore(contentDirectory: temporaryDirectory)
+    let store = try ContentStore(
+      contentDirectory: temporaryDirectory,
+      indexSlug: "Home",
+      loginSlug: "login"
+    )
 
     #expect(store.loginPost?.slug == "login")
     #expect(store.loginPost?.isLogin == true)
@@ -154,7 +166,11 @@ import Testing
       encoding: .utf8
     )
 
-    let store = try ContentStore(contentDirectory: temporaryDirectory, loginSlug: "members")
+    let store = try ContentStore(
+      contentDirectory: temporaryDirectory,
+      indexSlug: "Home",
+      loginSlug: "members"
+    )
 
     #expect(store.loginPost?.slug == "members")
     #expect(store.loginPost?.isLogin == true)
@@ -185,6 +201,8 @@ import Testing
 
     let store = try ContentStore(
       contentDirectory: temporaryDirectory,
+      indexSlug: "Home",
+      loginSlug: "login",
       privateDirectories: ["Private"]
     )
 
@@ -196,7 +214,9 @@ import Testing
     #expect(store.publishedPostGroups.allSatisfy { $0.directory != "Private" })
     #expect(store.postGroups(includingPrivate: true).contains { $0.directory == "Private" })
     #expect(
-      store.postGroups(includingPrivate: true).flatMap(\.posts).contains { $0.slug == "Secret" }
+      store.postGroups(includingPrivate: true)
+        .flatMap { $0.posts }
+        .contains { $0.slug == "Secret" }
     )
 
     try FileManager.default.removeItem(at: temporaryDirectory)
