@@ -8,8 +8,7 @@ protocol AuthDatabase: Sendable {
   func user(id: UUID, logger: Logger) async throws -> User?
   func createUser(email: String, logger: Logger) async throws -> User
   func createLoginToken(userID: UUID, tokenHash: String, expiresAt: Date, logger: Logger) async throws
-  func loginToken(hash: String, logger: Logger) async throws -> (id: UUID, userID: UUID)?
-  func deleteLoginToken(id: UUID, logger: Logger) async throws
+  func consumeLoginToken(hash: String, logger: Logger) async throws -> UUID?
   func deleteExpiredLoginTokens(logger: Logger) async throws
 }
 
@@ -69,18 +68,9 @@ struct PostgresAuthDatabase: AuthDatabase {
     )
   }
 
-  func loginToken(hash: String, logger: Logger) async throws -> (id: UUID, userID: UUID)? {
-    guard
-      let row = try await LoginTokensQueries.getLoginTokenByHash(
-        client, tokenHash: hash, logger: logger)
-    else {
-      return nil
-    }
-    return (row.id, row.userId)
-  }
-
-  func deleteLoginToken(id: UUID, logger: Logger) async throws {
-    try await LoginTokensQueries.deleteLoginToken(client, id: id, logger: logger)
+  func consumeLoginToken(hash: String, logger: Logger) async throws -> UUID? {
+    try await LoginTokensQueries.consumeLoginToken(
+      client, tokenHash: hash, logger: logger)
   }
 
   func deleteExpiredLoginTokens(logger: Logger) async throws {

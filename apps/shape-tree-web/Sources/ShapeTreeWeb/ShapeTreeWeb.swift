@@ -155,7 +155,8 @@ enum ShapeTreeWeb {
     store: ContentStore,
     initial: Post,
     indexSlug: String,
-    auth: AuthServices
+    auth: AuthServices,
+    rateLimiter: LoginRateLimiter = LoginRateLimiter()
   ) {
     let sessionConfig = SessionMiddlewareConfiguration(
       sessionCookieParameters: .init(
@@ -228,6 +229,7 @@ enum ShapeTreeWeb {
     AuthRoutes.addRoutes(
       to: router,
       auth: auth,
+      rateLimiter: rateLimiter,
       siteTitle: store.siteTitle,
       loginPost: store.loginPost
     )
@@ -251,9 +253,6 @@ enum ShapeTreeWeb {
         )
       }
       let secureCookies = URL(string: siteURL)?.scheme == "https"
-      let privateDirectories = parsePrivateDirectories(
-        config.string(forKey: "AUTH_PRIVATE_DIRECTORIES")
-      )
 
       let persist = PostgresPersistDriver(client: client, logger: logger)
       let database = PostgresAuthDatabase(client: client)
@@ -264,8 +263,7 @@ enum ShapeTreeWeb {
           settings: authSettings,
           smtp: smtp,
           siteURL: siteURL,
-          secureCookies: secureCookies,
-          privateDirectories: privateDirectories
+          secureCookies: secureCookies
         ),
         persistDriver: persist,
         postgresClient: client

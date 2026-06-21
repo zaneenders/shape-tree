@@ -24,9 +24,10 @@ enum FormParser {
 }
 
 enum AuthRoutes {
-  static func addRoutes<C: AuthRequestContext & SessionRequestContext>(
+  static func addRoutes<C: AuthRequestContext & SessionRequestContext & RemoteAddressRequestContext>(
     to router: Router<C>,
     auth: AuthServices,
+    rateLimiter: LoginRateLimiter,
     siteTitle: String,
     loginPost: Post? = nil
   ) where C.Identity == User, C.Session == UUID {
@@ -45,24 +46,33 @@ enum AuthRoutes {
       let fields = FormParser.parseURLForm(String(buffer: body))
       let email = AuthMiddleware.normalizedEmail(fields["email"] ?? "")
       let next = AuthMiddleware.safeNextPath(fields["next"])
+      let ip = context.remoteAddress?.ipAddress ?? "unknown"
+
+      guard await rateLimiter.allow(email: email, ip: ip) else {
+        context.logger.warning("Login rate limited for \(email) from \(ip)")
+        return AuthPages.checkEmail(siteURL: auth.siteURL, siteTitle: siteTitle)
+      }
+
+      let (rawToken, tokenHash) = LoginTokenService.generate()
+      let expiresAt = Date.now + Double(auth.settings.tokenTTL.components.seconds)
 
       if let user = try await auth.database.user(email: email, logger: context.logger) {
-        let (rawToken, tokenHash) = LoginTokenService.generate()
-        let expiresAt = Date.now + Double(auth.settings.tokenTTL.components.seconds)
-        try await auth.database.createLoginToken(
-          userID: user.id,
-          tokenHash: tokenHash,
-          expiresAt: expiresAt,
-          logger: context.logger
-        )
-        try await sendLoginEmail(
-          smtp: auth.smtp,
-          to: user.email,
-          siteURL: auth.siteURL,
-          rawToken: rawToken,
-          next: next,
-          tokenTTLMinutes: auth.settings.tokenTTLMinutes
-        )
+        Task {
+          try await auth.database.createLoginToken(
+            userID: user.id,
+            tokenHash: tokenHash,
+            expiresAt: expiresAt,
+            logger: context.logger
+          )
+          try await sendLoginEmail(
+            smtp: auth.smtp,
+            to: user.email,
+            siteURL: auth.siteURL,
+            rawToken: rawToken,
+            next: next,
+            tokenTTLMinutes: auth.settings.tokenTTLMinutes
+          )
+        }
       }
 
       return AuthPages.checkEmail(siteURL: auth.siteURL, siteTitle: siteTitle)
@@ -82,9 +92,6 @@ enum AuthRoutes {
     }
 
     router.post("auth/verify") { request, context async throws -> Response in
-      guard sameOrigin(request: request, siteURL: auth.siteURL) else {
-        throw HTTPError(.forbidden)
-      }
       let body = try await request.body.collect(upTo: 16 * 1024)
       let fields = FormParser.parseURLForm(String(buffer: body))
       guard let rawToken = fields["token"], !rawToken.isEmpty else {
@@ -93,13 +100,12 @@ enum AuthRoutes {
 
       let tokenHash = LoginTokenService.hash(rawToken)
       guard
-        let token = try await auth.database.loginToken(hash: tokenHash, logger: context.logger),
-        let user = try await auth.database.user(id: token.userID, logger: context.logger)
+        let userID = try await auth.database.consumeLoginToken(hash: tokenHash, logger: context.logger),
+        let user = try await auth.database.user(id: userID, logger: context.logger)
       else {
         return AuthPages.verifyFailed(siteURL: auth.siteURL, siteTitle: siteTitle)
       }
 
-      try await auth.database.deleteLoginToken(id: token.id, logger: context.logger)
       context.sessions.setSession(user.id, expiresIn: auth.settings.sessionTTL)
 
       let redirect = AuthMiddleware.safeNextPath(fields["next"]) ?? "/"
@@ -109,10 +115,7 @@ enum AuthRoutes {
         body: .init())
     }
 
-    router.post("auth/logout") { request, context async throws -> Response in
-      guard sameOrigin(request: request, siteURL: auth.siteURL) else {
-        throw HTTPError(.forbidden)
-      }
+    router.post("auth/logout") { _, context async throws -> Response in
       context.sessions.clearSession()
       return Response(
         status: .seeOther,
@@ -149,14 +152,17 @@ enum AuthRoutes {
     try await SMTPClient.send(email: email, settings: smtp.connection)
   }
 
-  private static func sameOrigin(request: Request, siteURL: String) -> Bool {
-    guard let siteHost = URL(string: siteURL)?.host else { return false }
-    if let origin = request.headers[.origin], let originHost = URL(string: origin)?.host {
-      return originHost == siteHost
+}
+
+extension SocketAddress {
+  fileprivate var ipAddress: String? {
+    switch self {
+    case .v4(let addr):
+      return addr.host
+    case .v6(let addr):
+      return addr.host
+    case .unixDomainSocket:
+      return nil
     }
-    if let referer = request.headers[.referer], let refererHost = URL(string: referer)?.host {
-      return refererHost == siteHost
-    }
-    return false
   }
 }

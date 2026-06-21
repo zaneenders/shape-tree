@@ -109,8 +109,7 @@ struct LoginFlowIntegrationTests {
         settings: AuthSettings(),
         smtp: smtpSettings,
         siteURL: siteURL,
-        secureCookies: false,
-        privateDirectories: ["Private"]
+        secureCookies: false
       )
 
       let router = Router(context: AppRequestContext.self)
@@ -192,7 +191,7 @@ struct LoginFlowIntegrationTests {
           #expect(body.contains("Confirm sign in"))
         }
 
-        // 6. POST /auth/verify with token + Origin header (same-origin check).
+        // 6. POST /auth/verify with token.
         var sessionCookie: String?
         let verifyBody = "token=\(rawToken)&next=/posts/\(secretSlug)"
         try await client.execute(
@@ -200,7 +199,6 @@ struct LoginFlowIntegrationTests {
           method: .post,
           headers: [
             .contentType: "application/x-www-form-urlencoded",
-            .origin: siteURL,
           ],
           body: ByteBuffer(string: verifyBody)
         ) { response in
@@ -241,7 +239,77 @@ struct LoginFlowIntegrationTests {
     }
   }
 
+  @Test(.disabled(if: !postgresEnabled()))
+  func consumeLoginTokenIsAtomicUnderConcurrency() async throws {
+    let logger = Logger(label: "test.token-atomicity")
+
+    let secretKeys = SecretsSpecifier<String, String>.specific([
+      "PGPASSWORD", "SMTP_PASSWORD",
+    ])
+    let config = ConfigReader(providers: [
+      EnvironmentVariablesProvider(secretsSpecifier: secretKeys),
+      try await EnvironmentVariablesProvider(
+        environmentFilePath: ".env",
+        allowMissing: true,
+        secretsSpecifier: secretKeys
+      ),
+    ])
+    let postgresSettings = try PostgresSettings.load(from: config)
+
+    let pgClient = PostgresClient(configuration: postgresSettings.configuration)
+    try await withThrowingTaskGroup(of: Void.self) { group in
+      group.addTask { await pgClient.run() }
+      defer { group.cancelAll() }
+
+      try await Migrations.run(client: pgClient, logger: logger)
+      let database = PostgresAuthDatabase(client: pgClient)
+      try await database.deleteExpiredLoginTokens(logger: logger)
+
+      let email = "token-atomicity-\(UUID().uuidString.prefix(8))@test.example"
+      let user = try await Self.ensureUser(
+        database: database, email: email, logger: logger)
+
+      let rawToken = "test-token-\(UUID().uuidString)"
+      let tokenHash = LoginTokenService.hash(rawToken)
+      let expiresAt = Date.now + 300
+
+      try await database.createLoginToken(
+        userID: user.id,
+        tokenHash: tokenHash,
+        expiresAt: expiresAt,
+        logger: logger
+      )
+
+      async let first = database.consumeLoginToken(hash: tokenHash, logger: logger)
+      async let second = database.consumeLoginToken(hash: tokenHash, logger: logger)
+      let (result1, result2) = try await (first, second)
+
+      let successes = [result1, result2].compactMap { $0 }
+      #expect(successes.count == 1)
+      #expect(successes.first == user.id)
+
+      let third = try await database.consumeLoginToken(hash: tokenHash, logger: logger)
+      #expect(third == nil)
+    }
+  }
+
   // MARK: - Helpers
+
+  private static func postgresEnabled() -> Bool {
+    let values = SMTPSettings.mergedEnvironment()
+    guard values["PG_INTEGRATION_TEST"]?.lowercased() == "true" else {
+      return false
+    }
+    guard
+      let host = values["PGHOST"], !host.isEmpty,
+      let portStr = values["PGPORT"], let port = Int(portStr),
+      port >= 1, port <= 65535,
+      let user = values["PGUSER"], !user.isEmpty,
+      let password = values["PGPASSWORD"], !password.isEmpty,
+      let database = values["PGDATABASE"], !database.isEmpty
+    else { return false }
+    return true
+  }
 
   private static func integrationEnabled() -> Bool {
     let values = SMTPSettings.mergedEnvironment()

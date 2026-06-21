@@ -9,5 +9,4 @@ struct AuthServices: Sendable {
   let smtp: SMTPSettings
   let siteURL: String
   let secureCookies: Bool
-  let privateDirectories: Set<String>
 }
