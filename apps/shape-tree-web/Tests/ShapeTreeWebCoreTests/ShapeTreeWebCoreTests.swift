@@ -223,6 +223,107 @@ import Testing
   }
 }
 
+@Suite struct NavContentResponseTests {
+  @Test func hidesPrivateGroupsWhenUnauthenticated() throws {
+    let (store, url) = try makePrivateStore()
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    let response = store.navContentResponse(
+      viewer: NavViewer(isAuthenticated: false),
+      wasmSlugs: ["Public", "Secret"]
+    )
+
+    #expect(response.viewer.isAuthenticated == false)
+    #expect(response.viewer.email == nil)
+    #expect(response.signIn?.href == "/login")
+    #expect(response.signIn?.label == "Sign in")
+    #expect(!response.groups.contains { $0.directory == "Private" })
+    #expect(response.groups.flatMap(\.items).contains { $0.slug == "Public" })
+    #expect(!response.groups.flatMap(\.items).contains { $0.slug == "Secret" })
+  }
+
+  @Test func showsPrivateGroupsWhenAuthenticated() throws {
+    let (store, url) = try makePrivateStore()
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    let response = store.navContentResponse(
+      viewer: NavViewer(isAuthenticated: true, email: "user@example.com"),
+      wasmSlugs: ["Public", "Secret"]
+    )
+
+    #expect(response.viewer.isAuthenticated == true)
+    #expect(response.viewer.email == "user@example.com")
+    #expect(response.signIn == nil)
+    #expect(response.groups.contains { $0.directory == "Private" })
+    #expect(response.groups.flatMap(\.items).contains { $0.slug == "Secret" })
+  }
+
+  @Test func marksWasmAvailabilityAndHref() throws {
+    let (store, url) = try makePrivateStore()
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    let response = store.navContentResponse(
+      viewer: NavViewer(isAuthenticated: false),
+      wasmSlugs: ["Public"]
+    )
+
+    let publicItem = response.groups.flatMap(\.items).first { $0.slug == "Public" }
+    #expect(publicItem?.hasWasm == true)
+    #expect(publicItem?.href == "/wasm/posts/Public")
+
+    let withoutWasm = store.navContentResponse(
+      viewer: NavViewer(isAuthenticated: false),
+      wasmSlugs: []
+    )
+    let fallbackItem = withoutWasm.groups.flatMap(\.items).first { $0.slug == "Public" }
+    #expect(fallbackItem?.hasWasm == false)
+    #expect(fallbackItem?.href == "/posts/Public")
+  }
+
+  @Test func encodesAndDecodesJSON() throws {
+    let (store, url) = try makePrivateStore()
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    let response = store.navContentResponse(
+      viewer: NavViewer(isAuthenticated: true, email: "user@example.com"),
+      wasmSlugs: ["Public"]
+    )
+
+    let data = try JSONEncoder().encode(response)
+    let decoded = try JSONDecoder().decode(NavContentResponse.self, from: data)
+    #expect(decoded == response)
+  }
+
+  private func makePrivateStore() throws -> (ContentStore, URL) {
+    let temporaryDirectory = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: temporaryDirectory.appendingPathComponent("Private", isDirectory: true),
+      withIntermediateDirectories: true
+    )
+    let publicPost = "---\ntitle: Public Post\n---\nHello."
+    let privatePost = "---\ntitle: Secret Post\n---\nSecret."
+    try publicPost.write(
+      to: temporaryDirectory.appendingPathComponent("Public.md"),
+      atomically: true,
+      encoding: .utf8
+    )
+    try privatePost.write(
+      to: temporaryDirectory.appendingPathComponent("Private/Secret.md"),
+      atomically: true,
+      encoding: .utf8
+    )
+
+    let store = try ContentStore(
+      contentDirectory: temporaryDirectory,
+      indexSlug: "Home",
+      loginSlug: "login",
+      privateDirectories: ["Private"]
+    )
+    return (store, temporaryDirectory)
+  }
+}
+
 @Suite struct MarkdownRendererTests {
   @Test func rendersHeadings() {
     let html = MarkdownRenderer.html(from: "# Title")
