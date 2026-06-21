@@ -77,6 +77,8 @@ extension ShapeTreeWeb {
       loginPost: store.loginPost
     )
 
+    WasmPostRoutes.register(on: router, store: store)
+
     ClientRoutes.register(on: router)
   }
 

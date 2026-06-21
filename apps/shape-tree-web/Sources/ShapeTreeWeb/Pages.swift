@@ -23,6 +23,43 @@ enum WebPages {
     }
   }
 
+  static func wasmPostShell(slug: String, title: String, siteTitle: String) -> HTML {
+    document(bodyAttrs: [.hxExt("head-support")]) {
+      meta(attrs: [.charset("utf-8"), .name("viewport"), .content("width=device-width, initial-scale=1")])
+      HTML.tag(.title) { "\(title) · \(siteTitle)" }
+      style(attrs: [.hxPreserve]) { HTML.raw(site_css) }
+      script(attrs: [.hxPreserve]) { HTML.raw(htmx_min_js) }
+      script(attrs: [.hxPreserve]) { HTML.raw(htmx_head_support) }
+      navClientScript()
+    } body: {
+      HTMX.Attributes.lazyNavShell(get: "/htmx/content/nav")
+      div(attrs: [.id("htmx-loading"), .class("htmx-indicator"), .ariaLive("polite")]) { "Loading…" }
+      main(attrs: [.id("main")]) {
+        p { "Loading \(title) via WASM…" }
+      }
+      script(attrs: [.type("module")]) {
+        HTML.raw(
+          """
+          import { init } from "/assets/client/index.js";
+
+          async function start() {
+            try {
+              await init({
+                module: fetch("/wasm/wasms/\(slug)", { cache: "no-store" }),
+              });
+            } catch (err) {
+              document.getElementById("main").innerHTML =
+                "<p style=\\\"color:red\\\">WASM load failed: " + err.message + "</p>";
+              console.error("[wasm-post] load failed", err);
+            }
+          }
+          void start();
+          """
+        )
+      }
+    }
+  }
+
   static func navigation(store: ContentStore, isAuthenticated: Bool = false) -> HTML {
     var items: [HTML] = [
       NavHTML.leaf(
@@ -42,12 +79,7 @@ enum WebPages {
     for group in store.postGroups(includingPrivate: isAuthenticated) {
       if let directory = group.directory {
         let branchItems = group.posts.map { post in
-          NavHTML.leaf(
-            href: post.path,
-            contentURL: post.contentURL,
-            target: "main",
-            name: post.title
-          )
+          navLeaf(for: post)
         }
         items.append(
           NavHTML.branch(
@@ -58,14 +90,7 @@ enum WebPages {
         )
       } else {
         for post in group.posts {
-          items.append(
-            NavHTML.leaf(
-              href: post.path,
-              contentURL: post.contentURL,
-              target: "main",
-              name: post.title
-            )
-          )
+          items.append(navLeaf(for: post))
         }
       }
     }
@@ -73,11 +98,30 @@ enum WebPages {
     return NavHTML.styled(NavHTML.list(class: "nav-root", items: items))
   }
 
+  private static func navLeaf(for post: Post) -> HTML {
+    if PostWasmAsset.isAvailable, !post.isIndex, !post.isLogin {
+      return NavHTML.leaf(
+        href: "/wasm/posts/\(post.slug)",
+        name: post.title
+      )
+    }
+    return NavHTML.leaf(
+      href: post.path,
+      contentURL: post.contentURL,
+      target: "main",
+      name: post.title
+    )
+  }
+
   static func pageArticle(for post: Post) -> HTML {
     if post.isIndex {
       return indexArticle(bodyHTML: post.bodyHTML)
     }
     return postArticle(post)
+  }
+
+  static func articleHTML(for post: Post) -> String {
+    pageArticle(for: post).render()
   }
 
   static func contentFragment(for post: Post, store: ContentStore) -> String {

@@ -183,7 +183,7 @@ public struct ContentStore: Sendable {
     return posts
   }
 
-  static func humanizedName(_ value: String) -> String {
+  public static func humanizedName(_ value: String) -> String {
     value
       .replacingOccurrences(of: "-", with: " ")
       .replacingOccurrences(of: "_", with: " ")
