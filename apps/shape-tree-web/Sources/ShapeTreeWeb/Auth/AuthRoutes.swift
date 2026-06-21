@@ -29,19 +29,6 @@ enum AuthRoutes {
     rateLimiter: LoginRateLimiter,
     siteTitle: String
   ) where C.Identity == User, C.Session == UUID {
-    let sessionConfig = SessionMiddlewareConfiguration(
-      sessionCookieParameters: .init(
-        name: "SESSION_ID",
-        secure: auth.secureCookies,
-        sameSite: .lax
-      ),
-      defaultSessionExpiration: auth.settings.sessionTTL
-    )
-
-    router.addMiddleware {
-      SessionMiddleware(storage: auth.persist, configuration: sessionConfig)
-    }
-
     router.get("login") { request, _ in
       let next = request.uri.queryParameters.get("next")
       return AuthPages.login(next: next, siteURL: auth.siteURL, siteTitle: siteTitle)

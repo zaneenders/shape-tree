@@ -67,21 +67,19 @@ enum ShapeTreeWeb {
       }
     }
 
-    if let auth {
-      let sessionConfig = SessionMiddlewareConfiguration(
-        sessionCookieParameters: .init(
-          name: "SESSION_ID",
-          secure: auth.services.secureCookies,
-          sameSite: .lax
-        ),
-        defaultSessionExpiration: auth.services.settings.sessionTTL
-      )
-      router.addMiddleware {
-        SessionMiddleware(storage: auth.services.persist, configuration: sessionConfig)
-        SessionAuthenticator(context: AppRequestContext.self) {
-          (userID: UUID, context: UserRepositoryContext) async throws -> User? in
-          try await auth.services.database.user(id: userID, logger: context.logger)
-        }
+    let sessionConfig = SessionMiddlewareConfiguration(
+      sessionCookieParameters: .init(
+        name: "SESSION_ID",
+        secure: auth.services.secureCookies,
+        sameSite: .lax
+      ),
+      defaultSessionExpiration: auth.services.settings.sessionTTL
+    )
+    router.addMiddleware {
+      SessionMiddleware(storage: auth.services.persist, configuration: sessionConfig)
+      SessionAuthenticator(context: AppRequestContext.self) {
+        (userID: UUID, context: UserRepositoryContext) async throws -> User? in
+        try await auth.services.database.user(id: userID, logger: context.logger)
       }
     }
 
@@ -91,7 +89,7 @@ enum ShapeTreeWeb {
 
     router.get("posts/:slug") { request, context in
       let slug = try context.parameters.require("slug")
-      guard let post = store.post(slug: slug), !post.isPrivate || auth != nil else {
+      guard let post = store.post(slug: slug), !post.isPrivate else {
         throw HTTPError(.notFound)
       }
       if post.isPrivate, context.identity == nil {
@@ -115,7 +113,7 @@ enum ShapeTreeWeb {
     router.get("htmx/content/posts/:slug") { request, context in
       try HTMX.requireRequest(request)
       let slug = try context.parameters.require("slug")
-      guard let post = store.post(slug: slug), !post.isPrivate || auth != nil else {
+      guard let post = store.post(slug: slug), !post.isPrivate else {
         throw HTTPError(.notFound)
       }
       if post.isPrivate, context.identity == nil {
@@ -125,15 +123,13 @@ enum ShapeTreeWeb {
       return htmlFragmentResponse(fragment)
     }
 
-    if let auth {
-      let rateLimiter = LoginRateLimiter()
-      AuthRoutes.addRoutes(
-        to: router,
-        auth: auth.services,
-        rateLimiter: rateLimiter,
-        siteTitle: store.siteTitle
-      )
-    }
+    let rateLimiter = LoginRateLimiter()
+    AuthRoutes.addRoutes(
+      to: router,
+      auth: auth.services,
+      rateLimiter: rateLimiter,
+      siteTitle: store.siteTitle
+    )
 
     ClientRoutes.register(on: router)
 
@@ -154,14 +150,12 @@ enum ShapeTreeWeb {
     )
     app.addServices(adminApp)
 
-    if let auth {
-      app.addServices(auth.postgresClient)
-      let startupLogger = app.logger
-      app.beforeServerStarts {
-        try await Migrations.run(client: auth.postgresClient, logger: startupLogger)
-        try await auth.services.database.deleteExpiredLoginTokens(logger: startupLogger)
-        try await auth.persistDriver.tidyExpired()
-      }
+    app.addServices(auth.postgresClient)
+    let startupLogger = app.logger
+    app.beforeServerStarts {
+      try await Migrations.run(client: auth.postgresClient, logger: startupLogger)
+      try await auth.services.database.deleteExpiredLoginTokens(logger: startupLogger)
+      try await auth.persistDriver.tidyExpired()
     }
 
     if !otel.disabled {
@@ -172,7 +166,6 @@ enum ShapeTreeWeb {
     if !privateDirectories.isEmpty {
       app.logger.info("Private directories: \(privateDirectories.sorted().joined(separator: ", "))")
     }
-    app.logger.info("Auth enabled=\(auth != nil)")
     app.logger.info("Listening on http://\(host):\(port)")
     app.logger.info("Admin server listening on http://\(adminHost):\(adminPort)")
     app.logger.info("OpenTelemetry disabled=\(otel.disabled)")
@@ -219,7 +212,7 @@ enum ShapeTreeWeb {
     from config: ConfigReader,
     siteURL: String,
     logger: Logger
-  ) async throws -> AuthServicesBundle? {
+  ) async throws -> AuthServicesBundle {
     do {
       let postgresSettings = try PostgresSettings.load(from: config)
       let client = PostgresClient(configuration: postgresSettings.configuration)
@@ -245,8 +238,8 @@ enum ShapeTreeWeb {
         persistDriver: persist,
         postgresClient: client
       )
-    } catch is PostgresSettings.ConfigError {
-      return nil
+    } catch {
+      throw ShapeTreeSetupError.authSetup("\(error)")
     }
   }
 

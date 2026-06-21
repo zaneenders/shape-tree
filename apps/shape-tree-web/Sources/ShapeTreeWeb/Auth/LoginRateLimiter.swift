@@ -1,5 +1,6 @@
 import Foundation
 
+// TODO: Test this.
 actor LoginRateLimiter {
   private var emailHits: [String: [Date]] = [:]
   private var ipHits: [String: [Date]] = [:]
