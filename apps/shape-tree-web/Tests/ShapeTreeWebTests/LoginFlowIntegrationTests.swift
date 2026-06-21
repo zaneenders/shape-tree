@@ -12,12 +12,26 @@ import Testing
 
 @testable import ShapeTreeWeb
 
+/// Suite-level gate: enabled when `SMTP_INTEGRATION_TEST=true` and SMTP/IMAP
+/// credentials are available in the environment or `.env`.
+private func loginFlowSuiteEnabled() -> Bool {
+  let values = SMTPSettings.mergedEnvironment()
+  guard values["SMTP_INTEGRATION_TEST"]?.lowercased() == "true" else {
+    return false
+  }
+  guard SMTPSettings.loadFromEnvironment() != nil,
+    IMAPSettings.loadFromEnvironment() != nil
+  else { return false }
+  let recipient = values["SMTP_TEST_TO"] ?? values["SMTP_FROM"]
+  return !(recipient ?? "").isEmpty
+}
+
 /// Full end-to-end login flow test against a real Postgres + SMTP/IMAP provider.
 ///
 /// Exercises the entire magic-link login flow in-process via Hummingbird's
 /// `.router` test framework:
 ///
-/// 1. Asserts a private post is hidden (redirect to /login) when unauthenticated.
+/// 1. Asserts a private post returns 404 (hidden) when unauthenticated.
 /// 2. Asserts the navigation does not show the private directory when unauthenticated.
 /// 3. Triggers a login email via POST /auth/login.
 /// 4. Polls IMAP for the login email and extracts the token from the link.
@@ -25,19 +39,34 @@ import Testing
 /// 6. Asserts the private post is now visible (200 OK with content).
 /// 7. Asserts the navigation now shows the private directory.
 ///
-/// Required environment variables:
-/// - `SMTP_INTEGRATION_TEST=true`
-/// - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`
-/// - `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE`
-/// - IMAP uses the same credentials; optional `IMAP_HOST`, `IMAP_PORT`, `IMAP_MAILBOX`
-/// - `SMTP_TEST_TO` — defaults to `SMTP_FROM` (send to self)
+/// The suite automatically starts the docker-compose `postgres` service in
+/// ``init`` and stops it in ``deinit`` — no manual setup needed. SMTP/IMAP
+/// credentials are read from `.env`.
+///
+/// Set `SMTP_INTEGRATION_TEST=true` to enable the suite (skipped otherwise):
 ///
 /// ```console
 /// SMTP_INTEGRATION_TEST=true swift test --filter LoginFlowIntegrationTests
 /// ```
-@Suite(.timeLimit(.minutes(2)))
-struct LoginFlowIntegrationTests {
-  @Test(.disabled(if: !integrationEnabled()))
+@Suite(.serialized, .timeLimit(.minutes(2)), .disabled(if: !loginFlowSuiteEnabled()))
+struct LoginFlowIntegrationTests: ~Copyable {
+
+  /// True when this instance started Postgres (and should stop it in deinit).
+  private let startedPostgres: Bool
+
+  init() async throws {
+    startedPostgres = try await Self.startPostgres()
+  }
+
+  deinit {
+    if startedPostgres {
+      Self.stopPostgres()
+    }
+  }
+
+  // MARK: - Tests
+
+  @Test
   func fullLoginFlowShowsPrivateContentAfterAuthentication() async throws {
     let values = SMTPSettings.mergedEnvironment()
     let logger = Logger(label: "test.login-flow")
@@ -51,17 +80,7 @@ struct LoginFlowIntegrationTests {
       return
     }
 
-    let secretKeys = SecretsSpecifier<String, String>.specific([
-      "PGPASSWORD", "SMTP_PASSWORD",
-    ])
-    let config = ConfigReader(providers: [
-      EnvironmentVariablesProvider(secretsSpecifier: secretKeys),
-      try await EnvironmentVariablesProvider(
-        environmentFilePath: ".env",
-        allowMissing: true,
-        secretsSpecifier: secretKeys
-      ),
-    ])
+    let config = try await Self.makeConfig()
     let postgresSettings = try PostgresSettings.load(from: config)
     let testEmail = smtpSettings.fromAddress
 
@@ -126,10 +145,9 @@ struct LoginFlowIntegrationTests {
       try await app.test(.router) { client in
         let htmxHeader = HTTPField.Name("HX-Request")!
 
-        // 1. Unauthenticated: private post redirects to login.
+        // 1. Unauthenticated: private post returns 404 (hidden, not redirected).
         try await client.execute(uri: "/posts/\(secretSlug)", method: .get) { response in
-          #expect(response.status == .seeOther)
-          #expect(response.headers[.location]?.contains("/login") == true)
+          #expect(response.status == .notFound)
         }
 
         // 2. Unauthenticated: nav omits private content.
@@ -198,7 +216,7 @@ struct LoginFlowIntegrationTests {
           uri: "/auth/verify",
           method: .post,
           headers: [
-            .contentType: "application/x-www-form-urlencoded",
+            .contentType: "application/x-www-form-urlencoded"
           ],
           body: ByteBuffer(string: verifyBody)
         ) { response in
@@ -239,21 +257,11 @@ struct LoginFlowIntegrationTests {
     }
   }
 
-  @Test(.disabled(if: !postgresEnabled()))
+  @Test
   func consumeLoginTokenIsAtomicUnderConcurrency() async throws {
     let logger = Logger(label: "test.token-atomicity")
 
-    let secretKeys = SecretsSpecifier<String, String>.specific([
-      "PGPASSWORD", "SMTP_PASSWORD",
-    ])
-    let config = ConfigReader(providers: [
-      EnvironmentVariablesProvider(secretsSpecifier: secretKeys),
-      try await EnvironmentVariablesProvider(
-        environmentFilePath: ".env",
-        allowMissing: true,
-        secretsSpecifier: secretKeys
-      ),
-    ])
+    let config = try await Self.makeConfig()
     let postgresSettings = try PostgresSettings.load(from: config)
 
     let pgClient = PostgresClient(configuration: postgresSettings.configuration)
@@ -293,43 +301,93 @@ struct LoginFlowIntegrationTests {
     }
   }
 
+  // MARK: - Docker lifecycle
+
+  /// Returns `true` if this call started Postgres (caller should stop it later),
+  /// `false` if it was already running.
+  private static func startPostgres() async throws -> Bool {
+    let compose = composeFilePath()
+
+    if isPostgresRunning(compose: compose) {
+      return false
+    }
+
+    let logger = Logger(label: "test.docker")
+    logger.info("Starting docker-compose postgres…")
+
+    try runProcess("/usr/local/bin/docker", ["compose", "-f", compose, "up", "-d", "postgres"])
+
+    let deadline = Date().addingTimeInterval(30)
+    while Date() < deadline {
+      if pgIsReady(compose: compose) {
+        logger.info("Postgres is ready")
+        return true
+      }
+      try await Task.sleep(for: .seconds(1))
+    }
+    throw PostgresStartupError("Postgres did not become ready within 30s")
+  }
+
+  /// Best-effort stop from `deinit` (can't be async until Swift 6.4).
+  private static func stopPostgres() {
+    let compose = composeFilePath()
+    let logger = Logger(label: "test.docker")
+    logger.info("Stopping docker-compose postgres")
+    _ = try? runProcess("/usr/local/bin/docker", ["compose", "-f", compose, "stop", "postgres"])
+  }
+
+  private static func isPostgresRunning(compose: String) -> Bool {
+    guard
+      let output = try? runProcessCapture(
+        "/usr/local/bin/docker",
+        ["compose", "-f", compose, "ps", "postgres", "--format", "json"]
+      )
+    else { return false }
+    return output.contains("\"running\"") || output.contains("\"State\":\"running\"")
+      || output.contains("\"status\":\"running\"")
+  }
+
+  private static func pgIsReady(compose: String) -> Bool {
+    let code = try? runProcessExitCode(
+      "/usr/local/bin/docker",
+      ["compose", "-f", compose, "exec", "-T", "postgres", "pg_isready", "-U", "shape_tree"])
+    return code == 0
+  }
+
+  private static func composeFilePath() -> String {
+    FileManager.default.currentDirectoryPath + "/../../docker-compose.yml"
+  }
+
+  private enum PostgresStartupError: Error, CustomStringConvertible {
+    case message(String)
+    init(_ text: String) { self = .message(text) }
+    var description: String {
+      if case .message(let text) = self { text } else { "PostgresStartupError" }
+    }
+  }
+
+  // MARK: - Config
+
+  /// Builds a `ConfigReader` that reads from the process environment and `.env`,
+  /// overriding `PGHOST` to `127.0.0.1` so the test can reach the docker-compose
+  /// Postgres port-forward (the `.env` default `postgres` only resolves inside Docker).
+  private static func makeConfig() async throws -> ConfigReader {
+    let secretKeys = SecretsSpecifier<String, String>.specific([
+      "PGPASSWORD", "SMTP_PASSWORD",
+    ])
+    var env = ProcessInfo.processInfo.environment
+    env["PGHOST"] = "127.0.0.1"
+    return ConfigReader(providers: [
+      EnvironmentVariablesProvider(environmentVariables: env, secretsSpecifier: secretKeys),
+      try await EnvironmentVariablesProvider(
+        environmentFilePath: ".env",
+        allowMissing: true,
+        secretsSpecifier: secretKeys
+      ),
+    ])
+  }
+
   // MARK: - Helpers
-
-  private static func postgresEnabled() -> Bool {
-    let values = SMTPSettings.mergedEnvironment()
-    guard values["PG_INTEGRATION_TEST"]?.lowercased() == "true" else {
-      return false
-    }
-    guard
-      let host = values["PGHOST"], !host.isEmpty,
-      let portStr = values["PGPORT"], let port = Int(portStr),
-      port >= 1, port <= 65535,
-      let user = values["PGUSER"], !user.isEmpty,
-      let password = values["PGPASSWORD"], !password.isEmpty,
-      let database = values["PGDATABASE"], !database.isEmpty
-    else { return false }
-    return true
-  }
-
-  private static func integrationEnabled() -> Bool {
-    let values = SMTPSettings.mergedEnvironment()
-    guard values["SMTP_INTEGRATION_TEST"]?.lowercased() == "true" else {
-      return false
-    }
-    guard SMTPSettings.loadFromEnvironment() != nil,
-      IMAPSettings.loadFromEnvironment() != nil
-    else { return false }
-    guard
-      let host = values["PGHOST"], !host.isEmpty,
-      let portStr = values["PGPORT"], let port = Int(portStr),
-      port >= 1, port <= 65535,
-      let user = values["PGUSER"], !user.isEmpty,
-      let password = values["PGPASSWORD"], !password.isEmpty,
-      let database = values["PGDATABASE"], !database.isEmpty
-    else { return false }
-    let recipient = values["SMTP_TEST_TO"] ?? values["SMTP_FROM"]
-    return !(recipient ?? "").isEmpty
-  }
 
   private static func ensureUser(
     database: PostgresAuthDatabase,
@@ -376,5 +434,35 @@ struct LoginFlowIntegrationTests {
     let parts = setCookie.split(separator: ";")
     guard let first = parts.first else { return "" }
     return String(first).trimmingCharacters(in: .whitespaces)
+  }
+
+  // MARK: - Process helpers
+
+  @discardableResult
+  private static func runProcess(_ executable: String, _ args: [String]) throws -> Process {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: executable)
+    process.arguments = args
+    process.standardOutput = FileHandle(forWritingAtPath: "/dev/null")
+    process.standardError = FileHandle(forWritingAtPath: "/dev/null")
+    try process.run()
+    process.waitUntilExit()
+    return process
+  }
+
+  private static func runProcessExitCode(_ executable: String, _ args: [String]) throws -> Int32 {
+    try runProcess(executable, args).terminationStatus
+  }
+
+  private static func runProcessCapture(_ executable: String, _ args: [String]) throws -> String {
+    let pipe = Pipe()
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: executable)
+    process.arguments = args
+    process.standardOutput = pipe
+    process.standardError = FileHandle(forWritingAtPath: "/dev/null")
+    try process.run()
+    process.waitUntilExit()
+    return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
   }
 }

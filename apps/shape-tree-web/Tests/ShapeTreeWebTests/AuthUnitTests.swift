@@ -104,31 +104,6 @@ import Testing
   @Test func safeNextPathRejectsEmpty() {
     #expect(AuthMiddleware.safeNextPath("") == nil)
   }
-
-  @Test func loginRedirectURLReturnsDefaultWhenNextIsNil() {
-    #expect(AuthMiddleware.loginRedirectURL(next: nil) == "/login")
-  }
-
-  @Test func loginRedirectURLReturnsDefaultWhenNextIsEmpty() {
-    #expect(AuthMiddleware.loginRedirectURL(next: "") == "/login")
-  }
-
-  @Test func loginRedirectURLReturnsDefaultWhenNextIsExternal() {
-    #expect(AuthMiddleware.loginRedirectURL(next: "http://evil.com") == "/login")
-  }
-
-  @Test func loginRedirectURLReturnsDefaultWhenNextIsDoubleSlash() {
-    #expect(AuthMiddleware.loginRedirectURL(next: "//evil.com") == "/login")
-  }
-
-  @Test func loginRedirectURLEncodesNextPath() {
-    #expect(AuthMiddleware.loginRedirectURL(next: "/posts/secret") == "/login?next=/posts/secret")
-  }
-
-  @Test func loginRedirectURLEncodesSpacesInNextPath() {
-    let url = AuthMiddleware.loginRedirectURL(next: "/posts/hello world")
-    #expect(url.contains("hello%20world"))
-  }
 }
 
 @Suite struct SMTPMessageEncodingTests {

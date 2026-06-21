@@ -1,5 +1,7 @@
 import Foundation
+import HTML
 import Hummingbird
+import ShapeTreeWebAssets
 import ShapeTreeWebCore
 
 enum AuthPages {
@@ -9,138 +11,80 @@ enum AuthPages {
     siteTitle: String,
     loginPost: Post? = nil
   ) -> Response {
-    let formHTML = loginFormHTML(next: next)
-    let body: String
+    let form = loginForm(next: next)
+    let body: HTML
     if let loginPost {
-      let rendered = substituteLoginForm(in: loginPost.bodyHTML, formHTML: formHTML)
-      body = """
-        <article>
-          <h1>\(escapeHTML(loginPost.title))</h1>
-          \(rendered)
-        </article>
-        """
+      let rendered = substituteLoginForm(in: loginPost.bodyHTML, formHTML: form.render())
+      body = article {
+        h1 { loginPost.title }
+        HTML.raw(rendered)
+      }
     } else {
-      body = """
-        <article>
-          <h1>Sign in</h1>
-          <p>Enter your email and we will send you a sign-in link.</p>
-          \(formHTML)
-        </article>
-        """
+      body = article {
+        h1 { "Sign in" }
+        p { "Enter your email and we will send you a sign-in link." }
+        form
+      }
     }
-    let html = pageShell(
-      title: "Sign in | \(siteTitle)",
-      body: body,
-      siteTitle: siteTitle
-    )
-    return html.makeHTMLResponse()
+    return pageShell(title: "Sign in | \(siteTitle)", body: body).makeHTMLResponse()
   }
 
   static func checkEmail(siteURL: String, siteTitle: String) -> Response {
-    let html = pageShell(
-      title: "Check your email | \(siteTitle)",
-      body: """
-        <article>
-          <h1>Check your email</h1>
-          <p>If your address is allowed, you will receive a sign-in link shortly.</p>
-          <p><a href="/login">Back to sign in</a></p>
-        </article>
-        """,
-      siteTitle: siteTitle
-    )
-    return html.makeHTMLResponse()
+    let body = article {
+      h1 { "Check your email" }
+      p { "If your address is allowed, you will receive a sign-in link shortly." }
+      p {
+        a(attrs: [.href("/login")]) { "Back to sign in" }
+      }
+    }
+    return pageShell(title: "Check your email | \(siteTitle)", body: body).makeHTMLResponse()
   }
 
   static func verifyConfirm(token: String, next: String?, siteURL: String, siteTitle: String) -> Response {
-    let escaped = escapeHTML(token)
-    let nextField: String
-    if let next, !next.isEmpty {
-      nextField = #"<input type="hidden" name="next" value="\#(escapeHTML(next))">"#
-    } else {
-      nextField = ""
+    let body = article {
+      h1 { "Confirm sign in" }
+      p { "Click below to finish signing in on this device." }
+      form(attrs: [.method("post"), .action("/auth/verify")]) {
+        hiddenField(name: "token", value: token)
+        if let next, !next.isEmpty {
+          hiddenField(name: "next", value: next)
+        }
+        button(attrs: [.type("submit")]) { "Sign in" }
+      }
     }
-    let html = pageShell(
-      title: "Confirm sign in | \(siteTitle)",
-      body: """
-        <article>
-          <h1>Confirm sign in</h1>
-          <p>Click below to finish signing in on this device.</p>
-          <form method="post" action="/auth/verify">
-            <input type="hidden" name="token" value="\(escaped)">
-            \(nextField)
-            <button type="submit">Sign in</button>
-          </form>
-        </article>
-        """,
-      siteTitle: siteTitle
-    )
-    return html.makeHTMLResponse()
+    return pageShell(title: "Confirm sign in | \(siteTitle)", body: body).makeHTMLResponse()
   }
 
   static func verifyFailed(siteURL: String, siteTitle: String) -> Response {
-    let html = pageShell(
-      title: "Sign in failed | \(siteTitle)",
-      body: """
-        <article>
-          <h1>Link expired or invalid</h1>
-          <p>This sign-in link may have expired or already been used.</p>
-          <p><a href="/login">Request a new link</a></p>
-        </article>
-        """,
-      siteTitle: siteTitle
-    )
-    return html.makeHTMLResponse()
-  }
-
-  private static func pageShell(title: String, body: String, siteTitle: String) -> String {
-    """
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <title>\(escapeHTML(title))</title>
-      <style>
-        :root { color-scheme: light dark; }
-        body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
-        article { background: color-mix(in srgb, currentColor 5%, transparent); padding: 1.5rem; border-radius: 0.5rem; }
-        form { display: flex; flex-direction: column; gap: 0.75rem; }
-        input, button { font: inherit; padding: 0.5rem; }
-        button { align-self: flex-start; cursor: pointer; }
-        a { color: inherit; }
-      </style>
-    </head>
-    <body>
-      \(body)
-    </body>
-    </html>
-    """
-  }
-
-  private static func escapeHTML(_ text: String) -> String {
-    text
-      .replacingOccurrences(of: "&", with: "&amp;")
-      .replacingOccurrences(of: "\"", with: "&quot;")
-      .replacingOccurrences(of: "<", with: "&lt;")
-      .replacingOccurrences(of: ">", with: "&gt;")
-  }
-
-  private static func loginFormHTML(next: String?) -> String {
-    let nextField: String
-    if let next, !next.isEmpty {
-      let escaped = escapeHTML(next)
-      nextField = #"<input type="hidden" name="next" value="\#(escaped)">"#
-    } else {
-      nextField = ""
+    let body = article {
+      h1 { "Link expired or invalid" }
+      p { "This sign-in link may have expired or already been used." }
+      p {
+        a(attrs: [.href("/login")]) { "Request a new link" }
+      }
     }
-    return """
-      <form method="post" action="/auth/login">
-        <label for="email">Email</label>
-        <input id="email" name="email" type="email" autocomplete="email" required>
-        \(nextField)
-        <button type="submit">Send link</button>
-      </form>
-      """
+    return pageShell(title: "Sign in failed | \(siteTitle)", body: body).makeHTMLResponse()
+  }
+
+  private static func pageShell(title: String, body: HTML) -> HTML {
+    document(lang: "en") {
+      HTML.void(.meta, attrs: [.charset("utf-8"), .name("viewport"), .content("width=device-width, initial-scale=1")])
+      HTML.tag(.title) { title }
+      HTML.raw("<style>\n\(auth_css)\n</style>")
+    } body: {
+      body
+    }
+  }
+
+  private static func loginForm(next: String?) -> HTML {
+    form(attrs: [.method("post"), .action("/auth/login")]) {
+      label(attrs: [.forID("email")]) { "Email" }
+      HTML.void(.input, attrs: [.id("email"), .name("email"), .type("email"), .autocomplete("email"), .required])
+      if let next, !next.isEmpty {
+        hiddenField(name: "next", value: next)
+      }
+      button(attrs: [.type("submit")]) { "Send link" }
+    }
   }
 
   /// Substitutes the login form into a rendered markdown body at the `{{login}}`
@@ -148,20 +92,11 @@ enum AuthPages {
   private static func substituteLoginForm(in bodyHTML: String, formHTML: String) -> String {
     let placeholder = "{{login}}"
     if bodyHTML.contains(placeholder) {
-      return bodyHTML
+      return
+        bodyHTML
         .replacingOccurrences(of: "<p>\(placeholder)</p>", with: formHTML)
         .replacingOccurrences(of: placeholder, with: formHTML)
     }
     return bodyHTML + "\n" + formHTML
-  }
-}
-
-extension String {
-  fileprivate func makeHTMLResponse() -> Response {
-    Response(
-      status: .ok,
-      headers: [.contentType: "text/html; charset=utf-8"],
-      body: .init(byteBuffer: ByteBuffer(string: self))
-    )
   }
 }

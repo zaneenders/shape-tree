@@ -190,7 +190,7 @@ enum ShapeTreeWeb {
           body: .init())
       }
       if post.isPrivate, context.identity == nil {
-        return AuthMiddleware.unauthenticatedResponse(request: request, next: request.uri.path)
+        throw HTTPError(.notFound)
       }
       return WebPages.shell(store: store, initial: post).makeHTMLResponse()
     }
@@ -220,7 +220,7 @@ enum ShapeTreeWeb {
         throw HTTPError(.notFound)
       }
       if post.isPrivate, context.identity == nil {
-        return AuthMiddleware.unauthenticatedResponse(request: request, next: "/posts/\(slug)")
+        throw HTTPError(.notFound)
       }
       let fragment = WebPages.contentFragment(for: post, store: store)
       return htmlFragmentResponse(fragment)
