@@ -3,7 +3,7 @@ import Hummingbird
 import RegexBuilder
 
 enum AuthMiddleware {
-  static func normalizedEmail(_ raw: String) -> String {
+  private static func normalizedEmail(_ raw: String) -> String {
     raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
   }
 
