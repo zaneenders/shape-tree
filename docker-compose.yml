@@ -34,6 +34,7 @@ services:
       PGDATABASE: shape_tree
     volumes:
       - ./apps/shape-tree-web/Examples:/Examples:ro
+      - /Users/zane/Content:/Users/zane/Content:ro
     ports:
       - "127.0.0.1:42069:42069"
       - "127.0.0.1:42070:42070"

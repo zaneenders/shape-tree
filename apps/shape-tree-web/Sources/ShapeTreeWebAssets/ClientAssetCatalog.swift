@@ -8,14 +8,14 @@ public enum ClientAssetCatalog {
   }
 
   public static var isAvailable: Bool {
-    ClientWasm.isAvailable
+    NavWasm.isAvailable
   }
 
   public static func entry(forRelativePath path: String) -> Entry? {
     switch path {
-    case "WASMClient.wasm":
-      guard ClientWasm.isAvailable else { return nil }
-      return .wasm(ClientWasm.bytes)
+    case "WASMNav.wasm":
+      guard NavWasm.isAvailable else { return nil }
+      return .wasm(NavWasm.bytes)
     case "index.js":
       return .script(client_index_js)
     case "instantiate.js":

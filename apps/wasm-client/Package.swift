@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-  name: "WASMClient",
+  name: "WASMNav",
   platforms: [
     .macOS(.v26)
   ],
@@ -12,7 +12,7 @@ let package = Package(
   ],
   targets: [
     .executableTarget(
-      name: "WASMClient",
+      name: "WASMNav",
       dependencies: [
         .product(name: "JavaScriptKit", package: "JavaScriptKit")
       ],

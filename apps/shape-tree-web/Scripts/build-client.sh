@@ -21,7 +21,7 @@ if ! command -v wasm-opt >/dev/null; then
   exit 1
 fi
 
-echo "Building WASM client with ${SDK}..."
+echo "Building WASMNav with ${SDK}..."
 rm -rf "$BUILD_DIR" "$CLIENT/.build/plugins/PackageToJS/outputs/js.tmp"
 (
   cd "$CLIENT"
@@ -30,10 +30,10 @@ rm -rf "$BUILD_DIR" "$CLIENT/.build/plugins/PackageToJS/outputs/js.tmp"
   swift package \
     --swift-sdk "$SDK" \
     --allow-writing-to-package-directory \
-    js --product WASMClient --output "$BUILD_DIR" --configuration release --debug-info-format none
+    js --product WASMNav --output "$BUILD_DIR" --configuration release --debug-info-format none
 )
 
-WASM="$BUILD_DIR/WASMClient.wasm"
+WASM="$BUILD_DIR/WASMNav.wasm"
 if [[ ! -f "$WASM" ]]; then
   echo "error: wasm output missing at ${WASM}" >&2
   exit 1
@@ -45,14 +45,14 @@ rm -rf "$OUT_JS"
 mkdir -p "$OUT_JS/platforms"
 cp "$BUILD_DIR/index.js" "$BUILD_DIR/instantiate.js" "$BUILD_DIR/runtime.js" "$OUT_JS/"
 cp "$BUILD_DIR/platforms/browser.js" "$OUT_JS/platforms/"
-cp "$WASM" "$ASSETS/ClientWasm.wasm"
+cp "$WASM" "$ASSETS/WASMNav.wasm"
 
 # WASI shim is committed under Sources/ShapeTreeWebAssets/Vendor/ and served locally.
 perl -pi -e "s|'\\@bjorn3/browser_wasi_shim'|'../browser_wasi_shim.js'|g" \
   "$OUT_JS/platforms/browser.js"
 
 echo "Wrote client JS to ${OUT_JS}"
-echo "Wrote ${ASSETS}/ClientWasm.wasm"
+echo "Wrote ${ASSETS}/WASMNav.wasm"
 
 # --- Per-page WASM: generate one .wasm per markdown file ---
 

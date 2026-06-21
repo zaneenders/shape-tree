@@ -119,6 +119,7 @@ struct LoginFlowIntegrationTests: ~Copyable {
       let store = try ContentStore(
         contentDirectory: contentDir,
         indexSlug: "Home",
+        loginSlug: "login",
         privateDirectories: ["Private"]
       )
       let initial = store.indexPost ?? store.publishedPosts.first!

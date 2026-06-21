@@ -1,5 +1,6 @@
 import Configuration
 import Foundation
+import ShapeTreeWebAssets
 import Hummingbird
 import Logging
 import ShapeTreeWebAuth
@@ -106,6 +107,9 @@ enum ShapeTreeWeb {
       app.logger.info("Private directories: \(privateDirectories.sorted().joined(separator: ", "))")
     }
     app.logger.info("Listening on http://\(host):\(port)")
+    if PostWasmAsset.isAvailable {
+      app.logger.info("Embedded \(PostWasmAsset.availableSlugs.count) wasm post(s)")
+    }
     app.logger.info("Admin server listening on http://\(adminHost):\(adminPort)")
     app.logger.info("OpenTelemetry disabled=\(otel.disabled)")
 

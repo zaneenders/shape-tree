@@ -1,7 +1,7 @@
 import JavaScriptKit
 
 @main
-enum NavDismiss {
+enum WASMNav {
   nonisolated(unsafe) static var listeners: [JSClosure] = []
 
   static func main() {
@@ -11,7 +11,7 @@ enum NavDismiss {
   }
 
   static func log(_ message: String) {
-    _ = JSObject.global.console.log("[nav] \(message)")
+    _ = JSObject.global.console.log("[wasm-nav] \(message)")
   }
 }
 
@@ -29,11 +29,11 @@ private func registerListeners(on document: JSValue) {
     if target.checked.boolean == true {
       closeSiblingDisclosures(clicked: target)
     }
-    NavDismiss.log("disclosure change")
+    WASMNav.log("disclosure change")
     syncBackdrop(in: document)
     return .undefined
   }
-  NavDismiss.listeners.append(changeListener)
+  WASMNav.listeners.append(changeListener)
   _ = document.addEventListener("change", JSValue.object(changeListener))
 
   let clickListener = JSClosure { arguments in
@@ -44,20 +44,31 @@ private func registerListeners(on document: JSValue) {
       return .undefined
     }
 
+    if let wasmLink = target.closest!("a.nav-wasm-link").object {
+      _ = event.preventDefault?()
+      if let slug = wasmDataset(wasmLink, key: "wasmSlug") {
+        let title = wasmDataset(wasmLink, key: "wasmTitle")
+        WASMNav.log("wasm nav link: \(slug)")
+        loadWasmPost(slug: slug, title: title, pushState: true)
+      }
+      closeAll(in: document)
+      return .undefined
+    }
+
     if !isContained(nav, target) {
-      NavDismiss.log("click away")
+      WASMNav.log("click away")
       closeAll(in: document)
       return .undefined
     }
 
     if target.closest!("a.nav-link").object != nil {
-      NavDismiss.log("nav link click")
+      WASMNav.log("nav link click")
       closeAll(in: document)
     }
 
     return .undefined
   }
-  NavDismiss.listeners.append(clickListener)
+  WASMNav.listeners.append(clickListener)
   _ = document.addEventListener("click", JSValue.object(clickListener))
 
   let keydownListener = JSClosure { arguments in
@@ -66,11 +77,11 @@ private func registerListeners(on document: JSValue) {
     else {
       return .undefined
     }
-    NavDismiss.log("escape")
+    WASMNav.log("escape")
     closeAll(in: document)
     return .undefined
   }
-  NavDismiss.listeners.append(keydownListener)
+  WASMNav.listeners.append(keydownListener)
   _ = document.addEventListener("keydown", JSValue.object(keydownListener))
 
   let afterSwapListener = JSClosure { arguments in
@@ -81,17 +92,17 @@ private func registerListeners(on document: JSValue) {
     else {
       return .undefined
     }
-    NavDismiss.log("htmx main swap")
+    WASMNav.log("htmx main swap")
     closeAll(in: document)
     return .undefined
   }
-  NavDismiss.listeners.append(afterSwapListener)
+  WASMNav.listeners.append(afterSwapListener)
   _ = document.addEventListener("htmx:afterSwap", JSValue.object(afterSwapListener))
 
   let afterSettleListener = JSClosure { _ in
     syncBackdrop(in: document)
     return .undefined
   }
-  NavDismiss.listeners.append(afterSettleListener)
+  WASMNav.listeners.append(afterSettleListener)
   _ = document.addEventListener("htmx:afterSettle", JSValue.object(afterSettleListener))
 }

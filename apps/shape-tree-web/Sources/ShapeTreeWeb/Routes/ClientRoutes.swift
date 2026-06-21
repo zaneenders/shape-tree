@@ -10,7 +10,7 @@ enum ClientRoutes {
     guard ClientAssetCatalog.isAvailable else { return }
 
     for relativePath in [
-      "WASMClient.wasm",
+      "WASMNav.wasm",
       "index.js",
       "instantiate.js",
       "runtime.js",

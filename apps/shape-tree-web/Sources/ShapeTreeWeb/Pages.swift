@@ -6,27 +6,22 @@ import ShapeTreeWebAssets
 import ShapeTreeWebCore
 
 enum WebPages {
-  static func shell(store: ContentStore, initial: Post) -> HTML {
-    document(bodyAttrs: [.hxExt("head-support")]) {
-      meta(attrs: [.charset("utf-8"), .name("viewport"), .content("width=device-width, initial-scale=1")])
-      HTML.tag(.title) { pageTitle(for: initial, siteTitle: store.siteTitle) }
-      style(attrs: [.hxPreserve]) { HTML.raw(site_css) }
-      script(attrs: [.hxPreserve]) { HTML.raw(htmx_min_js) }
-      script(attrs: [.hxPreserve]) { HTML.raw(htmx_head_support) }
-      navClientScript()
-    } body: {
-      HTMX.Attributes.lazyNavShell(get: "/htmx/content/nav")
-      div(attrs: [.id("htmx-loading"), .class("htmx-indicator"), .ariaLive("polite")]) { "Loading…" }
-      main(attrs: [.id("main")]) {
-        pageArticle(for: initial)
-      }
+  static func shell(
+    store: ContentStore,
+    initial: Post,
+    wasmBoot: (slug: String, title: String)? = nil
+  ) -> HTML {
+    var bodyAttrs: [HTMLAttr] = [.hxExt("head-support")]
+    if let wasmBoot {
+      bodyAttrs.append(.flag("data-initial-wasm-slug=\"\(htmlAttrEscape(wasmBoot.slug))\""))
+      bodyAttrs.append(.flag("data-initial-wasm-title=\"\(htmlAttrEscape(wasmBoot.title))\""))
     }
-  }
 
-  static func wasmPostShell(slug: String, title: String, siteTitle: String) -> HTML {
-    document(bodyAttrs: [.hxExt("head-support")]) {
+    return document(bodyAttrs: bodyAttrs) {
       meta(attrs: [.charset("utf-8"), .name("viewport"), .content("width=device-width, initial-scale=1")])
-      HTML.tag(.title) { "\(title) · \(siteTitle)" }
+      HTML.tag(.title, attrs: [.flag("data-site-title=\"\(htmlAttrEscape(store.siteTitle))\"")]) {
+        pageTitle(for: initial, siteTitle: store.siteTitle)
+      }
       style(attrs: [.hxPreserve]) { HTML.raw(site_css) }
       script(attrs: [.hxPreserve]) { HTML.raw(htmx_min_js) }
       script(attrs: [.hxPreserve]) { HTML.raw(htmx_head_support) }
@@ -35,27 +30,11 @@ enum WebPages {
       HTMX.Attributes.lazyNavShell(get: "/htmx/content/nav")
       div(attrs: [.id("htmx-loading"), .class("htmx-indicator"), .ariaLive("polite")]) { "Loading…" }
       main(attrs: [.id("main")]) {
-        p { "Loading \(title) via WASM…" }
-      }
-      script(attrs: [.type("module")]) {
-        HTML.raw(
-          """
-          import { init } from "/assets/client/index.js";
-
-          async function start() {
-            try {
-              await init({
-                module: fetch("/wasm/wasms/\(slug)", { cache: "no-store" }),
-              });
-            } catch (err) {
-              document.getElementById("main").innerHTML =
-                "<p style=\\\"color:red\\\">WASM load failed: " + err.message + "</p>";
-              console.error("[wasm-post] load failed", err);
-            }
-          }
-          void start();
-          """
-        )
+        if let wasmBoot {
+          p { "Loading \(wasmBoot.title)…" }
+        } else {
+          pageArticle(for: initial)
+        }
       }
     }
   }
@@ -100,10 +79,7 @@ enum WebPages {
 
   private static func navLeaf(for post: Post) -> HTML {
     if PostWasmAsset.isAvailable, !post.isIndex, !post.isLogin {
-      return NavHTML.leaf(
-        href: "/wasm/posts/\(post.slug)",
-        name: post.title
-      )
+      return wasmNavLeaf(for: post)
     }
     return NavHTML.leaf(
       href: post.path,
@@ -111,6 +87,19 @@ enum WebPages {
       target: "main",
       name: post.title
     )
+  }
+
+  private static func wasmNavLeaf(for post: Post) -> HTML {
+    li(attrs: [.class("nav-leaf")]) {
+      a(attrs: [
+        .class("nav-link nav-wasm-link"),
+        .href("/wasm/posts/\(post.slug)"),
+        .flag("data-wasm-slug=\"\(htmlAttrEscape(post.slug))\""),
+        .flag("data-wasm-title=\"\(htmlAttrEscape(post.title))\""),
+      ]) {
+        post.title
+      }
+    }
   }
 
   static func pageArticle(for post: Post) -> HTML {
@@ -176,12 +165,62 @@ enum WebPages {
         """
         import { init } from "/assets/client/index.js";
 
-        if (!window.__shapeTreeNavDismiss) {
-          window.__shapeTreeNavDismiss = true;
+        function pageTitleFromSite(siteTitle, pageTitle) {
+          return pageTitle ? `${pageTitle} · ${siteTitle}` : siteTitle;
+        }
+
+        function readSiteTitle() {
+          return document.querySelector("title")?.dataset?.siteTitle ?? "";
+        }
+
+        const shapeTree = {
+          async loadWasmPost(slug, { pushState = true, title = null } = {}) {
+            const main = document.getElementById("main");
+            const indicator = document.getElementById("htmx-loading");
+            if (!main) return;
+            main.innerHTML = "<p>Loading…</p>";
+            indicator?.classList.add("htmx-request");
+            try {
+              await init({
+                module: fetch(`/wasm/wasms/${encodeURIComponent(slug)}`, { cache: "no-store" }),
+              });
+              const pageTitle = title ?? slug;
+              document.title = pageTitleFromSite(readSiteTitle(), pageTitle);
+              if (pushState) {
+                history.pushState(
+                  { wasmSlug: slug, title: pageTitle },
+                  "",
+                  `/wasm/posts/${encodeURIComponent(slug)}`
+                );
+              }
+            } catch (err) {
+              main.innerHTML =
+                `<p style="color:red">WASM load failed: ${err.message}</p>`;
+              console.error("[wasm-post] load failed", err);
+            } finally {
+              indicator?.classList.remove("htmx-request");
+            }
+          },
+        };
+
+        globalThis.shapeTree = shapeTree;
+
+        window.addEventListener("popstate", (event) => {
+          const state = event.state;
+          if (state?.wasmSlug) {
+            void shapeTree.loadWasmPost(state.wasmSlug, {
+              pushState: false,
+              title: state.title ?? null,
+            });
+          }
+        });
+
+        if (!window.__shapeTreeWasmNav) {
+          window.__shapeTreeWasmNav = true;
 
           async function start() {
             await init({
-              module: fetch("/assets/client/WASMClient.wasm", { cache: "no-store" }),
+              module: fetch("/assets/client/WASMNav.wasm", { cache: "no-store" }),
             });
           }
 
@@ -190,6 +229,17 @@ enum WebPages {
           } else {
             document.addEventListener("DOMContentLoaded", () => { void start(); });
           }
+        }
+
+        const bootSlug = document.body?.dataset?.initialWasmSlug;
+        if (bootSlug) {
+          const bootTitle = document.body?.dataset?.initialWasmTitle ?? null;
+          history.replaceState(
+            { wasmSlug: bootSlug, title: bootTitle },
+            "",
+            location.pathname
+          );
+          void shapeTree.loadWasmPost(bootSlug, { pushState: false, title: bootTitle });
         }
         """
       )
@@ -201,6 +251,12 @@ enum WebPages {
       return siteTitle
     }
     return "\(post.title) · \(siteTitle)"
+  }
+
+  private static func htmlAttrEscape(_ value: String) -> String {
+    value
+      .replacingOccurrences(of: "&", with: "&amp;")
+      .replacingOccurrences(of: "\"", with: "&quot;")
   }
 
 }

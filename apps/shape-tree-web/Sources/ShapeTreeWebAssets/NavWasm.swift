@@ -1,16 +1,16 @@
 import Foundation
 
-public enum ClientWasm {
+public enum NavWasm {
   /// Loaded once at first access; the embedded resource never changes at runtime.
   public static let bytes: Data = {
     guard
-      let url = Bundle.module.url(forResource: "ClientWasm", withExtension: "wasm"),
+      let url = Bundle.module.url(forResource: "WASMNav", withExtension: "wasm"),
       let data = try? Data(contentsOf: url),
       !data.isEmpty
     else {
       fatalError(
         """
-        ClientWasm.wasm is missing or empty. Build the wasm client before launching the server:
+        WASMNav.wasm is missing or empty. Build the wasm client before launching the server:
           ./Scripts/build-client.sh
         """
       )
