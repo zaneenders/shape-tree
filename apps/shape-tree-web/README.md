@@ -60,7 +60,7 @@ Markdown files support `---` front matter (`title`, `date`, `tags`, `excerpt`). 
 
 ### Swift WASM
 
-Installed the sdk and binaryen to build the WASMClient correctly.
+Installed the sdk and binaryen to build the WASM client correctly.
 
 ```bash
 swift sdk install \

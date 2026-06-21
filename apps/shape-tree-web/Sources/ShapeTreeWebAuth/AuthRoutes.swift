@@ -25,12 +25,14 @@ enum FormParser {
 }
 
 package enum AuthRoutes {
-  package static func addRoutes<C: AuthRequestContext & SessionRequestContext & RemoteAddressRequestContext>(
+  /// Registers the session middleware and authenticator. This must be called
+  /// before any routes that read `context.identity` are added to the router,
+  /// because Hummingbird only applies middleware to routes registered after it.
+  package static func addSessionMiddleware<
+    C: AuthRequestContext & SessionRequestContext & RemoteAddressRequestContext
+  >(
     to router: Router<C>,
-    auth: AuthServices,
-    rateLimiter: LoginRateLimiter,
-    siteTitle: String,
-    loginPost: Post? = nil
+    auth: AuthServices
   ) where C.Identity == User, C.Session == UUID {
     let sessionConfig = SessionMiddlewareConfiguration(
       sessionCookieParameters: .init(
@@ -47,7 +49,15 @@ package enum AuthRoutes {
         try await auth.database.user(id: userID, logger: context.logger)
       }
     }
+  }
 
+  package static func addRoutes<C: AuthRequestContext & SessionRequestContext & RemoteAddressRequestContext>(
+    to router: Router<C>,
+    auth: AuthServices,
+    rateLimiter: LoginRateLimiter,
+    siteTitle: String,
+    loginPost: Post? = nil
+  ) where C.Identity == User, C.Session == UUID {
     router.get("login") { request, _ in
       let next = request.uri.queryParameters.get("next")
       return AuthPages.login(
