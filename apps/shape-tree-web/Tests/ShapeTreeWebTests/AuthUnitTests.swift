@@ -86,6 +86,20 @@ import Testing
     #expect(AuthMiddleware.normalizedEmail("  Foo@Example.COM ") == "foo@example.com")
   }
 
+  @Test func validatedEmailNormalizesValidAddress() {
+    #expect(AuthMiddleware.validatedEmail("  Foo@Example.COM ") == "foo@example.com")
+    #expect(AuthMiddleware.validatedEmail("a.b+tag@sub.example.co") == "a.b+tag@sub.example.co")
+  }
+
+  @Test func validatedEmailRejectsMalformedAddress() {
+    #expect(AuthMiddleware.validatedEmail("") == nil)
+    #expect(AuthMiddleware.validatedEmail("not-an-email") == nil)
+    #expect(AuthMiddleware.validatedEmail("foo@bar") == nil)
+    #expect(AuthMiddleware.validatedEmail("foo@bar.") == nil)
+    #expect(AuthMiddleware.validatedEmail("foo bar@example.com") == nil)
+    #expect(AuthMiddleware.validatedEmail("@example.com") == nil)
+  }
+
   @Test func safeNextPathRejectsNonAbsolutePath() {
     #expect(AuthMiddleware.safeNextPath("http://evil.com") == nil)
   }

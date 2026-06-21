@@ -71,9 +71,13 @@ package enum AuthRoutes {
     router.post("auth/login") { request, context async throws -> Response in
       let body = try await request.body.collect(upTo: 16 * 1024)
       let fields = FormParser.parseURLForm(String(buffer: body))
-      let email = AuthMiddleware.normalizedEmail(fields["email"] ?? "")
       let next = AuthMiddleware.safeNextPath(fields["next"])
       let ip = context.remoteAddress?.ipAddress ?? "unknown"
+
+      guard let email = AuthMiddleware.validatedEmail(fields["email"] ?? "") else {
+        context.logger.warning("Rejected malformed login email from \(ip)")
+        return AuthPages.checkEmail(siteURL: auth.siteURL, siteTitle: siteTitle)
+      }
 
       guard await rateLimiter.allow(email: email, ip: ip) else {
         context.logger.warning("Login rate limited for \(email) from \(ip)")
