@@ -48,8 +48,9 @@ private func registerListeners(on document: JSValue) {
       _ = event.preventDefault?()
       if let slug = wasmDataset(wasmLink, key: "wasmSlug") {
         let title = wasmDataset(wasmLink, key: "wasmTitle")
+        let path = wasmDataset(wasmLink, key: "wasmPath")
         WASMNav.log("wasm nav link: \(slug)")
-        loadWasmPost(slug: slug, title: title, pushState: true)
+        loadWasmPost(slug: slug, title: title, pushState: true, path: path)
       }
       closeAll(in: document)
       return .undefined
@@ -83,26 +84,4 @@ private func registerListeners(on document: JSValue) {
   }
   WASMNav.listeners.append(keydownListener)
   _ = document.addEventListener("keydown", JSValue.object(keydownListener))
-
-  let afterSwapListener = JSClosure { arguments in
-    guard let event = arguments[0].object,
-      let detail = event.detail.object,
-      let swapTarget = detail.target.object,
-      jsEquals(swapTarget.id, "main")
-    else {
-      return .undefined
-    }
-    WASMNav.log("htmx main swap")
-    closeAll(in: document)
-    return .undefined
-  }
-  WASMNav.listeners.append(afterSwapListener)
-  _ = document.addEventListener("htmx:afterSwap", JSValue.object(afterSwapListener))
-
-  let afterSettleListener = JSClosure { _ in
-    syncBackdrop(in: document)
-    return .undefined
-  }
-  WASMNav.listeners.append(afterSettleListener)
-  _ = document.addEventListener("htmx:afterSettle", JSValue.object(afterSettleListener))
 }

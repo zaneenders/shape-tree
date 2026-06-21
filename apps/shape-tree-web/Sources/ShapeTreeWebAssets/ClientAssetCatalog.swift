@@ -18,6 +18,8 @@ public enum ClientAssetCatalog {
       return .wasm(NavWasm.bytes)
     case "index.js":
       return .script(client_index_js)
+    case "bootstrap.js":
+      return .script(Vendor_bootstrap_js)
     case "instantiate.js":
       return .script(client_instantiate_js)
     case "runtime.js":

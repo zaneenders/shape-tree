@@ -122,7 +122,6 @@ struct LoginFlowIntegrationTests: ~Copyable {
         loginSlug: "login",
         privateDirectories: ["Private"]
       )
-      let initial = store.indexPost ?? store.publishedPosts.first!
       let secretSlug = "secret"
 
       let auth = AuthServices(
@@ -138,7 +137,6 @@ struct LoginFlowIntegrationTests: ~Copyable {
       ShapeTreeWeb.configureRouter(
         router,
         store: store,
-        initial: initial,
         indexSlug: "Home",
         auth: auth
       )

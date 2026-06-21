@@ -7,7 +7,7 @@ func wasmDataset(_ element: JSObject, key: String) -> String? {
   return value.string
 }
 
-func loadWasmPost(slug: String, title: String?, pushState: Bool) {
+func loadWasmPost(slug: String, title: String?, pushState: Bool, path: String?) {
   guard let shapeTree = JSObject.global.shapeTree.object else {
     WASMNav.log("shapeTree.loadWasmPost unavailable")
     return
@@ -17,6 +17,9 @@ func loadWasmPost(slug: String, title: String?, pushState: Bool) {
   options.pushState = .boolean(pushState)
   if let title {
     options.title = .string(JSString(title))
+  }
+  if let path {
+    options.path = .string(JSString(path))
   }
   _ = shapeTree.loadWasmPost!(
     JSValue.string(JSString(slug)),

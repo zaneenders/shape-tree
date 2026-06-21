@@ -3,6 +3,7 @@ import HTML
 import HTMX
 import Hummingbird
 import NIOCore
+import ShapeTreeWebAssets
 import ShapeTreeWebAuth
 import ShapeTreeWebCore
 
@@ -10,21 +11,22 @@ extension ShapeTreeWeb {
   static func configureRouter(
     _ router: Router<AppRequestContext>,
     store: ContentStore,
-    initial: Post,
     indexSlug: String,
     auth: AuthServices,
     rateLimiter: LoginRateLimiter = LoginRateLimiter()
   ) {
     AuthRoutes.addSessionMiddleware(to: router, auth: auth)
 
+    let homeSlug = store.indexPost?.slug ?? indexSlug
+
     router.get { _, _ in
-      WebPages.shell(store: store, initial: initial).makeHTMLResponse()
+      WebPages.shell(store: store, homeSlug: homeSlug).makeHTMLResponse()
     }
 
     router.get("posts/:slug") { request, context in
       let slug = try context.parameters.require("slug")
       guard let post = store.post(slug: slug) else {
-        return WebPages.notFoundResponse(store: store)
+        return WebPages.notFoundResponse(store: store, homeSlug: homeSlug)
       }
       if post.isLogin {
         return Response(
@@ -33,9 +35,15 @@ extension ShapeTreeWeb {
           body: .init())
       }
       if post.isPrivate, context.identity == nil {
-        return WebPages.notFoundResponse(store: store)
+        return WebPages.notFoundResponse(store: store, homeSlug: homeSlug)
       }
-      return WebPages.shell(store: store, initial: post).makeHTMLResponse()
+      if PostWasmAsset.isAvailable, PostWasmAsset.wasm(forSlug: post.slug) != nil {
+        return Response(
+          status: .seeOther,
+          headers: [.location: "/wasm/posts/\(post.slug)"],
+          body: .init())
+      }
+      return WebPages.notFoundResponse(store: store, homeSlug: homeSlug)
     }
 
     router.get("htmx/content/nav") { request, context in
@@ -84,7 +92,7 @@ extension ShapeTreeWeb {
 
     NavContentRoutes.register(on: router, store: store)
 
-    WasmPostRoutes.register(on: router, store: store)
+    WasmPostRoutes.register(on: router, store: store, homeSlug: homeSlug)
 
     ClientRoutes.register(on: router)
   }

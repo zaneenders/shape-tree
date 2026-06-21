@@ -12,6 +12,7 @@ enum ClientRoutes {
     for relativePath in [
       "WASMNav.wasm",
       "index.js",
+      "bootstrap.js",
       "instantiate.js",
       "runtime.js",
       "platforms/browser.js",

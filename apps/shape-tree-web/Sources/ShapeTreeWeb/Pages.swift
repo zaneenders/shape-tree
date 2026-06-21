@@ -9,34 +9,43 @@ import ShapeTreeWebCore
 enum WebPages {
   static func shell(
     store: ContentStore,
-    initial: Post,
-    wasmBoot: (slug: String, title: String)? = nil
+    homeSlug: String,
+    documentTitle: String? = nil,
+    wasmBoot: (slug: String, title: String)? = nil,
+    bootNotFound: Bool = false
   ) -> HTML {
-    var bodyAttrs: [HTMLAttr] = [.hxExt("head-support")]
+    var bodyAttrs: [HTMLAttr] = []
+    bodyAttrs.append(.flag("data-home-slug=\"\(htmlAttrEscape(homeSlug))\""))
+    bodyAttrs.append(.flag("data-home-title=\"\(htmlAttrEscape(store.siteTitle))\""))
+
     if let wasmBoot {
       bodyAttrs.append(.flag("data-initial-wasm-slug=\"\(htmlAttrEscape(wasmBoot.slug))\""))
       bodyAttrs.append(.flag("data-initial-wasm-title=\"\(htmlAttrEscape(wasmBoot.title))\""))
     }
+    if bootNotFound {
+      bodyAttrs.append(.flag("data-boot-not-found=\"true\""))
+    }
+
+    let titleText = documentTitle ?? store.siteTitle
 
     return document(bodyAttrs: bodyAttrs) {
       meta(attrs: [.charset("utf-8"), .name("viewport"), .content("width=device-width, initial-scale=1")])
       HTML.tag(.title, attrs: [.flag("data-site-title=\"\(htmlAttrEscape(store.siteTitle))\"")]) {
-        pageTitle(for: initial, siteTitle: store.siteTitle)
+        titleText
       }
-      style(attrs: [.hxPreserve]) { HTML.raw(site_css) }
-      script(attrs: [.hxPreserve]) { HTML.raw(htmx_min_js) }
-      script(attrs: [.hxPreserve]) { HTML.raw(htmx_head_support) }
-      navClientScript()
+      style { HTML.raw(site_css) }
+      script(attrs: [.type("module"), .src("/assets/client/bootstrap.js")]) {}
     } body: {
-      HTMX.Attributes.lazyNavShell(get: "/htmx/content/nav")
+      HTML.tag(
+        .nav,
+        attrs: [
+          .id("styled-navigation"),
+          .class("site-nav"),
+          .ariaLabel("Site"),
+        ]
+      ) {}
       div(attrs: [.id("htmx-loading"), .class("htmx-indicator"), .ariaLive("polite")]) { "Loading…" }
-      main(attrs: [.id("main")]) {
-        if let wasmBoot {
-          p { "Loading \(wasmBoot.title)…" }
-        } else {
-          pageArticle(for: initial)
-        }
-      }
+      main(attrs: [.id("main")]) {}
     }
   }
 
@@ -122,27 +131,13 @@ enum WebPages {
     )
   }
 
-  static func notFound(store: ContentStore) -> HTML {
-    document(bodyAttrs: [.hxExt("head-support")]) {
-      meta(attrs: [.charset("utf-8"), .name("viewport"), .content("width=device-width, initial-scale=1")])
-      HTML.tag(.title, attrs: [.flag("data-site-title=\"\(htmlAttrEscape(store.siteTitle))\"")]) {
-        "Not Found · \(store.siteTitle)"
-      }
-      style(attrs: [.hxPreserve]) { HTML.raw(site_css) }
-      script(attrs: [.hxPreserve]) { HTML.raw(htmx_min_js) }
-      script(attrs: [.hxPreserve]) { HTML.raw(htmx_head_support) }
-      navClientScript()
-    } body: {
-      HTMX.Attributes.lazyNavShell(get: "/htmx/content/nav")
-      div(attrs: [.id("htmx-loading"), .class("htmx-indicator"), .ariaLive("polite")]) { "Loading…" }
-      main(attrs: [.id("main")]) {
-        notFoundArticle()
-      }
-    }
-  }
-
-  static func notFoundResponse(store: ContentStore) -> Response {
-    notFound(store: store).makeHTMLResponse(.notFound)
+  static func notFoundResponse(store: ContentStore, homeSlug: String) -> Response {
+    shell(
+      store: store,
+      homeSlug: homeSlug,
+      documentTitle: "Not Found · \(store.siteTitle)",
+      bootNotFound: true
+    ).makeHTMLResponse(.notFound)
   }
 
   static func notFoundFragment(store: ContentStore) -> String {
@@ -204,124 +199,6 @@ enum WebPages {
       div(attrs: [.class("post-body")]) {
         HTML.raw(post.bodyHTML)
       }
-    }
-  }
-
-  private static func navClientScript() -> HTML {
-    script(attrs: [.type("module"), .hxPreserve]) {
-      HTML.raw(
-        """
-        import { init } from "/assets/client/index.js";
-
-        function pageTitleFromSite(siteTitle, pageTitle) {
-          return pageTitle ? `${pageTitle} · ${siteTitle}` : siteTitle;
-        }
-
-        function readSiteTitle() {
-          return document.querySelector("title")?.dataset?.siteTitle ?? "";
-        }
-
-        const shapeTree = {
-          async loadNotFound({ pushState = true, path = location.pathname } = {}) {
-            const indicator = document.getElementById("htmx-loading");
-            indicator?.classList.add("htmx-request");
-            try {
-              await htmx.ajax("GET", "/htmx/content/not-found", {
-                target: "#main",
-                swap: "innerHTML",
-                headers: { "HX-Request": "true" },
-              });
-              document.title = pageTitleFromSite(readSiteTitle(), "Not Found");
-              if (pushState) {
-                history.pushState({ notFound: true, path }, "", path);
-              }
-            } finally {
-              indicator?.classList.remove("htmx-request");
-            }
-          },
-
-          async loadWasmPost(slug, { pushState = true, title = null } = {}) {
-            const main = document.getElementById("main");
-            const indicator = document.getElementById("htmx-loading");
-            if (!main) return;
-            main.innerHTML = "<p>Loading…</p>";
-            indicator?.classList.add("htmx-request");
-            const wasmPath = `/wasm/wasms/${encodeURIComponent(slug)}`;
-            const postPath = `/wasm/posts/${encodeURIComponent(slug)}`;
-            try {
-              const response = await fetch(wasmPath, { cache: "no-store" });
-              if (response.status === 404) {
-                await shapeTree.loadNotFound({ pushState, path: postPath });
-                return;
-              }
-              if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-              }
-              await init({ module: response });
-              const pageTitle = title ?? slug;
-              document.title = pageTitleFromSite(readSiteTitle(), pageTitle);
-              if (pushState) {
-                history.pushState(
-                  { wasmSlug: slug, title: pageTitle },
-                  "",
-                  postPath
-                );
-              }
-            } catch (err) {
-              main.innerHTML =
-                `<p style="color:red">WASM load failed: ${err.message}</p>`;
-              console.error("[wasm-post] load failed", err);
-            } finally {
-              indicator?.classList.remove("htmx-request");
-            }
-          },
-        };
-
-        globalThis.shapeTree = shapeTree;
-
-        window.addEventListener("popstate", (event) => {
-          const state = event.state;
-          if (state?.wasmSlug) {
-            void shapeTree.loadWasmPost(state.wasmSlug, {
-              pushState: false,
-              title: state.title ?? null,
-            });
-          } else if (state?.notFound) {
-            void shapeTree.loadNotFound({
-              pushState: false,
-              path: state.path ?? location.pathname,
-            });
-          }
-        });
-
-        if (!window.__shapeTreeWasmNav) {
-          window.__shapeTreeWasmNav = true;
-
-          async function start() {
-            await init({
-              module: fetch("/assets/client/WASMNav.wasm", { cache: "no-store" }),
-            });
-          }
-
-          if (document.body) {
-            void start();
-          } else {
-            document.addEventListener("DOMContentLoaded", () => { void start(); });
-          }
-        }
-
-        const bootSlug = document.body?.dataset?.initialWasmSlug;
-        if (bootSlug) {
-          const bootTitle = document.body?.dataset?.initialWasmTitle ?? null;
-          history.replaceState(
-            { wasmSlug: bootSlug, title: bootTitle },
-            "",
-            location.pathname
-          );
-          void shapeTree.loadWasmPost(bootSlug, { pushState: false, title: bootTitle });
-        }
-        """
-      )
     }
   }
 

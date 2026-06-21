@@ -45,6 +45,7 @@ rm -rf "$OUT_JS"
 mkdir -p "$OUT_JS/platforms"
 cp "$BUILD_DIR/index.js" "$BUILD_DIR/instantiate.js" "$BUILD_DIR/runtime.js" "$OUT_JS/"
 cp "$BUILD_DIR/platforms/browser.js" "$OUT_JS/platforms/"
+cp "$ASSETS/Vendor/bootstrap.js" "$OUT_JS/bootstrap.js"
 cp "$WASM" "$ASSETS/WASMNav.wasm"
 
 # WASI shim is committed under Sources/ShapeTreeWebAssets/Vendor/ and served locally.
@@ -117,6 +118,7 @@ done < "$MANIFEST"
 if [[ -n "$FIRST_JS_DIR" ]]; then
   cp "$FIRST_JS_DIR/index.js" "$FIRST_JS_DIR/instantiate.js" "$FIRST_JS_DIR/runtime.js" "$OUT_JS/"
   cp "$FIRST_JS_DIR/platforms/browser.js" "$OUT_JS/platforms/"
+  cp "$ASSETS/Vendor/bootstrap.js" "$OUT_JS/bootstrap.js"
   perl -pi -e "s|'\\@bjorn3/browser_wasi_shim'|'../browser_wasi_shim.js'|g" \
     "$OUT_JS/platforms/browser.js"
 fi

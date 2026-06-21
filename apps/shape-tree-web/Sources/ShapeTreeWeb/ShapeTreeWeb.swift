@@ -56,7 +56,6 @@ enum ShapeTreeWeb {
       loginSlug: "Login",
       privateDirectories: privateDirectories
     )
-    let initial = store.indexPost ?? store.publishedPosts.first ?? fallbackIndexPost(slug: indexSlug)
 
     let router = Router(context: AppRequestContext.self)
     if !otel.disabled {
@@ -70,7 +69,6 @@ enum ShapeTreeWeb {
     ShapeTreeWeb.configureRouter(
       router,
       store: store,
-      initial: initial,
       indexSlug: indexSlug,
       auth: authBundle.services
     )

@@ -6,7 +6,11 @@ import ShapeTreeWebAuth
 import ShapeTreeWebCore
 
 enum WasmPostRoutes {
-  static func register(on router: Router<AppRequestContext>, store: ContentStore) {
+  static func register(
+    on router: Router<AppRequestContext>,
+    store: ContentStore,
+    homeSlug: String
+  ) {
     guard PostWasmAsset.isAvailable else { return }
 
     router.get("wasm/wasms/:slug") { _, context in
@@ -17,10 +21,10 @@ enum WasmPostRoutes {
     }
 
     router.get("wasm/posts/:slug") { _, context in
-      try wasmPostShellResponse(context: context, store: store)
+      try wasmPostShellResponse(context: context, store: store, homeSlug: homeSlug)
     }
     router.head("wasm/posts/:slug") { _, context in
-      try wasmPostShellResponse(context: context, store: store, head: true)
+      try wasmPostShellResponse(context: context, store: store, homeSlug: homeSlug, head: true)
     }
   }
 
@@ -51,6 +55,7 @@ enum WasmPostRoutes {
   private static func wasmPostShellResponse(
     context: AppRequestContext,
     store: ContentStore,
+    homeSlug: String,
     head: Bool = false
   ) throws -> Response {
     let rawSlug = try context.parameters.require("slug")
@@ -64,7 +69,7 @@ enum WasmPostRoutes {
           body: .init(byteBuffer: ByteBuffer())
         )
       }
-      return WebPages.notFoundResponse(store: store)
+      return WebPages.notFoundResponse(store: store, homeSlug: homeSlug)
     }
     if head {
       return Response(
@@ -75,7 +80,8 @@ enum WasmPostRoutes {
     }
     return WebPages.shell(
       store: store,
-      initial: post,
+      homeSlug: homeSlug,
+      documentTitle: "\(post.title) · \(store.siteTitle)",
       wasmBoot: (slug: post.slug, title: post.title)
     ).makeHTMLResponse()
   }

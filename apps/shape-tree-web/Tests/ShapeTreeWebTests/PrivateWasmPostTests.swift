@@ -51,16 +51,17 @@ struct PrivateWasmPostTests {
     )
 
     let router = Router(context: AppRequestContext.self)
-    WasmPostRoutes.register(on: router, store: store)
+    WasmPostRoutes.register(on: router, store: store, homeSlug: "Home")
 
     let app = Application(router: router)
     try await app.test(TestingSetup.router) { client in
       try await client.execute(uri: "/wasm/posts/secret", method: .get) { response in
         #expect(response.status == .notFound)
         let body = String(buffer: response.body)
-        #expect(body.contains("<h1>404</h1>"))
-        #expect(body.contains("Page not found."))
-        #expect(body.contains("styled-navigation") || body.contains("nav-shell"))
+        #expect(body.contains("data-boot-not-found=\"true\""))
+        #expect(body.contains("id=\"styled-navigation\""))
+        #expect(body.contains("/assets/client/bootstrap.js"))
+        #expect(body.contains("<main id=\"main\"></main>"))
       }
 
       try await client.execute(uri: "/wasm/wasms/secret", method: .get) { response in
