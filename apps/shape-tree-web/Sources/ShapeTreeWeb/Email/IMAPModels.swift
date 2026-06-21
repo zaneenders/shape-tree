@@ -13,19 +13,22 @@ struct IncomingEmail: Sendable, Equatable {
   var from: String
   var subject: String
   var date: String
+  var body: String?
 
   init(
     uid: UInt32? = nil,
     sequenceNumber: UInt32? = nil,
     from: String,
     subject: String,
-    date: String
+    date: String,
+    body: String? = nil
   ) {
     self.uid = uid
     self.sequenceNumber = sequenceNumber
     self.from = from
     self.subject = subject
     self.date = date
+    self.body = body
   }
 }
 

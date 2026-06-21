@@ -42,7 +42,7 @@ enum ShapeTreeWeb {
     let contentPath = try config.requiredString(forKey: "CONTENT_PATH")
     let indexSlug = try config.requiredString(forKey: "INDEX_SLUG")
     let otel = try OtelSettings.load(from: config)
-    let siteURL = config.string(forKey: "SITE_URL") ?? "http://localhost:\(port)"
+    let siteURL = try config.requiredString(forKey: "SITE_URL")
     let privateDirectories = parsePrivateDirectories(
       config.string(forKey: "AUTH_PRIVATE_DIRECTORIES")
     )
@@ -67,84 +67,15 @@ enum ShapeTreeWeb {
       }
     }
 
-    let sessionConfig = SessionMiddlewareConfiguration(
-      sessionCookieParameters: .init(
-        name: "SESSION_ID",
-        secure: auth.services.secureCookies,
-        sameSite: .lax
-      ),
-      defaultSessionExpiration: auth.services.settings.sessionTTL
-    )
-    router.addMiddleware {
-      SessionMiddleware(storage: auth.services.persist, configuration: sessionConfig)
-      SessionAuthenticator(context: AppRequestContext.self) {
-        (userID: UUID, context: UserRepositoryContext) async throws -> User? in
-        try await auth.services.database.user(id: userID, logger: context.logger)
-      }
-    }
-
-    router.get { _, _ in
-      WebPages.shell(store: store, initial: initial).makeHTMLResponse()
-    }
-
-    router.get("posts/:slug") { request, context in
-      let slug = try context.parameters.require("slug")
-      guard let post = store.post(slug: slug) else {
-        throw HTTPError(.notFound)
-      }
-      if post.isLogin {
-        return Response(
-          status: .seeOther,
-          headers: [.location: "/login"],
-          body: .init())
-      }
-      if post.isPrivate, context.identity == nil {
-        return AuthMiddleware.unauthenticatedResponse(request: request, next: request.uri.path)
-      }
-      return WebPages.shell(store: store, initial: post).makeHTMLResponse()
-    }
-
-    router.get("htmx/content/nav") { request, context in
-      try HTMX.requireRequest(request)
-      return WebPages.navigation(
-        store: store,
-        isAuthenticated: context.identity != nil
-      ).makeHTMLResponse()
-    }
-
-    router.get("htmx/content/index") { request, _ in
-      try HTMX.requireRequest(request)
-      let post = store.indexPost ?? fallbackIndexPost(slug: indexSlug)
-      let fragment = WebPages.contentFragment(for: post, store: store)
-      return htmlFragmentResponse(fragment)
-    }
-
-    router.get("htmx/content/posts/:slug") { request, context in
-      try HTMX.requireRequest(request)
-      let slug = try context.parameters.require("slug")
-      guard let post = store.post(slug: slug) else {
-        throw HTTPError(.notFound)
-      }
-      if post.isLogin {
-        throw HTTPError(.notFound)
-      }
-      if post.isPrivate, context.identity == nil {
-        return AuthMiddleware.unauthenticatedResponse(request: request, next: "/posts/\(slug)")
-      }
-      let fragment = WebPages.contentFragment(for: post, store: store)
-      return htmlFragmentResponse(fragment)
-    }
-
     let rateLimiter = LoginRateLimiter()
-    AuthRoutes.addRoutes(
-      to: router,
+    ShapeTreeWeb.configureRouter(
+      router,
+      store: store,
+      initial: initial,
+      indexSlug: indexSlug,
       auth: auth.services,
-      rateLimiter: rateLimiter,
-      siteTitle: store.siteTitle,
-      loginPost: store.loginPost
+      rateLimiter: rateLimiter
     )
-
-    ClientRoutes.register(on: router)
 
     var app = Application(
       router: router,
@@ -219,6 +150,93 @@ enum ShapeTreeWeb {
       }
       group.cancelAll()
     }
+  }
+
+  static func configureRouter(
+    _ router: Router<AppRequestContext>,
+    store: ContentStore,
+    initial: Post,
+    indexSlug: String,
+    auth: AuthServices,
+    rateLimiter: LoginRateLimiter
+  ) {
+    let sessionConfig = SessionMiddlewareConfiguration(
+      sessionCookieParameters: .init(
+        name: "SESSION_ID",
+        secure: auth.secureCookies,
+        sameSite: .lax
+      ),
+      defaultSessionExpiration: auth.settings.sessionTTL
+    )
+    router.addMiddleware {
+      SessionMiddleware(storage: auth.persist, configuration: sessionConfig)
+      SessionAuthenticator(context: AppRequestContext.self) {
+        (userID: UUID, context: UserRepositoryContext) async throws -> User? in
+        try await auth.database.user(id: userID, logger: context.logger)
+      }
+    }
+
+    router.get { _, _ in
+      WebPages.shell(store: store, initial: initial).makeHTMLResponse()
+    }
+
+    router.get("posts/:slug") { request, context in
+      let slug = try context.parameters.require("slug")
+      guard let post = store.post(slug: slug) else {
+        throw HTTPError(.notFound)
+      }
+      if post.isLogin {
+        return Response(
+          status: .seeOther,
+          headers: [.location: "/login"],
+          body: .init())
+      }
+      if post.isPrivate, context.identity == nil {
+        return AuthMiddleware.unauthenticatedResponse(request: request, next: request.uri.path)
+      }
+      return WebPages.shell(store: store, initial: post).makeHTMLResponse()
+    }
+
+    router.get("htmx/content/nav") { request, context in
+      try HTMX.requireRequest(request)
+      return WebPages.navigation(
+        store: store,
+        isAuthenticated: context.identity != nil
+      ).makeHTMLResponse()
+    }
+
+    router.get("htmx/content/index") { request, _ in
+      try HTMX.requireRequest(request)
+      let post = store.indexPost ?? fallbackIndexPost(slug: indexSlug)
+      let fragment = WebPages.contentFragment(for: post, store: store)
+      return htmlFragmentResponse(fragment)
+    }
+
+    router.get("htmx/content/posts/:slug") { request, context in
+      try HTMX.requireRequest(request)
+      let slug = try context.parameters.require("slug")
+      guard let post = store.post(slug: slug) else {
+        throw HTTPError(.notFound)
+      }
+      if post.isLogin {
+        throw HTTPError(.notFound)
+      }
+      if post.isPrivate, context.identity == nil {
+        return AuthMiddleware.unauthenticatedResponse(request: request, next: "/posts/\(slug)")
+      }
+      let fragment = WebPages.contentFragment(for: post, store: store)
+      return htmlFragmentResponse(fragment)
+    }
+
+    AuthRoutes.addRoutes(
+      to: router,
+      auth: auth,
+      rateLimiter: rateLimiter,
+      siteTitle: store.siteTitle,
+      loginPost: store.loginPost
+    )
+
+    ClientRoutes.register(on: router)
   }
 
   private static func buildAuthServices(

@@ -6,7 +6,8 @@ import NIOSSL
 enum IMAPClient {
   private static let headerFields = ["FROM", "SUBJECT", "DATE"]
   private static let fetchAttributes: [FetchAttribute] = [
-    .bodySection(peek: true, .headerFields(headerFields), nil)
+    .bodySection(peek: true, .headerFields(headerFields), nil),
+    .bodySection(peek: true, .text, nil),
   ]
 
   /// Fetches the most recent messages from a mailbox (default `INBOX`).
@@ -196,11 +197,13 @@ private struct FetchMessageCollector {
     var uid: UInt32?
     var sequenceNumber: UInt32?
     var headerText = ""
+    var bodyText: String?
   }
 
   var messages: [IncomingEmail] = []
   private var current: PartialMessage?
   private var streamingBuffer: ByteBuffer?
+  private var streamingIsBody = false
 
   mutating func handle(_ fetch: FetchResponse) {
     switch fetch {
@@ -219,21 +222,38 @@ private struct FetchMessageCollector {
         self.current?.uid = uid.rawValue
       }
 
-    case .streamingBegin:
+    case .streamingBegin(let kind, _):
       self.streamingBuffer = ByteBuffer()
+      self.streamingIsBody = isBodyStream(kind)
 
     case .streamingBytes(var bytes):
       self.streamingBuffer?.writeBuffer(&bytes)
 
     case .streamingEnd:
       if var buffer = self.streamingBuffer {
-        let headerText = buffer.readString(length: buffer.readableBytes) ?? ""
-        self.current?.headerText = headerText
+        let text = buffer.readString(length: buffer.readableBytes) ?? ""
+        if self.streamingIsBody {
+          self.current?.bodyText = text
+        } else {
+          self.current?.headerText = text
+        }
       }
       self.streamingBuffer = nil
+      self.streamingIsBody = false
 
     case .finish:
       self.finalizeCurrent()
+    }
+  }
+
+  private func isBodyStream(_ kind: StreamingKind) -> Bool {
+    switch kind {
+    case .body(let section, _):
+      return section.kind == .text
+    case .rfc822Text:
+      return true
+    default:
+      return false
     }
   }
 
@@ -246,10 +266,12 @@ private struct FetchMessageCollector {
         sequenceNumber: current.sequenceNumber,
         from: headers["from"] ?? "",
         subject: headers["subject"] ?? "",
-        date: headers["date"] ?? ""
+        date: headers["date"] ?? "",
+        body: current.bodyText
       )
     )
     self.current = nil
     self.streamingBuffer = nil
+    self.streamingIsBody = false
   }
 }

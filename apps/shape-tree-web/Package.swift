@@ -91,7 +91,16 @@ let package = Package(
     ),
     .testTarget(
       name: "ShapeTreeWebTests",
-      dependencies: ["ShapeTreeWeb"],
+      dependencies: [
+        "ShapeTreeWeb",
+        "ShapeTreeWebCore",
+        .product(name: "Hummingbird", package: "hummingbird"),
+        .product(name: "HummingbirdTesting", package: "hummingbird"),
+        .product(name: "HummingbirdAuth", package: "hummingbird-auth"),
+        .product(name: "PostgresNIO", package: "postgres-nio"),
+        .product(name: "NIOCore", package: "swift-nio"),
+        .product(name: "Configuration", package: "swift-configuration"),
+      ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
         .treatAllWarnings(as: .error),
