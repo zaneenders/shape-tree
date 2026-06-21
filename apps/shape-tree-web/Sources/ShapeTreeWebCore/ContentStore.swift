@@ -38,8 +38,8 @@ public struct ContentStore: Sendable {
 
   public init(
     contentDirectory: URL,
-    indexSlug: String = "Home",
-    loginSlug: String = "login",
+    indexSlug: String,
+    loginSlug: String,
     privateDirectories: Set<String> = []
   ) throws {
     guard FileManager.default.fileExists(atPath: contentDirectory.path) else {

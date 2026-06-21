@@ -52,6 +52,7 @@ enum ShapeTreeWeb {
     let store = try ContentStore(
       contentDirectory: contentURL,
       indexSlug: indexSlug,
+      loginSlug: "Login",
       privateDirectories: privateDirectories
     )
     let initial = store.indexPost ?? store.publishedPosts.first ?? fallbackIndexPost(slug: indexSlug)
