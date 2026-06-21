@@ -1,12 +1,8 @@
 import Foundation
 
 package actor LoginRateLimiter: Sendable {
-  private struct Key: Hashable {
-    let email: String
-    let ip: String
-  }
 
-  private var attempts: [Key: [Date]] = [:]
+  private var attempts: [String: [Date]] = [:]
   private let window: Duration
   private let maxAttempts: Int
 
@@ -15,16 +11,15 @@ package actor LoginRateLimiter: Sendable {
     self.maxAttempts = maxAttempts
   }
 
-  func allow(email: String, ip: String) -> Bool {
-    let key = Key(email: email, ip: ip)
+  func allow(ip: String) -> Bool {
     let now = Date.now
     let cutoff = now.addingTimeInterval(-windowSeconds)
-    let recent = (attempts[key] ?? []).filter { $0 > cutoff }
+    let recent = (attempts[ip] ?? []).filter { $0 > cutoff }
     guard recent.count < maxAttempts else {
-      attempts[key] = recent
+      attempts[ip] = recent
       return false
     }
-    attempts[key] = recent + [now]
+    attempts[ip] = recent + [now]
     return true
   }
 

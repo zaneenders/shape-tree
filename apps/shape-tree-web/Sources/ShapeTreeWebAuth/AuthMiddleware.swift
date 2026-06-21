@@ -2,7 +2,11 @@ import Foundation
 import Hummingbird
 import RegexBuilder
 
-enum AuthMiddleware {
+enum AuthEmailError: Error {
+  case invalid
+}
+
+enum AuthEmail {
   private static func normalizedEmail(_ raw: String) -> String {
     raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
   }

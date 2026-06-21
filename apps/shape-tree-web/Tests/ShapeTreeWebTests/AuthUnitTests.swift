@@ -82,42 +82,39 @@ import Testing
 }
 
 @Suite struct AuthMiddlewareTests {
-  @Test func normalizedEmailTrimsAndLowercases() {
-    #expect(AuthMiddleware.normalizedEmail("  Foo@Example.COM ") == "foo@example.com")
-  }
 
   @Test func validatedEmailNormalizesValidAddress() {
-    #expect(AuthMiddleware.validatedEmail("  Foo@Example.COM ") == "foo@example.com")
-    #expect(AuthMiddleware.validatedEmail("a.b+tag@sub.example.co") == "a.b+tag@sub.example.co")
+    #expect(AuthEmail.validatedEmail("  Foo@Example.COM ") == "foo@example.com")
+    #expect(AuthEmail.validatedEmail("a.b+tag@sub.example.co") == "a.b+tag@sub.example.co")
   }
 
   @Test func validatedEmailRejectsMalformedAddress() {
-    #expect(AuthMiddleware.validatedEmail("") == nil)
-    #expect(AuthMiddleware.validatedEmail("not-an-email") == nil)
-    #expect(AuthMiddleware.validatedEmail("foo@bar") == nil)
-    #expect(AuthMiddleware.validatedEmail("foo@bar.") == nil)
-    #expect(AuthMiddleware.validatedEmail("foo bar@example.com") == nil)
-    #expect(AuthMiddleware.validatedEmail("@example.com") == nil)
+    #expect(AuthEmail.validatedEmail("") == nil)
+    #expect(AuthEmail.validatedEmail("not-an-email") == nil)
+    #expect(AuthEmail.validatedEmail("foo@bar") == nil)
+    #expect(AuthEmail.validatedEmail("foo@bar.") == nil)
+    #expect(AuthEmail.validatedEmail("foo bar@example.com") == nil)
+    #expect(AuthEmail.validatedEmail("@example.com") == nil)
   }
 
   @Test func safeNextPathRejectsNonAbsolutePath() {
-    #expect(AuthMiddleware.safeNextPath("http://evil.com") == nil)
+    #expect(AuthEmail.safeNextPath("http://evil.com") == nil)
   }
 
   @Test func safeNextPathRejectsDoubleSlash() {
-    #expect(AuthMiddleware.safeNextPath("//evil.com") == nil)
+    #expect(AuthEmail.safeNextPath("//evil.com") == nil)
   }
 
   @Test func safeNextPathAcceptsSimplePath() {
-    #expect(AuthMiddleware.safeNextPath("/posts/secret") == "/posts/secret")
+    #expect(AuthEmail.safeNextPath("/posts/secret") == "/posts/secret")
   }
 
   @Test func safeNextPathRejectsNil() {
-    #expect(AuthMiddleware.safeNextPath(nil) == nil)
+    #expect(AuthEmail.safeNextPath(nil) == nil)
   }
 
   @Test func safeNextPathRejectsEmpty() {
-    #expect(AuthMiddleware.safeNextPath("") == nil)
+    #expect(AuthEmail.safeNextPath("") == nil)
   }
 }
 
@@ -155,31 +152,23 @@ import Testing
 @Suite struct LoginRateLimiterTests {
   @Test func allowsUpToMaxAttempts() async {
     let limiter = LoginRateLimiter(window: .seconds(60), maxAttempts: 3)
-    #expect(await limiter.allow(email: "a@b.com", ip: "1.2.3.4") == true)
-    #expect(await limiter.allow(email: "a@b.com", ip: "1.2.3.4") == true)
-    #expect(await limiter.allow(email: "a@b.com", ip: "1.2.3.4") == true)
+    #expect(await limiter.allow(ip: "1.2.3.4") == true)
+    #expect(await limiter.allow(ip: "1.2.3.4") == true)
+    #expect(await limiter.allow(ip: "1.2.3.4") == true)
   }
 
   @Test func blocksAfterMaxAttempts() async {
     let limiter = LoginRateLimiter(window: .seconds(60), maxAttempts: 2)
-    _ = await limiter.allow(email: "a@b.com", ip: "1.2.3.4")
-    _ = await limiter.allow(email: "a@b.com", ip: "1.2.3.4")
-    #expect(await limiter.allow(email: "a@b.com", ip: "1.2.3.4") == false)
-  }
-
-  @Test func tracksPerEmailIPIndependently() async {
-    let limiter = LoginRateLimiter(window: .seconds(60), maxAttempts: 1)
-    #expect(await limiter.allow(email: "a@b.com", ip: "1.1.1.1") == true)
-    #expect(await limiter.allow(email: "a@b.com", ip: "1.1.1.1") == false)
-    #expect(await limiter.allow(email: "a@b.com", ip: "2.2.2.2") == true)
-    #expect(await limiter.allow(email: "c@d.com", ip: "1.1.1.1") == true)
+    _ = await limiter.allow(ip: "1.2.3.4")
+    _ = await limiter.allow(ip: "1.2.3.4")
+    #expect(await limiter.allow(ip: "1.2.3.4") == false)
   }
 
   @Test func resetsAfterWindowExpires() async throws {
     let limiter = LoginRateLimiter(window: .milliseconds(200), maxAttempts: 1)
-    #expect(await limiter.allow(email: "a@b.com", ip: "1.1.1.1") == true)
-    #expect(await limiter.allow(email: "a@b.com", ip: "1.1.1.1") == false)
+    #expect(await limiter.allow(ip: "1.1.1.1") == true)
+    #expect(await limiter.allow(ip: "1.1.1.1") == false)
     try await Task.sleep(for: .milliseconds(250))
-    #expect(await limiter.allow(email: "a@b.com", ip: "1.1.1.1") == true)
+    #expect(await limiter.allow(ip: "1.1.1.1") == true)
   }
 }

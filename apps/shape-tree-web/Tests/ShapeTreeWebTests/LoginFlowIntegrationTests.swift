@@ -396,11 +396,13 @@ struct LoginFlowIntegrationTests: ~Copyable {
     email: String,
     logger: Logger
   ) async throws -> User {
-    let normalized = AuthMiddleware.normalizedEmail(email)
-    if let existing = try await database.user(email: normalized, logger: logger) {
+    guard let email = AuthEmail.validatedEmail(email) else {
+      throw AuthEmailError.invalid
+    }
+    if let existing = try await database.user(email: email, logger: logger) {
       return existing
     }
-    return try await database.createUser(email: normalized, logger: logger)
+    return try await database.createUser(email: email, logger: logger)
   }
 
   private static func createTestContent(at dir: URL, marker: String) throws {

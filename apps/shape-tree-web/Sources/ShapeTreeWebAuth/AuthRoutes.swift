@@ -71,15 +71,15 @@ package enum AuthRoutes {
     router.post("auth/login") { request, context async throws -> Response in
       let body = try await request.body.collect(upTo: 16 * 1024)
       let fields = FormParser.parseURLForm(String(buffer: body))
-      let next = AuthMiddleware.safeNextPath(fields["next"])
+      let next = AuthEmail.safeNextPath(fields["next"])
       let ip = context.remoteAddress?.ipAddress ?? "unknown"
 
-      guard let email = AuthMiddleware.validatedEmail(fields["email"] ?? "") else {
+      guard let email = AuthEmail.validatedEmail(fields["email"] ?? "") else {
         context.logger.warning("Rejected malformed login email from \(ip)")
         return AuthPages.checkEmail(siteURL: auth.siteURL, siteTitle: siteTitle)
       }
 
-      guard await rateLimiter.allow(email: email, ip: ip) else {
+      guard await rateLimiter.allow(ip: ip) else {
         context.logger.warning("Login rate limited for \(email) from \(ip)")
         return AuthPages.checkEmail(siteURL: auth.siteURL, siteTitle: siteTitle)
       }
@@ -113,7 +113,7 @@ package enum AuthRoutes {
       guard let token = request.uri.queryParameters.get("token"), !token.isEmpty else {
         return AuthPages.verifyFailed(siteURL: auth.siteURL, siteTitle: siteTitle)
       }
-      let next = AuthMiddleware.safeNextPath(request.uri.queryParameters.get("next"))
+      let next = AuthEmail.safeNextPath(request.uri.queryParameters.get("next"))
       return AuthPages.verifyConfirm(
         token: token,
         next: next,
@@ -139,7 +139,7 @@ package enum AuthRoutes {
 
       context.sessions.setSession(user.id, expiresIn: auth.settings.sessionTTL)
 
-      let redirect = AuthMiddleware.safeNextPath(fields["next"]) ?? "/"
+      let redirect = AuthEmail.safeNextPath(fields["next"]) ?? "/"
       return Response(
         status: .seeOther,
         headers: [.location: redirect],

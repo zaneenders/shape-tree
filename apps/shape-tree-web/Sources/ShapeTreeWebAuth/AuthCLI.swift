@@ -5,7 +5,7 @@ import PostgresNIO
 
 package enum AuthCLI {
   package static func addUser(email rawEmail: String, logger: Logger) async throws {
-    guard let email = AuthMiddleware.validatedEmail(rawEmail) else {
+    guard let email = AuthEmail.validatedEmail(rawEmail) else {
       logger.error("Invalid email: \(rawEmail)")
       return
     }
