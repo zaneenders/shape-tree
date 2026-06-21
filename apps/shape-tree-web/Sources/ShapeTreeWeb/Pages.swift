@@ -8,16 +8,16 @@ import ShapeTreeWebCore
 enum WebPages {
   static func shell(store: ContentStore, initial: Post) -> HTML {
     document(bodyAttrs: [.hxExt("head-support")]) {
-      HTML.void(.meta, attrs: [.charset("utf-8"), .name("viewport"), .content("width=device-width, initial-scale=1")])
+      meta(attrs: [.charset("utf-8"), .name("viewport"), .content("width=device-width, initial-scale=1")])
       HTML.tag(.title) { pageTitle(for: initial, siteTitle: store.siteTitle) }
-      HTML.raw("<style hx-preserve=\"true\">\n\(site_css)\n</style>")
-      HTML.raw("<script hx-preserve=\"true\">\n\(htmx_min_js)\n</script>")
-      HTML.raw("<script hx-preserve=\"true\">\n\(htmx_head_support)\n</script>")
+      style(attrs: [.hxPreserve]) { HTML.raw(site_css) }
+      script(attrs: [.hxPreserve]) { HTML.raw(htmx_min_js) }
+      script(attrs: [.hxPreserve]) { HTML.raw(htmx_head_support) }
       navClientScript()
     } body: {
       HTMX.Attributes.lazyNavShell(get: "/htmx/content/nav")
-      HTML.raw(#"<div id="htmx-loading" class="htmx-indicator" aria-live="polite">Loading…</div>"#)
-      HTML.tag(.main, attrs: [.id("main")]) {
+      div(attrs: [.id("htmx-loading"), .class("htmx-indicator"), .ariaLive("polite")]) { "Loading…" }
+      main(attrs: [.id("main")]) {
         pageArticle(for: initial)
       }
     }
@@ -91,7 +91,7 @@ enum WebPages {
   private static func indexArticle(bodyHTML: String) -> HTML {
     article {
       if !bodyHTML.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-        HTML.tag(.div, attrs: [.class("post-body")]) {
+        div(attrs: [.class("post-body")]) {
           HTML.raw(bodyHTML)
         }
       }
@@ -110,19 +110,17 @@ enum WebPages {
   private static func postArticle(_ post: Post) -> HTML {
     article {
       h1 { post.title }
-      HTML.tag(.p, attrs: [.class("post-meta")]) {
+      p(attrs: [.class("post-meta")]) {
         DateFormatting.displayString(from: post.date)
       }
       if !post.tags.isEmpty {
-        HTML.tag(.ul, attrs: [.class("post-tags")]) {
-          HTML.fragment(
-            post.tags.map { tag in
-              HTML.tag(.li, attrs: [.class("post-tag")]) { tag }
-            }
-          )
+        ul(attrs: [.class("post-tags")]) {
+          for tag in post.tags {
+            li(attrs: [.class("post-tag")]) { tag }
+          }
         }
       }
-      HTML.tag(.div, attrs: [.class("post-body")]) {
+      div(attrs: [.class("post-body")]) {
         HTML.raw(post.bodyHTML)
       }
     }

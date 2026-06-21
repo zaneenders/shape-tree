@@ -68,9 +68,9 @@ enum AuthPages {
 
   private static func pageShell(title: String, body: HTML) -> HTML {
     document(lang: "en") {
-      HTML.void(.meta, attrs: [.charset("utf-8"), .name("viewport"), .content("width=device-width, initial-scale=1")])
+      meta(attrs: [.charset("utf-8"), .name("viewport"), .content("width=device-width, initial-scale=1")])
       HTML.tag(.title) { title }
-      HTML.raw("<style>\n\(auth_css)\n</style>")
+      style { HTML.raw(auth_css) }
     } body: {
       body
     }
@@ -79,7 +79,7 @@ enum AuthPages {
   private static func loginForm(next: String?) -> HTML {
     form(attrs: [.method("post"), .action("/auth/login")]) {
       label(attrs: [.forID("email")]) { "Email" }
-      HTML.void(.input, attrs: [.id("email"), .name("email"), .type("email"), .autocomplete("email"), .required])
+      input(attrs: [.id("email"), .name("email"), .type("email"), .autocomplete("email"), .required])
       if let next, !next.isEmpty {
         hiddenField(name: "next", value: next)
       }
