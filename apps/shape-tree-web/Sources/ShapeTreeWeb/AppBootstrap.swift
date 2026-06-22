@@ -13,9 +13,10 @@ extension ShapeTreeWeb {
     auth: AuthServices,
     rateLimiter: LoginRateLimiter = LoginRateLimiter()
   ) {
-    AuthRoutes.addSessionMiddleware(to: router, auth: auth)
-
     let homeSlug = store.indexPost?.slug ?? indexSlug
+
+    AuthRoutes.addSessionMiddleware(to: router, auth: auth)
+    router.add(middleware: NotFoundMiddleware(store: store, homeSlug: homeSlug))
 
     router.get { _, _ in
       WebPages.shell(store: store, homeSlug: homeSlug).makeHTMLResponse()

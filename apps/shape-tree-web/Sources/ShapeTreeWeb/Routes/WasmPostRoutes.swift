@@ -1,5 +1,6 @@
 import Foundation
 import Hummingbird
+import HTTPTypes
 import NIOCore
 import ShapeTreeWebAssets
 import ShapeTreeWebAuth
@@ -13,11 +14,17 @@ enum WasmPostRoutes {
   ) {
     guard PostWasmAsset.isAvailable else { return }
 
-    router.get("wasm/wasms/:slug") { _, context in
-      try wasmBytesResponse(context: context, store: store)
+    router.get("wasm/wasms/:slug") { request, context in
+      if wantsHTMLDocument(request) {
+        return try postShellRedirect(for: context)
+      }
+      return try wasmBytesResponse(context: context, store: store)
     }
-    router.head("wasm/wasms/:slug") { _, context in
-      try wasmBytesResponse(context: context, store: store, head: true)
+    router.head("wasm/wasms/:slug") { request, context in
+      if wantsHTMLDocument(request) {
+        return try postShellRedirect(for: context, head: true)
+      }
+      return try wasmBytesResponse(context: context, store: store, head: true)
     }
 
     router.get("wasm/posts/:slug") { _, context in
@@ -105,5 +112,22 @@ enum WasmPostRoutes {
       documentTitle: "\(page.title) · \(store.siteTitle)",
       wasmBoot: (slug: page.slug, title: page.title)
     ).makeHTMLResponse()
+  }
+
+  /// Top-level browser navigations to the wasm asset URL should load the HTML shell
+  /// at `/wasm/posts/:slug` instead of a bare 404 from the bytes endpoint.
+  private static func postShellRedirect(for context: AppRequestContext, head: Bool = false) throws -> Response {
+    let slug = try context.parameters.require("slug")
+    return Response(
+      status: .seeOther,
+      headers: [.location: "/wasm/posts/\(slug)"],
+      body: .init(byteBuffer: head ? ByteBuffer() : ByteBuffer())
+    )
+  }
+
+  private static let secFetchDest = HTTPField.Name("Sec-Fetch-Dest")!
+
+  private static func wantsHTMLDocument(_ request: Request) -> Bool {
+    request.headers[secFetchDest] == "document"
   }
 }
