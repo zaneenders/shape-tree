@@ -9,7 +9,7 @@ OUT_JS="$ASSETS/client"
 BUILD_DIR="$CLIENT/.build/js"
 SDK="${SWIFT_WASM_SDK:-swift-6.3.2-RELEASE_wasm-embedded}"
 
-CONTENT_PATH="${CONTENT_PATH:-/Users/zane/Content}"
+CONTENT_PATH="${CONTENT_PATH:-$ROOT/Examples/content}"
 INDEX_SLUG="${INDEX_SLUG:-Home}"
 LOGIN_SLUG="${LOGIN_SLUG:-Login}"
 
@@ -161,7 +161,7 @@ while IFS='=' read -r target slug; do
   wasm-opt -Oz --strip-debug --strip-producers "$PAGE_WASM" -o "$PAGE_WASM"
   cp "$PAGE_WASM" "$WASM_POSTS_DIR/$slug.wasm"
   PAGE_JS_DIR="$PAGE_BUILD_DIR"
-done < "$MANIFEST"
+done <"$MANIFEST"
 
 # Shared JS runtime for page wasm — keep WASMNav index.js (do not overwrite).
 if [[ -n "$PAGE_JS_DIR" ]]; then

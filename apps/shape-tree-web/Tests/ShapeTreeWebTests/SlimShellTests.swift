@@ -87,11 +87,11 @@ import Testing
       homeSlug: "Home",
       documentTitle: "Sign in · \(store.siteTitle)",
       bootLogin: true,
-      loginNext: "/posts/secret"
+      loginNext: "/wasm/posts/secret"
     ).render()
 
     #expect(html.contains("data-boot-login=\"true\""))
-    #expect(html.contains("data-login-next=\"/posts/secret\""))
+    #expect(html.contains("data-login-next=\"/wasm/posts/secret\""))
     #expect(html.contains("<main id=\"main\"></main>"))
     #expect(!html.contains("Send link"))
   }
@@ -120,12 +120,12 @@ import Testing
       documentTitle: "Confirm sign in · \(store.siteTitle)",
       bootVerify: true,
       verifyToken: "test-token",
-      verifyNext: "/posts/secret"
+      verifyNext: "/wasm/posts/secret"
     ).render()
 
     #expect(html.contains("data-boot-verify=\"true\""))
     #expect(html.contains("data-verify-token=\"test-token\""))
-    #expect(html.contains("data-verify-next=\"/posts/secret\""))
+    #expect(html.contains("data-verify-next=\"/wasm/posts/secret\""))
     #expect(html.contains("/assets/client/bootstrap.js"))
     #expect(html.contains("<main id=\"main\"></main>"))
     #expect(!html.contains("<h1>Confirm sign in</h1>"))

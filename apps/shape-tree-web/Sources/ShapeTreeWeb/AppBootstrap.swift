@@ -2,7 +2,6 @@ import Foundation
 import HTML
 import Hummingbird
 import NIOCore
-import ShapeTreeWebAssets
 import ShapeTreeWebAuth
 import ShapeTreeWebCore
 
@@ -36,13 +35,10 @@ extension ShapeTreeWeb {
       if post.isPrivate, context.identity == nil {
         return WebPages.notFoundResponse(store: store, homeSlug: homeSlug)
       }
-      if PostWasmAsset.isAvailable, PostWasmAsset.wasm(forSlug: post.slug) != nil {
-        return Response(
-          status: .seeOther,
-          headers: [.location: "/wasm/posts/\(post.slug)"],
-          body: .init())
-      }
-      return WebPages.notFoundResponse(store: store, homeSlug: homeSlug)
+      return Response(
+        status: .seeOther,
+        headers: [.location: "/wasm/posts/\(post.slug)"],
+        body: .init())
     }
 
     AuthRoutes.addRoutes(
@@ -50,7 +46,7 @@ extension ShapeTreeWeb {
       auth: auth,
       rateLimiter: rateLimiter,
       spaLoginPage: { next in
-        let safeNext = AuthEmail.safeNextPath(next)
+        let safeNext = AuthEmail.normalizedWasmNextPath(next)
         return WebPages.shell(
           store: store,
           homeSlug: homeSlug,
@@ -69,7 +65,7 @@ extension ShapeTreeWeb {
             : "Confirm sign in · \(store.siteTitle)",
           bootVerify: true,
           verifyToken: verifyToken,
-          verifyNext: next
+          verifyNext: AuthEmail.normalizedWasmNextPath(next)
         ).makeHTMLResponse()
       }
     )

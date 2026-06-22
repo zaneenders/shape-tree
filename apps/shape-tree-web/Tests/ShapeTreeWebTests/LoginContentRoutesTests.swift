@@ -51,7 +51,7 @@ import Testing
         let body = String(buffer: response.body)
         let payload = try JSONDecoder().decode(LoginContentResponse.self, from: Data(body.utf8))
         #expect(payload.title == "Sign in")
-        #expect(payload.next == "/posts/secret")
+        #expect(payload.next == "/wasm/posts/secret")
         #expect(!payload.bodyHTML.contains("{{login}}"))
       }
     }

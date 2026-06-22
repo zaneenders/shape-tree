@@ -90,7 +90,7 @@ extension ContentStore {
   /// Builds the nav JSON payload using the same visibility rules as server-rendered navigation.
   public func navContentResponse(viewer: NavViewer, wasmSlugs: Set<String>) -> NavContentResponse {
     let index = indexPost
-    let homeSlug = index?.slug ?? "Home"
+    let homeSlug = index?.slug ?? configuredIndexSlug
     let homeTitle = siteTitle
     let home = NavContentItem(
       slug: homeSlug,
@@ -122,16 +122,11 @@ extension ContentStore {
   }
 
   private func navItem(for post: Post, wasmSlugs: Set<String>) -> NavContentItem {
-    let hasWasm = wasmSlugs.contains(post.slug)
-    let href =
-      hasWasm
-      ? "/wasm/posts/\(post.slug)"
-      : post.path
-    return NavContentItem(
+    NavContentItem(
       slug: post.slug,
       title: post.title,
-      href: href,
-      hasWasm: hasWasm
+      href: "/wasm/posts/\(post.slug)",
+      hasWasm: wasmSlugs.contains(post.slug)
     )
   }
 }

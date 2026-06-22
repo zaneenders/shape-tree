@@ -60,6 +60,8 @@ public struct ContentStore: Sendable {
     self.postsBySlug = Dictionary(uniqueKeysWithValues: loaded.map { ($0.slug, $0) })
   }
 
+  public var configuredIndexSlug: String { indexSlug }
+
   public var siteTitle: String {
     indexPost?.title ?? "ShapeTree Web"
   }

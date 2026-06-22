@@ -7,7 +7,7 @@ import ShapeTreeWebCore
 enum LoginContentRoutes {
   static func register(on router: Router<AppRequestContext>, store: ContentStore) {
     router.get("api/get-login-content") { request, _ in
-      let next = AuthEmail.safeNextPath(request.uri.queryParameters.get("next"))
+      let next = AuthEmail.normalizedWasmNextPath(request.uri.queryParameters.get("next"))
       let payload = store.loginContentResponse(next: next)
       return try jsonResponse(payload)
     }

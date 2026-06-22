@@ -33,13 +33,14 @@ private func loginFlowSuiteEnabled() -> Bool {
 /// Exercises the entire magic-link login flow in-process via Hummingbird's
 /// `.router` test framework:
 ///
-/// 1. Asserts a private post returns 404 (hidden) when unauthenticated.
+/// 1. Asserts a private wasm route returns 404 when unauthenticated.
 /// 2. Asserts the navigation does not show the private directory when unauthenticated.
-/// 3. Triggers a login email via POST /auth/login.
+/// 3. Triggers a login email via POST /auth/login (legacy `/posts/` next is normalized).
 /// 4. Polls IMAP for the login email and extracts the token from the link.
-/// 5. Verifies the token via POST /auth/verify and captures the session cookie.
-/// 6. Asserts the private post is now visible (200 OK with content).
-/// 7. Asserts the navigation now shows the private directory.
+/// 5. Verifies GET /auth/verify returns the slim shell with token for client-side confirm UI.
+/// 6. Verifies POST /auth/verify and captures the session cookie (wasm redirect target).
+/// 7. Asserts the private wasm post shell is reachable when authenticated.
+/// 8. Asserts the navigation now shows the private directory.
 ///
 /// The suite automatically starts the docker-compose `postgres` service in
 /// ``init`` and stops it in ``deinit`` — no manual setup needed. SMTP/IMAP
@@ -144,7 +145,14 @@ struct LoginFlowIntegrationTests: ~Copyable {
       let app = Application(router: router)
 
       try await app.test(.router) { client in
-        // 1. Unauthenticated: private post returns 404 (hidden, not redirected).
+        let wasmPostPath = "/wasm/posts/\(secretSlug)"
+
+        // 1. Unauthenticated: private wasm route returns 404 (hidden, not redirected).
+        try await client.execute(uri: wasmPostPath, method: .get) { response in
+          #expect(response.status == .notFound)
+        }
+
+        // 1b. Unauthenticated: legacy post URL stays hidden.
         try await client.execute(uri: "/posts/\(secretSlug)", method: .get) { response in
           #expect(response.status == .notFound)
         }
@@ -223,7 +231,7 @@ struct LoginFlowIntegrationTests: ~Copyable {
           #expect(response.status == .ok)
           #expect(response.headers[.contentType] == "application/json; charset=utf-8")
           let body = String(buffer: response.body)
-          #expect(body.contains("/posts/\(secretSlug)?signed-in=1"))
+          #expect(body.contains("\(wasmPostPath)?signed-in=1"))
           if let setCookie = response.headers[.setCookie] {
             sessionCookie = Self.parseSessionCookie(setCookie)
           }
@@ -234,15 +242,27 @@ struct LoginFlowIntegrationTests: ~Copyable {
           return
         }
 
-        // 7. Authenticated: private post is now visible.
+        // 7. Authenticated: legacy post URL redirects to the wasm route.
         try await client.execute(
           uri: "/posts/\(secretSlug)",
           method: .get,
           headers: [.cookie: sessionCookie]
         ) { response in
+          #expect(response.status == .seeOther)
+          #expect(response.headers[.location] == wasmPostPath)
+        }
+
+        // 7b. Authenticated: wasm post shell boots client-side content.
+        try await client.execute(
+          uri: wasmPostPath,
+          method: .get,
+          headers: [.cookie: sessionCookie]
+        ) { response in
           #expect(response.status == .ok)
           let body = String(buffer: response.body)
-          #expect(body.contains(contentMarker))
+          #expect(body.contains("data-initial-wasm-slug=\"\(secretSlug)\""))
+          #expect(body.contains("id=\"styled-navigation\""))
+          #expect(!body.contains(contentMarker))
         }
 
         // 8. Authenticated: nav now includes private content.

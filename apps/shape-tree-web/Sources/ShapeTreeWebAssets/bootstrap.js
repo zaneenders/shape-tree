@@ -181,15 +181,13 @@ function appendContentItem(list, item, homeSlug) {
   const leaf = document.createElement("li");
   leaf.className = "nav-leaf";
   const link = document.createElement("a");
-  link.className = item.hasWasm ? "nav-link nav-wasm-link" : "nav-link";
+  link.className = "nav-link nav-wasm-link";
   link.href = item.href;
   link.textContent = item.title;
-  if (item.hasWasm) {
-    link.dataset.wasmSlug = item.slug;
-    link.dataset.wasmTitle = item.title;
-    if (item.slug === homeSlug) {
-      link.dataset.wasmPath = "/";
-    }
+  link.dataset.wasmSlug = item.slug;
+  link.dataset.wasmTitle = item.title;
+  if (item.slug === homeSlug) {
+    link.dataset.wasmPath = "/";
   }
   leaf.appendChild(link);
   list.appendChild(leaf);

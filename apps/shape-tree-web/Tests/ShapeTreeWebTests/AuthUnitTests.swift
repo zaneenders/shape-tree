@@ -119,8 +119,24 @@ import Testing
 
   @Test func signedInRedirectAppendsQueryParam() {
     #expect(AuthEmail.signedInRedirect(to: "/") == "/?signed-in=1")
-    #expect(AuthEmail.signedInRedirect(to: "/posts/secret") == "/posts/secret?signed-in=1")
-    #expect(AuthEmail.signedInRedirect(to: "/posts/secret?foo=bar") == "/posts/secret?foo=bar&signed-in=1")
+    #expect(AuthEmail.signedInRedirect(to: "/wasm/posts/secret") == "/wasm/posts/secret?signed-in=1")
+    #expect(
+      AuthEmail.signedInRedirect(to: "/wasm/posts/secret?foo=bar")
+        == "/wasm/posts/secret?foo=bar&signed-in=1"
+    )
+  }
+
+  @Test func normalizedWasmNextPathAcceptsWasmRoutes() {
+    #expect(AuthEmail.normalizedWasmNextPath("/wasm/posts/secret") == "/wasm/posts/secret")
+    #expect(AuthEmail.normalizedWasmNextPath("/") == "/")
+  }
+
+  @Test func normalizedWasmNextPathRewritesLegacyPostRoutes() {
+    #expect(AuthEmail.normalizedWasmNextPath("/posts/secret") == "/wasm/posts/secret")
+    #expect(AuthEmail.normalizedWasmNextPath(nil) == nil)
+    #expect(AuthEmail.normalizedWasmNextPath("//evil.com") == nil)
+    #expect(AuthEmail.normalizedWasmNextPath("/other") == nil)
+    #expect(AuthEmail.normalizedWasmNextPath("/posts/") == nil)
   }
 }
 

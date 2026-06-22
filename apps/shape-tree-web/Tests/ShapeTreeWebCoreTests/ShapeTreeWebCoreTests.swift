@@ -288,7 +288,34 @@ import Testing
     )
     let fallbackItem = withoutWasm.groups.flatMap(\.items).first { $0.slug == "Public" }
     #expect(fallbackItem?.hasWasm == false)
-    #expect(fallbackItem?.href == "/posts/Public")
+    #expect(fallbackItem?.href == "/wasm/posts/Public")
+  }
+
+  @Test func usesConfiguredIndexSlugWhenIndexPostMissing() throws {
+    let temporaryDirectory = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: temporaryDirectory) }
+
+    try "---\ntitle: Public Post\n---\nHello.".write(
+      to: temporaryDirectory.appendingPathComponent("Public.md"),
+      atomically: true,
+      encoding: .utf8
+    )
+
+    let store = try ContentStore(
+      contentDirectory: temporaryDirectory,
+      indexSlug: "Landing",
+      loginSlug: "login"
+    )
+
+    let response = store.navContentResponse(
+      viewer: NavViewer(isAuthenticated: false),
+      wasmSlugs: []
+    )
+
+    #expect(response.home.slug == "Landing")
+    #expect(store.configuredIndexSlug == "Landing")
   }
 
   @Test func encodesAndDecodesJSON() throws {
@@ -363,9 +390,9 @@ import Testing
       loginSlug: "login"
     )
 
-    let response = store.loginContentResponse(next: "/posts/secret")
+    let response = store.loginContentResponse(next: "/wasm/posts/secret")
     #expect(response.title == "Sign in")
-    #expect(response.next == "/posts/secret")
+    #expect(response.next == "/wasm/posts/secret")
     #expect(!response.bodyHTML.contains("{{login}}"))
     #expect(response.bodyHTML.contains("Welcome back"))
   }
