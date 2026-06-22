@@ -12,7 +12,6 @@ let package = Package(
   ],
   dependencies: [
     .package(url: "https://github.com/zaneenders/lorikeet.git", revision: "30702f6"),
-    .package(url: "https://github.com/apple/swift-markdown.git", from: "0.7.0"),
     .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.24.0"),
     .package(url: "https://github.com/hummingbird-project/hummingbird-auth.git", from: "2.0.0"),
     .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.21.0"),
@@ -32,9 +31,6 @@ let package = Package(
   targets: [
     .target(
       name: "ShapeTreeWebCore",
-      dependencies: [
-        .product(name: "Markdown", package: "swift-markdown")
-      ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
         .treatAllWarnings(as: .error),

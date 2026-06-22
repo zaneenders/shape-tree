@@ -11,7 +11,7 @@ public enum CoreWasm {
       fatalError(
         """
         ShapeTreeCore.wasm is missing or empty. Build the wasm client before launching the server:
-          ./Scripts/build-client.sh
+          ./Scripts/build-core.sh
         """
       )
     }

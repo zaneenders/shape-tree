@@ -17,7 +17,7 @@ FROM alpine:3.21
 
 COPY --from=selected /ShapeTreeWeb /usr/local/bin/
 COPY --from=selected /resources /usr/local/bin/shape-tree-web_ShapeTreeWebAssets.resources
-COPY apps/shape-tree-web/content /content
+COPY examples/shape-tree-site/content /content
 
 RUN adduser -D -h /home/web web
 USER web

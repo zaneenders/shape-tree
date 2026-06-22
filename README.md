@@ -6,7 +6,7 @@ and a static-ish blog.
 | App | What it is |
 |---|---|
 | [`apps/shape-tree-api`](apps/shape-tree-api) | Hummingbird server wrapping the [Scribe](https://github.com/zaneenders/scribe) agent. Streams chat completions, tool calls and serves a journal. |
-| [`apps/shape-tree-web`](apps/shape-tree-web) | Markdown blog built on [Lorikeet](https://github.com/zaneenders/lorikeet) and [Hummingbird](https://github.com/hummingbird-project/hummingbird/). |
+| [`apps/shape-tree-web`](apps/shape-tree-web) | Wasm host: Hummingbird server + ShapeTreeCore client. Serves page wasm from a content directory. |
 | [`apps/ShapeTreeApp`](apps/ShapeTreeApp) | Cross-platform (iOS + macOS) SwiftUI client that talks to the API. |
 
 

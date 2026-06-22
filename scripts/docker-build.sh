@@ -29,11 +29,15 @@ fi
 
 echo "=== Host arch: $HOST_ARCH — using SDK: $SDK ==="
 
-echo "=== Building ShapeTreeWeb WASM client ==="
+echo "=== Building ShapeTreeWeb WASM client (core) ==="
 cd "$ROOT/apps/shape-tree-web"
-if [[ -f Scripts/build-client.sh ]]; then
-  export CONTENT_SOURCE_PATH="${CONTENT_SOURCE_PATH:-$ROOT/apps/shape-tree-web/Examples/content}"
-  bash Scripts/build-client.sh
+if [[ -f Scripts/build-core.sh ]]; then
+  bash Scripts/build-core.sh
+fi
+
+echo "=== Building example site content ==="
+if [[ -f "$ROOT/examples/shape-tree-site/Scripts/build-site.sh" ]]; then
+  bash "$ROOT/examples/shape-tree-site/Scripts/build-site.sh"
 fi
 
 echo "=== Building ShapeTreeWeb (Linux) ==="
