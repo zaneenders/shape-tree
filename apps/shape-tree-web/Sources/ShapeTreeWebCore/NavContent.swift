@@ -11,14 +11,16 @@ public struct NavViewer: Codable, Sendable, Equatable {
   }
 }
 
-/// A navigable content item (home, article, favorite page, etc.).
+/// A navigable content item.
 public struct NavContentItem: Codable, Sendable, Equatable {
+  public var path: String
   public var slug: String
   public var title: String
   public var href: String
   public var hasWasm: Bool
 
-  public init(slug: String, title: String, href: String, hasWasm: Bool) {
+  public init(path: String, slug: String, title: String, href: String, hasWasm: Bool = true) {
+    self.path = path
     self.slug = slug
     self.title = title
     self.href = href
@@ -78,33 +80,15 @@ public struct NavContentResponse: Codable, Sendable, Equatable {
 
 extension ContentStore {
   /// Builds the nav JSON payload the client renders, applying per-viewer visibility rules.
-  public func navContentResponse(viewer: NavViewer, wasmSlugs: Set<String>) -> NavContentResponse {
-    let index = indexPost
-    let homeSlug = index?.slug ?? configuredIndexSlug
-    let homeTitle = siteTitle
-    let home = NavContentItem(
-      slug: homeSlug,
-      title: homeTitle,
-      href: "/",
-      hasWasm: wasmSlugs.contains(homeSlug)
-    )
+  public func navContentResponse(viewer: NavViewer) -> NavContentResponse {
+    let homeNode = homeNode ?? ContentNode(path: indexPath, title: siteTitle, isPrivate: false, isHome: true)
+    let home = navItem(for: homeNode)
 
-    var groups = postGroups(includingPrivate: viewer.isAuthenticated).map { group in
+    let groups = nodeGroups(includingPrivate: viewer.isAuthenticated).map { group in
       NavContentGroup(
         label: group.label,
         directory: group.directory,
-        items: group.posts.map { navItem(for: $0, wasmSlugs: wasmSlugs) }
-      )
-    }
-
-    let appPages = AppPages.visiblePages(isAuthenticated: viewer.isAuthenticated)
-    if !appPages.isEmpty {
-      groups.append(
-        NavContentGroup(
-          label: "Apps",
-          directory: "Apps",
-          items: appPages.map { navItem(for: $0, wasmSlugs: wasmSlugs) }
-        )
+        items: group.nodes.map(navItem(for:))
       )
     }
 
@@ -122,21 +106,13 @@ extension ContentStore {
     )
   }
 
-  private func navItem(for page: AppPage, wasmSlugs: Set<String>) -> NavContentItem {
+  private func navItem(for node: ContentNode) -> NavContentItem {
     NavContentItem(
-      slug: page.slug,
-      title: page.title,
-      href: "/wasm/posts/\(page.slug)",
-      hasWasm: wasmSlugs.contains(page.slug)
-    )
-  }
-
-  private func navItem(for post: Post, wasmSlugs: Set<String>) -> NavContentItem {
-    NavContentItem(
-      slug: post.slug,
-      title: post.title,
-      href: "/wasm/posts/\(post.slug)",
-      hasWasm: wasmSlugs.contains(post.slug)
+      path: node.path,
+      slug: node.slug,
+      title: node.title,
+      href: node.path == indexPath && node.isHome ? "/" : node.href,
+      hasWasm: true
     )
   }
 }

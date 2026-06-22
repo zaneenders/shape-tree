@@ -119,11 +119,10 @@ struct LoginFlowIntegrationTests: ~Copyable {
 
       let store = try ContentStore(
         contentDirectory: contentDir,
-        indexSlug: "Home",
-        loginSlug: "login",
+        indexPath: "Home",
         privateDirectories: ["Private"]
       )
-      let secretSlug = "secret"
+      let secretPath = "Private/secret"
 
       let auth = AuthServices(
         database: database,
@@ -138,17 +137,17 @@ struct LoginFlowIntegrationTests: ~Copyable {
       ShapeTreeWeb.configureRouter(
         router,
         store: store,
-        indexSlug: "Home",
         auth: auth
       )
 
       let app = Application(router: router)
 
       try await app.test(.router) { client in
-        let wasmPostPath = "/wasm/posts/\(secretSlug)"
+        let contentPath = "/content/\(secretPath)"
+        let documentHeaders: HTTPFields = [HTTPField.Name("Sec-Fetch-Dest")!: "document"]
 
-        // 1. Unauthenticated: private wasm route returns 404 (hidden, not redirected).
-        try await client.execute(uri: wasmPostPath, method: .get) { response in
+        // 1. Unauthenticated: private wasm bytes return 404 (hidden, not redirected).
+        try await client.execute(uri: "\(contentPath).wasm", method: .get) { response in
           #expect(response.status == .notFound)
         }
 
@@ -157,11 +156,11 @@ struct LoginFlowIntegrationTests: ~Copyable {
           #expect(response.status == .ok)
           let body = String(buffer: response.body)
           let payload = try JSONDecoder().decode(NavContentResponse.self, from: Data(body.utf8))
-          #expect(!payload.groups.flatMap(\.items).contains { $0.slug == secretSlug })
+          #expect(!payload.groups.flatMap(\.items).contains { $0.path == secretPath })
         }
 
         // 3. Trigger login email.
-        let loginBody = "email=\(testEmail)&next=\(wasmPostPath)"
+        let loginBody = "email=\(testEmail)&next=\(contentPath)"
         try await client.execute(
           uri: "/auth/login",
           method: .post,
@@ -199,19 +198,19 @@ struct LoginFlowIntegrationTests: ~Copyable {
 
         // 5. GET /auth/verify returns the slim shell with token for client-side confirm UI.
         try await client.execute(
-          uri: "/auth/verify?token=\(rawToken)&next=\(wasmPostPath)",
+          uri: "/auth/verify?token=\(rawToken)&next=\(contentPath)",
           method: .get
         ) { response in
           #expect(response.status == .ok)
           let body = String(buffer: response.body)
-          #expect(body.contains("data-boot-verify=\"true\""))
-          #expect(body.contains("data-verify-token=\"\(rawToken)\""))
+          #expect(body.contains("data-index-path=\"Home\""))
           #expect(body.contains("/assets/client/bootstrap.js"))
+          #expect(!body.contains("data-boot-verify"))
         }
 
         // 6. POST /auth/verify with token.
         var sessionCookie: String?
-        let verifyBody = "token=\(rawToken)&next=\(wasmPostPath)"
+        let verifyBody = "token=\(rawToken)&next=\(contentPath)"
         try await client.execute(
           uri: "/auth/verify",
           method: .post,
@@ -222,7 +221,7 @@ struct LoginFlowIntegrationTests: ~Copyable {
           body: ByteBuffer(string: verifyBody)
         ) { response in
           #expect(response.status == .seeOther)
-          #expect(response.headers[.location] == "\(wasmPostPath)?signed-in=1")
+          #expect(response.headers[.location] == "\(contentPath)?signed-in=1")
           if let setCookie = response.headers[.setCookie] {
             sessionCookie = Self.parseSessionCookie(setCookie)
           }
@@ -233,17 +232,28 @@ struct LoginFlowIntegrationTests: ~Copyable {
           return
         }
 
-        // 7. Authenticated: wasm post shell boots client-side content.
+        // 7. Authenticated: content shell is unified; wasm bytes are available.
+        var authedDocument = documentHeaders
+        authedDocument[.cookie] = sessionCookie
         try await client.execute(
-          uri: wasmPostPath,
+          uri: contentPath,
+          method: .get,
+          headers: authedDocument
+        ) { response in
+          #expect(response.status == .ok)
+          let body = String(buffer: response.body)
+          #expect(body.contains("data-index-path=\"Home\""))
+          #expect(body.contains("id=\"styled-navigation\""))
+          #expect(!body.contains(contentMarker))
+        }
+
+        try await client.execute(
+          uri: "\(contentPath).wasm",
           method: .get,
           headers: [.cookie: sessionCookie]
         ) { response in
           #expect(response.status == .ok)
-          let body = String(buffer: response.body)
-          #expect(body.contains("data-initial-wasm-slug=\"\(secretSlug)\""))
-          #expect(body.contains("id=\"styled-navigation\""))
-          #expect(!body.contains(contentMarker))
+          #expect(response.headers[.contentType] == "application/wasm")
         }
 
         // 8. Authenticated: nav now includes private content.
@@ -255,7 +265,7 @@ struct LoginFlowIntegrationTests: ~Copyable {
           #expect(response.status == .ok)
           let body = String(buffer: response.body)
           let payload = try JSONDecoder().decode(NavContentResponse.self, from: Data(body.utf8))
-          #expect(payload.groups.flatMap(\.items).contains { $0.slug == secretSlug })
+          #expect(payload.groups.flatMap(\.items).contains { $0.path == secretPath })
         }
       }
     }
@@ -408,23 +418,8 @@ struct LoginFlowIntegrationTests: ~Copyable {
   }
 
   private static func createTestContent(at dir: URL, marker: String) throws {
-    let homeMarkdown = "---\ntitle: Test Site\n---\nWelcome to the test site."
-    try homeMarkdown.write(
-      to: dir.appendingPathComponent("Home.md"),
-      atomically: true,
-      encoding: .utf8
-    )
-    let privateDir = dir.appendingPathComponent("Private", isDirectory: true)
-    try FileManager.default.createDirectory(
-      at: privateDir,
-      withIntermediateDirectories: true
-    )
-    let secretMarkdown = "---\ntitle: \(marker)\n---\n\(marker)"
-    try secretMarkdown.write(
-      to: privateDir.appendingPathComponent("secret.md"),
-      atomically: true,
-      encoding: .utf8
-    )
+    try TestContentFixtures.writeNode(in: dir, path: "Home", title: "Test Site")
+    try TestContentFixtures.writeNode(in: dir, path: "Private/secret", title: marker)
   }
 
   private static func extractToken(from body: String) -> String? {

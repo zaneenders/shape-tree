@@ -32,6 +32,7 @@ echo "=== Host arch: $HOST_ARCH — using SDK: $SDK ==="
 echo "=== Building ShapeTreeWeb WASM client ==="
 cd "$ROOT/apps/shape-tree-web"
 if [[ -f Scripts/build-client.sh ]]; then
+  export CONTENT_SOURCE_PATH="${CONTENT_SOURCE_PATH:-$ROOT/apps/shape-tree-web/Examples/content}"
   bash Scripts/build-client.sh
 fi
 

@@ -1,34 +1,31 @@
 import JavaScriptKit
 
 enum Router {
-  static func nodeWasmURL(slug: String) -> String {
-    "/wasm/wasms/\(encodeURIComponent(slug))"
+  static func contentWasmURL(path: String) -> String {
+    let encoded = encodeContentPath(path)
+    return "/content/\(encoded).wasm"
   }
 
-  static func postPath(slug: String) -> String {
-    "/wasm/posts/\(encodeURIComponent(slug))"
+  static func contentBrowserPath(path: String, isHome: Bool = false) -> String {
+    if isHome { return "/" }
+    return "/content/\(encodeContentPath(path))"
   }
 
-  /// Fetches and instantiates a node wasm into `#main`, updating title and history.
-  static func mountNode(slug: String, title: String?, path: String?, pushState: Bool) {
+  /// Fetches and instantiates a content wasm into `#main`, updating title and history.
+  static func mountContent(path: String, title: String?, browserPath: String?, pushState: Bool) {
     guard let main = element("main") else { return }
     setHTML(main, "<p>Loading…</p>")
     setLoading(true)
-    let resolvedPath = path ?? postPath(slug: slug)
-    mountModule(nodeWasmURL(slug: slug)) { result in
+    let resolvedPath = browserPath ?? contentBrowserPath(path: path)
+    mountModule(contentWasmURL(path: path)) { result in
       setLoading(false)
       if result.status == 404 || !result.ok {
         renderNotFound(path: resolvedPath, pushState: pushState)
         return
       }
-      setDocumentTitle(title ?? slug)
+      setDocumentTitle(title ?? displayTitle(forPath: path))
       if pushState {
-        let state = JSObject()
-        state.node = .boolean(true)
-        state.slug = .string(JSString(slug))
-        if let title { state.title = .string(JSString(title)) }
-        state.path = .string(JSString(resolvedPath))
-        pushHistory(state: state, path: resolvedPath)
+        pushHistory(state: nodeState(path: path, title: title, browserPath: resolvedPath), path: resolvedPath)
       }
     }
   }
@@ -91,10 +88,10 @@ enum Router {
     let popstate = JSClosure { arguments in
       guard let event = arguments[0].object else { return .undefined }
       let state: JSValue = event.state
-      if state.node.boolean == true, let slug = state.slug.string {
+      if state.node.boolean == true, let path = state.contentPath.string {
         let title = state.title.string
-        let path = state.path.string
-        mountNode(slug: slug, title: title, path: path, pushState: false)
+        let browserPath = state.path.string
+        mountContent(path: path, title: title, browserPath: browserPath, pushState: false)
       } else if state.login.boolean == true {
         let next = state.next.string
         showLogin(next: next, pushState: false)
@@ -111,5 +108,22 @@ enum Router {
     }
     ShapeTreeCore.listeners.append(popstate)
     _ = JSObject.global.addEventListener!("popstate", JSValue.object(popstate))
+  }
+
+  private static func nodeState(path: String, title: String?, browserPath: String) -> JSObject {
+    let state = JSObject()
+    state.node = .boolean(true)
+    state.contentPath = .string(JSString(path))
+    if let title { state.title = .string(JSString(title)) }
+    state.path = .string(JSString(browserPath))
+    return state
+  }
+
+  private static func displayTitle(forPath path: String) -> String {
+    path.split(separator: "/").last.map(String.init) ?? path
+  }
+
+  private static func encodeContentPath(_ path: String) -> String {
+    path.split(separator: "/").map { encodeURIComponent(String($0)) }.joined(separator: "/")
   }
 }

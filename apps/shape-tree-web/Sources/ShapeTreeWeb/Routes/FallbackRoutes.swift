@@ -5,7 +5,6 @@ import ShapeTreeWebCore
 
 struct NotFoundMiddleware<Context: RequestContext>: RouterMiddleware {
   let store: ContentStore
-  let homeSlug: String
 
   func handle(
     _ request: Request,
@@ -23,7 +22,7 @@ struct NotFoundMiddleware<Context: RequestContext>: RouterMiddleware {
           body: .init(byteBuffer: ByteBuffer())
         )
       }
-      return WebPages.notFoundResponse(store: store, homeSlug: homeSlug)
+      return WebPages.notFoundResponse(store: store)
     }
   }
 

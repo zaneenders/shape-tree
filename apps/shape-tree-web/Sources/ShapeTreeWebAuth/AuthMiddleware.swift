@@ -44,12 +44,17 @@ package enum AuthEmail {
     return raw
   }
 
-  /// Accepts wasm post paths; returns the wasm route or `/`, rejecting everything else.
-  package static func normalizedWasmNextPath(_ raw: String?) -> String? {
+  /// Accepts content paths; returns the path or `/`, rejecting everything else.
+  package static func normalizedContentNextPath(_ raw: String?) -> String? {
     guard let raw = safeNextPath(raw) else { return nil }
     if raw == "/" { return raw }
-    if raw.hasPrefix("/wasm/posts/") { return raw }
+    if raw.hasPrefix("/content/") { return raw }
     return nil
+  }
+
+  /// Backwards-compatible alias while callers migrate.
+  package static func normalizedWasmNextPath(_ raw: String?) -> String? {
+    normalizedContentNextPath(raw)
   }
 
   /// Appends `signed-in=1` so the SPA can refresh nav after magic-link verify.

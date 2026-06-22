@@ -1,6 +1,6 @@
 # shape-tree-web
 
-Markdown site on [Lorikeet](https://github.com/zaneenders/lorikeet) + [Hummingbird](https://github.com/hummingbird-project/hummingbird) with a Swift WASM client. Content is a directory of `.md` files; subdirectories become nav groups.
+Markdown site on [Lorikeet](https://github.com/zaneenders/lorikeet) + [Hummingbird](https://github.com/hummingbird-project/hummingbird) with a Swift WASM client. At build time, markdown is compiled into per-page `.wasm` modules on disk; at runtime the server serves them under `/content/**`.
 
 ## Run
 
@@ -11,7 +11,22 @@ cp .env.example .env        # edit if needed; defaults work for local demo
 swift run ShapeTreeWeb
 ```
 
-`CONTENT_PATH` points at your markdown tree (default `Examples/content`). `index.md` → home page; front matter: `title`, `date`, `tags`, `excerpt`.
+**Environment**
+
+| Variable | Purpose |
+|----------|---------|
+| `CONTENT_PATH` | Runtime wasm/css tree (default `content`, relative to repo root) |
+| `CONTENT_SOURCE_PATH` | Build-only markdown source for `./Scripts/build-client.sh` (default `Examples/content`) |
+| `INDEX_PATH` | Home page path within the content tree (default `Home`) |
+| `SITE_TITLE` | Optional site title override |
+
+`index.md` → home page; front matter: `title`, `date`, `tags`, `excerpt`. Output layout mirrors source paths (`Articles/new-mac.md` → `content/Articles/new-mac.wasm`).
+
+**URLs**
+
+- `/` — home (same HTML shell as content pages)
+- `/content/Articles/new-mac` — HTML shell; Core loads `/content/Articles/new-mac.wasm`
+- `/api/get-nav-content` — auth-aware nav JSON
 
 ## Auth (optional)
 
@@ -21,7 +36,7 @@ Set all `PG*` vars (see `.env.example`) to enable passwordless email login. Set 
 swift run ShapeTreeWeb --add-user user@example.com
 ```
 
-`AUTH_PRIVATE_DIRECTORIES` — comma-separated dirs to hide from nav and require sign-in (e.g. `Private`). Optional branded login: add `login.md` to content; `{{login}}` in the body places the form (appended if omitted).
+`AUTH_PRIVATE_DIRECTORIES` — comma-separated dirs to hide from nav and require sign-in (e.g. `Private`). Optional branded login: add `login.md` to content source; `{{login}}` in the body places the form (appended if omitted).
 
 ## WASM client build
 
@@ -35,7 +50,17 @@ brew install binaryen   # wasm-opt; apt: binaryen
 
 ## Custom WASM pages
 
-Interactive pages (no `.md` file): `apps/wasm-post/Sources/CustomPages/`. Register in `apps/wasm-post/custom-pages.manifest` (`Page_Canvas=Canvas`) and `AppPages.swift`, then rebuild. Example: **Canvas** (particle field, **Apps** nav group).
+Interactive pages (no `.md` file): `apps/wasm-post/Sources/CustomPages/`. Register in `apps/wasm-post/custom-pages.manifest` (`Page_Canvas=Apps/Canvas`), then rebuild. Example: **Canvas** (particle field, **Apps** nav group).
+
+## Docker
+
+From the repo root:
+
+```bash
+./scripts/docker-build.sh up
+```
+
+`build-client.sh` runs first, output goes to `apps/shape-tree-web/content/`, and the image copies that tree to `/content` with `CONTENT_PATH=/content`.
 
 ## Tests
 

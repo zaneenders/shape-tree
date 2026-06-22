@@ -55,12 +55,12 @@ private func registerListeners(on document: JSValue) {
 
     if let nodeLink = target.closest!("a.nav-node-link").object {
       _ = event.preventDefault?()
-      let slug = wasmDataset(nodeLink, key: "slug")
-      let title = wasmDataset(nodeLink, key: "title")
       let path = wasmDataset(nodeLink, key: "path")
-      if let slug {
-        ShapeTreeCore.log("node nav link: \(slug)")
-        Router.mountNode(slug: slug, title: title, path: path, pushState: true)
+      let title = wasmDataset(nodeLink, key: "title")
+      let browserPath = wasmDataset(nodeLink, key: "browserPath")
+      if let path {
+        ShapeTreeCore.log("node nav link: \(path)")
+        Router.mountContent(path: path, title: title, browserPath: browserPath, pushState: true)
       }
       closeAll(in: document)
       return .undefined

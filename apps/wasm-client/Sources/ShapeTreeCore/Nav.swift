@@ -18,9 +18,9 @@ enum Nav {
     guard let list = createElement("ul") else { return }
     list.className = .string("nav-root")
 
-    let homeSlug = bodyDataset("homeSlug") ?? payload.home.slug.string
+    let indexPath = bodyDataset("indexPath") ?? payload.home.path.string ?? "Home"
 
-    appendItem(to: list, item: payload.home, homeSlug: homeSlug)
+    appendItem(to: list, item: payload.home, indexPath: indexPath)
 
     let signIn: JSValue = payload.signIn
     if let signInObject = signIn.object, let leaf = createElement("li") {
@@ -38,13 +38,13 @@ enum Nav {
     let groups: JSValue = payload.groups
     let groupCount = Int(groups.object?.length.number ?? 0)
     for index in 0..<groupCount {
-      appendGroup(to: list, group: groups[index], homeSlug: homeSlug)
+      appendGroup(to: list, group: groups[index], indexPath: indexPath)
     }
 
     _ = nav.appendChild!(list)
   }
 
-  private static func appendItem(to list: JSObject, item: JSValue, homeSlug: String?) {
+  private static func appendItem(to list: JSObject, item: JSValue, indexPath: String) {
     guard let itemObject = item.object,
       let leaf = createElement("li"),
       let link = createElement("a")
@@ -54,17 +54,17 @@ enum Nav {
     link.href = itemObject.href
     setText(link, itemObject.title.string ?? "")
     if let dataset = link.dataset.object {
-      dataset.slug = itemObject.slug
+      dataset.path = itemObject.path
       dataset.title = itemObject.title
-      if let homeSlug, jsEquals(itemObject.slug, homeSlug) {
-        dataset.path = .string("/")
+      if let path = itemObject.path.string {
+        dataset.browserPath = .string(JSString(browserPath(forItemPath: path, href: itemObject.href.string, indexPath: indexPath)))
       }
     }
     _ = leaf.appendChild!(link)
     _ = list.appendChild!(leaf)
   }
 
-  private static func appendGroup(to list: JSObject, group: JSValue, homeSlug: String?) {
+  private static func appendGroup(to list: JSObject, group: JSValue, indexPath: String) {
     guard let groupObject = group.object,
       let branch = createElement("li"),
       let input = createElement("input"),
@@ -88,13 +88,19 @@ enum Nav {
     let items: JSValue = groupObject.items
     let itemCount = Int(items.object?.length.number ?? 0)
     for index in 0..<itemCount {
-      appendItem(to: flyout, item: items[index], homeSlug: homeSlug)
+      appendItem(to: flyout, item: items[index], indexPath: indexPath)
     }
 
     _ = branch.appendChild!(input)
     _ = branch.appendChild!(label)
     _ = branch.appendChild!(flyout)
     _ = list.appendChild!(branch)
+  }
+
+  private static func browserPath(forItemPath path: String, href: String?, indexPath: String) -> String {
+    if path == indexPath { return "/" }
+    if let href, !href.isEmpty { return href }
+    return Router.contentBrowserPath(path: path)
   }
 
   private static func navBranchID(_ directory: String) -> String {

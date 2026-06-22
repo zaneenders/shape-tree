@@ -1,7 +1,6 @@
 import Foundation
 import Hummingbird
 import NIOCore
-import ShapeTreeWebAssets
 import ShapeTreeWebAuth
 import ShapeTreeWebCore
 
@@ -12,8 +11,7 @@ enum NavContentRoutes {
         isAuthenticated: context.identity != nil,
         email: context.identity?.email
       )
-      let wasmSlugs = store.navWasmSlugs(fromEmbedded: Set(PostWasmAsset.availableSlugs))
-      let payload = store.navContentResponse(viewer: viewer, wasmSlugs: wasmSlugs)
+      let payload = store.navContentResponse(viewer: viewer)
       return try jsonResponse(payload)
     }
   }

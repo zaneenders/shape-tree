@@ -5,20 +5,25 @@ import Markdown
 struct ContentGenerator {
   static func main() {
     let args = CommandLine.arguments
-    guard args.count >= 5 else {
+    guard args.count >= 6 else {
       FileHandle.standardError.write(
         Data(
-          "Usage: ContentGenerator <output-pages-dir> <output-package-swift> <output-manifest> <input.md> [<input.md> ...]\n"
-            .utf8))
+          """
+          Usage: ContentGenerator <output-pages-dir> <output-package-swift> <output-manifest> \
+          <output-meta-dir> <content-source-root> <input.md> [<input.md> ...]
+
+          """.utf8))
       exit(1)
     }
 
     let outputPagesDir = args[1]
     let outputPackageSwift = args[2]
     let outputManifest = args[3]
-    let inputFiles = Array(args.dropFirst(4))
+    let outputMetaDir = args[4]
+    let sourceRoot = URL(fileURLWithPath: args[5]).standardizedFileURL
+    let inputFiles = Array(args.dropFirst(6))
 
-    var pages: [(slug: String, html: String)] = []
+    var pages: [(path: String, title: String, html: String)] = []
 
     for path in inputFiles {
       guard path.hasSuffix(".md") else { continue }
@@ -26,22 +31,27 @@ struct ContentGenerator {
         FileHandle.standardError.write(Data("Warning: could not read \(path)\n".utf8))
         continue
       }
-      let slug = ((path as NSString).deletingPathExtension as NSString).lastPathComponent
-      let html = renderArticle(source: source, slug: slug)
-      pages.append((slug, html))
+      let fileURL = URL(fileURLWithPath: path).standardizedFileURL
+      let relativePath = fileURL.path(from: sourceRoot)
+      let contentPath = (relativePath as NSString).deletingPathExtension
+      let (title, _, _) = splitFrontMatter(source, path: contentPath)
+      let html = renderArticle(source: source, path: contentPath, title: title)
+      pages.append((contentPath, title ?? humanize(contentPath), html))
     }
 
-    pages.sort { $0.slug < $1.slug }
+    pages.sort { $0.path < $1.path }
 
     try? FileManager.default.createDirectory(
       atPath: outputPagesDir, withIntermediateDirectories: true)
+    try? FileManager.default.createDirectory(
+      atPath: outputMetaDir, withIntermediateDirectories: true)
 
-    for (slug, html) in pages {
-      let safeName = safeTargetName(slug)
+    for (path, title, html) in pages {
+      let safeName = safeTargetName(path)
       let escaped = escapeSwiftString(html)
       let fileContent = """
         // GENERATED FILE — do not edit.
-        // Page: \(slug)
+        // Page: \(path)
         import JavaScriptKit
 
         @main
@@ -58,6 +68,7 @@ struct ContentGenerator {
 
       let outputPath = "\(outputPagesDir)/\(safeName).swift"
       try? fileContent.write(toFile: outputPath, atomically: true, encoding: .utf8)
+      writeMeta(title: title, contentPath: path, outputMetaDir: outputMetaDir)
     }
 
     var pkg = "// swift-tools-version: 6.3\n\n"
@@ -69,8 +80,8 @@ struct ContentGenerator {
     pkg += "    .package(url: \"https://github.com/swiftwasm/JavaScriptKit.git\", from: \"0.37.0\"),\n"
     pkg += "  ],\n"
     pkg += "  targets: [\n"
-    for (slug, _) in pages {
-      let safeName = safeTargetName(slug)
+    for (path, _, _) in pages {
+      let safeName = safeTargetName(path)
       pkg += "    .executableTarget(\n"
       pkg += "      name: \"\(safeName)\",\n"
       pkg += "      dependencies: [.product(name: \"JavaScriptKit\", package: \"JavaScriptKit\")],\n"
@@ -89,9 +100,9 @@ struct ContentGenerator {
     try? pkg.write(toFile: outputPackageSwift, atomically: true, encoding: .utf8)
 
     var manifest = ""
-    for (slug, _) in pages {
-      let safeName = safeTargetName(slug)
-      manifest += "\(safeName)=\(slug)\n"
+    for (path, _, _) in pages {
+      let safeName = safeTargetName(path)
+      manifest += "\(safeName)=\(path)\n"
     }
     try? manifest.write(toFile: outputManifest, atomically: true, encoding: .utf8)
 
@@ -99,8 +110,21 @@ struct ContentGenerator {
       Data("Generated \(pages.count) page(s)\n".utf8))
   }
 
-  static func safeTargetName(_ slug: String) -> String {
-    let sanitized = slug.map { c in
+  static func writeMeta(title: String, contentPath: String, outputMetaDir: String) {
+    let meta = MetaSidecar(title: title)
+    guard let data = try? JSONEncoder().encode(meta) else { return }
+    let destination = URL(fileURLWithPath: outputMetaDir)
+      .appendingPathComponent(contentPath)
+      .appendingPathExtension("meta.json")
+    try? FileManager.default.createDirectory(
+      at: destination.deletingLastPathComponent(),
+      withIntermediateDirectories: true
+    )
+    try? data.write(to: destination)
+  }
+
+  static func safeTargetName(_ path: String) -> String {
+    let sanitized = path.map { c in
       if c.isLetter || c.isNumber { String(c) } else { "_" }
     }.joined()
     return "Page_" + sanitized
@@ -115,11 +139,11 @@ struct ContentGenerator {
       .replacingOccurrences(of: "\t", with: "\\t")
   }
 
-  static func renderArticle(source: String, slug: String) -> String {
-    let (title, date, body) = splitFrontMatter(source, slug: slug)
+  static func renderArticle(source: String, path: String, title: String?) -> String {
+    let (parsedTitle, date, body) = splitFrontMatter(source, path: path)
     let doc = Document(parsing: body)
 
-    var titleToUse = title ?? humanize(slug)
+    var titleToUse = title ?? parsedTitle ?? humanize(path)
     var bodyBlocks: [BlockMarkup] = []
 
     if let heading = doc.child(at: 0) as? Heading, heading.level == 1 {
@@ -140,7 +164,7 @@ struct ContentGenerator {
   }
 
   static func splitFrontMatter(
-    _ source: String, slug: String
+    _ source: String, path: String
   ) -> (title: String?, date: String?, body: String) {
     let lines = source.components(separatedBy: "\n")
 
@@ -189,8 +213,8 @@ struct ContentGenerator {
     return v
   }
 
-  static func humanize(_ slug: String) -> String {
-    let name = (slug as NSString).lastPathComponent
+  static func humanize(_ path: String) -> String {
+    let name = (path as NSString).lastPathComponent
     return name
       .replacingOccurrences(of: "-", with: " ")
       .replacingOccurrences(of: "_", with: " ")
@@ -202,5 +226,20 @@ struct ContentGenerator {
       .replacingOccurrences(of: "&", with: "&amp;")
       .replacingOccurrences(of: "<", with: "&lt;")
       .replacingOccurrences(of: ">", with: "&gt;")
+  }
+}
+
+struct MetaSidecar: Codable {
+  var title: String
+}
+
+extension URL {
+  fileprivate func path(from root: URL) -> String {
+    let rootPath = root.standardizedFileURL.path + "/"
+    let fullPath = standardizedFileURL.path
+    if fullPath.hasPrefix(rootPath) {
+      return String(fullPath.dropFirst(rootPath.count))
+    }
+    return lastPathComponent
   }
 }

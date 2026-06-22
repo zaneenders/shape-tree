@@ -9,60 +9,39 @@ extension ShapeTreeWeb {
   static func configureRouter(
     _ router: Router<AppRequestContext>,
     store: ContentStore,
-    indexSlug: String,
     auth: AuthServices,
     rateLimiter: LoginRateLimiter = LoginRateLimiter()
   ) {
-    let homeSlug = store.indexPost?.slug ?? indexSlug
-
     AuthRoutes.addSessionMiddleware(to: router, auth: auth)
-    router.add(middleware: NotFoundMiddleware(store: store, homeSlug: homeSlug))
+    router.add(middleware: NotFoundMiddleware(store: store))
 
     router.get { _, _ in
-      WebPages.shell(store: store, homeSlug: homeSlug).makeHTMLResponse()
+      WebPages.shell(store: store).makeHTMLResponse()
     }
 
     AuthRoutes.addRoutes(
       to: router,
       auth: auth,
       rateLimiter: rateLimiter,
-      spaLoginPage: { next in
-        let safeNext = AuthEmail.normalizedWasmNextPath(next)
-        return WebPages.shell(
+      spaLoginPage: { _ in
+        WebPages.shell(
           store: store,
-          homeSlug: homeSlug,
-          documentTitle: "Sign in · \(store.siteTitle)",
-          bootLogin: true,
-          loginNext: safeNext
+          documentTitle: "Sign in · \(store.siteTitle)"
         ).makeHTMLResponse()
       },
-      spaVerifyPage: { token, next in
-        let verifyToken = token.flatMap { $0.isEmpty ? nil : $0 }
-        return WebPages.shell(
-          store: store,
-          homeSlug: homeSlug,
-          documentTitle: verifyToken == nil
-            ? "Sign in failed · \(store.siteTitle)"
-            : "Confirm sign in · \(store.siteTitle)",
-          bootVerify: true,
-          verifyToken: verifyToken,
-          verifyNext: AuthEmail.normalizedWasmNextPath(next)
-        ).makeHTMLResponse()
+      spaVerifyPage: { _, _ in
+        WebPages.shell(store: store).makeHTMLResponse()
       },
       spaCheckEmailPage: {
         WebPages.shell(
           store: store,
-          homeSlug: homeSlug,
-          documentTitle: "Check your email · \(store.siteTitle)",
-          bootCheckEmail: true
+          documentTitle: "Check your email · \(store.siteTitle)"
         ).makeHTMLResponse()
       }
     )
 
     NavContentRoutes.register(on: router, store: store)
-
-    WasmPostRoutes.register(on: router, store: store, homeSlug: homeSlug)
-
+    ContentRoutes.register(on: router, store: store)
     ClientRoutes.register(on: router)
   }
 
