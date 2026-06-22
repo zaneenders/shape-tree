@@ -17,6 +17,9 @@ enum WebPages {
         titleText
       }
       style { HTML.raw(site_css) }
+      script(attrs: [.type("importmap")]) {
+        HTML.raw(clientImportMapJSON)
+      }
       script(attrs: [.type("module"), .src("/assets/client/bootstrap.js")]) {}
     } body: {
       HTML.tag(
@@ -31,6 +34,10 @@ enum WebPages {
       main(attrs: [.id("main")]) {}
     }
   }
+
+  private static let clientImportMapJSON = """
+    {"imports":{"@bjorn3/browser_wasi_shim":"/assets/client/browser_wasi_shim.js"}}
+    """
 
   private static func shellBodyAttrs(store: ContentStore) -> [HTMLAttr] {
     [

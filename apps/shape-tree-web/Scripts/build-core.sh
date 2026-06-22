@@ -20,17 +20,6 @@ if ! command -v wasm-opt >/dev/null; then
   exit 1
 fi
 
-patch_client_index_js() {
-  local file="$1"
-  if [[ ! -f "$file" ]]; then
-    echo "error: ${file} missing" >&2
-    exit 1
-  fi
-  perl -0777 -pi -e '
-    s/if \(!module\) \{\s*module = fetch\(new URL\([^)]+\)\)\s*\}/if (!module) {\n    throw new Error("init requires options.module");\n  }/s
-  ' "$file"
-}
-
 echo "Building ShapeTreeCore with ${CORE_SDK}..."
 rm -rf "$BUILD_DIR" "$CLIENT/.build/plugins/PackageToJS/outputs/js.tmp"
 (
@@ -55,10 +44,6 @@ mkdir -p "$OUT_JS/platforms"
 cp "$BUILD_DIR/index.js" "$BUILD_DIR/instantiate.js" "$BUILD_DIR/runtime.js" "$OUT_JS/"
 cp "$BUILD_DIR/platforms/browser.js" "$OUT_JS/platforms/"
 cp "$WASM" "$ASSETS/ShapeTreeCore.wasm"
-patch_client_index_js "$OUT_JS/index.js"
-
-perl -pi -e "s|'\\@bjorn3/browser_wasi_shim'|'../browser_wasi_shim.js'|g" \
-  "$OUT_JS/platforms/browser.js"
 
 echo "Wrote client JS to ${OUT_JS}"
 echo "Wrote ${ASSETS}/ShapeTreeCore.wasm"

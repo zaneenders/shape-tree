@@ -13,6 +13,9 @@ import Testing
     #expect(html.contains("id=\"styled-navigation\""))
     #expect(html.contains("<main id=\"main\"></main>"))
     #expect(html.contains("/assets/client/bootstrap.js"))
+    #expect(html.contains("type=\"importmap\""))
+    #expect(html.contains("@bjorn3/browser_wasi_shim"))
+    #expect(html.contains("/assets/client/browser_wasi_shim.js"))
     #expect(html.contains("data-index-path=\"Home\""))
     #expect(!html.contains("data-boot-login"))
   }
