@@ -33,6 +33,8 @@ services:
       PGPASSWORD: shape_tree
       PGDATABASE: shape_tree
       CONTENT_PATH: /content
+    volumes:
+      - ./examples/shape-tree-site/content:/content:ro
     ports:
       - "127.0.0.1:42069:42069"
       - "127.0.0.1:42070:42070"

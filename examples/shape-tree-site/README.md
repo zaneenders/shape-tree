@@ -34,10 +34,10 @@ Or use an absolute path.
 Interactive pages without a `.md` file live in `wasm-post/Sources/CustomPages/`. Register in `wasm-post/custom-pages.manifest`:
 
 ```
-Page_Canvas=Apps/Canvas
+Page_Canvas=Private/Canvas
 ```
 
-Then rerun `./Scripts/build-site.sh`.
+Then rerun `./Scripts/build-site.sh`. The page is gated by `AUTH_PRIVATE_DIRECTORIES=Private` on the server.
 
 ## Environment
 

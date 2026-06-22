@@ -143,7 +143,7 @@ if [[ -f "$POST_PKG/custom-pages.manifest" ]]; then
     if [[ ! -f "$meta_dest" ]]; then
       mkdir -p "$(dirname "$meta_dest")"
       case "$content_path" in
-        Apps/Canvas) printf '{"title":"Canvas"}' >"$meta_dest" ;;
+        Private/Canvas) printf '{"title":"Canvas"}' >"$meta_dest" ;;
       esac
     fi
   done <"$POST_PKG/custom-pages.manifest"
