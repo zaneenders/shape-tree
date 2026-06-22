@@ -34,15 +34,17 @@ enum WasmPostRoutes {
     head: Bool = false
   ) throws -> Response {
     let rawSlug = try context.parameters.require("slug")
-    guard let post = WebPages.post(forSlug: rawSlug, store: store),
-      WebPages.canView(post, isAuthenticated: context.identity != nil)
-    else {
+    guard let page = WebPages.wasmPage(
+      forSlug: rawSlug,
+      store: store,
+      isAuthenticated: context.identity != nil
+    ) else {
       throw HTTPError(.notFound)
     }
-    if post.isLogin {
+    if page.isLogin {
       throw HTTPError(.notFound)
     }
-    guard let wasm = PostWasmAsset.wasm(forSlug: post.slug) else {
+    guard let wasm = PostWasmAsset.wasm(forSlug: page.slug) else {
       throw HTTPError(.notFound)
     }
     return Response(
@@ -62,9 +64,11 @@ enum WasmPostRoutes {
     head: Bool = false
   ) throws -> Response {
     let rawSlug = try context.parameters.require("slug")
-    guard let post = WebPages.post(forSlug: rawSlug, store: store),
-      WebPages.canView(post, isAuthenticated: context.identity != nil)
-    else {
+    guard let page = WebPages.wasmPage(
+      forSlug: rawSlug,
+      store: store,
+      isAuthenticated: context.identity != nil
+    ) else {
       if head {
         return Response(
           status: .notFound,
@@ -74,7 +78,7 @@ enum WasmPostRoutes {
       }
       return WebPages.notFoundResponse(store: store, homeSlug: homeSlug)
     }
-    if post.isLogin {
+    if page.isLogin {
       let location = "/login"
       if head {
         return Response(
@@ -98,8 +102,8 @@ enum WasmPostRoutes {
     return WebPages.shell(
       store: store,
       homeSlug: homeSlug,
-      documentTitle: "\(post.title) · \(store.siteTitle)",
-      wasmBoot: (slug: post.slug, title: post.title)
+      documentTitle: "\(page.title) · \(store.siteTitle)",
+      wasmBoot: (slug: page.slug, title: page.title)
     ).makeHTMLResponse()
   }
 }

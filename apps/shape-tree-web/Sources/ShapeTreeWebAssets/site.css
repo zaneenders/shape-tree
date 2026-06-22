@@ -1,12 +1,11 @@
 /*
-  Borrowed from the monospace web and zaneenders.com
+  Inspired from the monospace web
   https://owickstrom.github.io/the-monospace-web/
-  https://zaneenders.com
 */
 
 :root {
   --font-family: monospace;
-  --line-height: 1.20rem;
+  --line-height: 1.2rem;
   --border-thickness: 2px;
 
   --font-weight-normal: 500;
@@ -190,11 +189,21 @@ main h6 {
   line-height: var(--line-height);
 }
 
-main h2 { color: var(--blue); }
-main h3 { color: var(--green); }
-main h4 { color: var(--orange); }
-main h5 { color: var(--indigo); }
-main h6 { color: var(--pink); }
+main h2 {
+  color: var(--blue);
+}
+main h3 {
+  color: var(--green);
+}
+main h4 {
+  color: var(--orange);
+}
+main h5 {
+  color: var(--indigo);
+}
+main h6 {
+  color: var(--pink);
+}
 
 main ul,
 main ol {
@@ -442,7 +451,11 @@ nav.site-nav.nav-shell:empty::after {
   font-weight: var(--font-weight-normal);
   border: 1px solid var(--gray-3);
   border-radius: 2px;
-  background: color-mix(in srgb, var(--background-color-alt) 55%, var(--background-color));
+  background: color-mix(
+    in srgb,
+    var(--background-color-alt) 55%,
+    var(--background-color)
+  );
   box-shadow: none;
   transition:
     border-color 0.12s ease,
@@ -671,4 +684,24 @@ nav.site-nav.nav-shell:empty::after {
 
 #site-loading.is-loading {
   display: block;
+}
+
+/* ================================================================
+   WASM app pages
+   ================================================================ */
+
+.canvas-blurb {
+  margin: 0 0 calc(var(--line-height) * 0.75);
+  color: var(--text-color-alt);
+}
+
+.playground-canvas {
+  display: block;
+  width: 100%;
+  max-width: 800px;
+  border: 1px solid var(--gray-4);
+  border-radius: 4px;
+  background: #080a12;
+  touch-action: none;
+  cursor: crosshair;
 }

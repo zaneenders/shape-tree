@@ -85,6 +85,23 @@ enum WebPages {
     !post.isPrivate || isAuthenticated
   }
 
+  static func wasmPage(
+    forSlug rawSlug: String,
+    store: ContentStore,
+    isAuthenticated: Bool
+  ) -> WasmPage? {
+    let slug = PostWasmAsset.slugCandidates(for: rawSlug).first ?? rawSlug
+    if let post = store.post(slug: slug) {
+      guard canView(post, isAuthenticated: isAuthenticated) else { return nil }
+      return WasmPage(slug: post.slug, title: post.title, isLogin: post.isLogin)
+    }
+    if let page = AppPages.page(slug: slug) {
+      guard !page.isPrivate || isAuthenticated else { return nil }
+      return WasmPage(slug: page.slug, title: page.title)
+    }
+    return nil
+  }
+
   private static func htmlAttrEscape(_ value: String) -> String {
     value
       .replacingOccurrences(of: "&", with: "&amp;")

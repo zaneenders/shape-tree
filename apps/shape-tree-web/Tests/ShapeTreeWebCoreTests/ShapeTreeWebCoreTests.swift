@@ -269,6 +269,32 @@ import Testing
     #expect(wasmSlugs.contains("Secret"))
   }
 
+  @Test func includesAppPageInWasmSlugsWhenEmbedded() throws {
+    let (store, url) = try makePrivateStore()
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    let slugs = store.navWasmSlugs(fromEmbedded: ["Canvas", "Public"])
+    #expect(slugs.contains("Canvas"))
+    #expect(slugs.contains("Public"))
+  }
+
+  @Test func includesAppPagesInNav() throws {
+    let (store, url) = try makePrivateStore()
+    defer { try? FileManager.default.removeItem(at: url) }
+
+    let response = store.navContentResponse(
+      viewer: NavViewer(isAuthenticated: false),
+      wasmSlugs: ["Canvas"]
+    )
+
+    let appsGroup = response.groups.first { $0.label == "Apps" }
+    #expect(appsGroup != nil)
+    let canvas = appsGroup?.items.first { $0.slug == "Canvas" }
+    #expect(canvas?.title == "Canvas")
+    #expect(canvas?.hasWasm == true)
+    #expect(canvas?.href == "/wasm/posts/Canvas")
+  }
+
   @Test func marksWasmAvailabilityAndHref() throws {
     let (store, url) = try makePrivateStore()
     defer { try? FileManager.default.removeItem(at: url) }

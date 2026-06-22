@@ -77,16 +77,6 @@ public struct NavContentResponse: Codable, Sendable, Equatable {
 }
 
 extension ContentStore {
-  /// Slugs that have embedded page wasm and should be linked as SPA wasm routes in nav.
-  public func navWasmSlugs(fromEmbedded embedded: Set<String>) -> Set<String> {
-    guard !embedded.isEmpty else { return [] }
-    return Set(
-      posts
-        .filter { !$0.isLogin && embedded.contains($0.slug) }
-        .map(\.slug)
-    )
-  }
-
   /// Builds the nav JSON payload the client renders, applying per-viewer visibility rules.
   public func navContentResponse(viewer: NavViewer, wasmSlugs: Set<String>) -> NavContentResponse {
     let index = indexPost
@@ -99,11 +89,22 @@ extension ContentStore {
       hasWasm: wasmSlugs.contains(homeSlug)
     )
 
-    let groups = postGroups(includingPrivate: viewer.isAuthenticated).map { group in
+    var groups = postGroups(includingPrivate: viewer.isAuthenticated).map { group in
       NavContentGroup(
         label: group.label,
         directory: group.directory,
         items: group.posts.map { navItem(for: $0, wasmSlugs: wasmSlugs) }
+      )
+    }
+
+    let appPages = AppPages.visiblePages(isAuthenticated: viewer.isAuthenticated)
+    if !appPages.isEmpty {
+      groups.append(
+        NavContentGroup(
+          label: "Apps",
+          directory: "Apps",
+          items: appPages.map { navItem(for: $0, wasmSlugs: wasmSlugs) }
+        )
       )
     }
 
@@ -118,6 +119,15 @@ extension ContentStore {
       home: home,
       groups: groups,
       signIn: signIn
+    )
+  }
+
+  private func navItem(for page: AppPage, wasmSlugs: Set<String>) -> NavContentItem {
+    NavContentItem(
+      slug: page.slug,
+      title: page.title,
+      href: "/wasm/posts/\(page.slug)",
+      hasWasm: wasmSlugs.contains(page.slug)
     )
   }
 

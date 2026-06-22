@@ -84,3 +84,9 @@ chmod +x Scripts/build-client.sh
 ./Scripts/build-client.sh
 ```
 
+### Custom WASM app pages
+
+Hand-authored interactive pages (no markdown file) live in `apps/wasm-post/Sources/CustomPages/`. Register each page in `apps/wasm-post/custom-pages.manifest` (`Page_Canvas=Canvas`) and in `AppPages.swift` on the server. `./Scripts/build-client.sh` merges custom targets with generated markdown pages and embeds `WasmPosts/{slug}.wasm`.
+
+The included **Canvas** page is an interactive particle field under the **Apps** nav group — a reference for building more WASM apps in Swift with JavaScriptKit.
+
