@@ -7,18 +7,33 @@ POST_PKG="$ROOT/../wasm-post"
 ASSETS="$ROOT/Sources/ShapeTreeWebAssets"
 OUT_JS="$ASSETS/client"
 BUILD_DIR="$CLIENT/.build/js"
+# Per-page nodes are trivial and build tiny in Embedded mode. The core driver uses
+# JavaScriptKit promises/DOM building, which pulls Unicode tables only the full SDK has.
 SDK="${SWIFT_WASM_SDK:-swift-6.3.2-RELEASE_wasm-embedded}"
+CORE_SDK="${SWIFT_WASM_CORE_SDK:-swift-6.3.2-RELEASE_wasm}"
 
+# Content settings default to the same .env the server reads (via swift-configuration),
+# so every served .md gets a matching wasm blob. Each .md is a wasm node — there is no
+# JSON fallback, so a build/runtime content mismatch would 404.
+ENV_FILE="$ROOT/.env"
+read_env() { grep -E "^$1=" "$ENV_FILE" 2>/dev/null | tail -1 | cut -d= -f2- || true; }
+if [[ -f "$ENV_FILE" ]]; then
+  CONTENT_PATH="${CONTENT_PATH:-$(read_env CONTENT_PATH)}"
+  INDEX_SLUG="${INDEX_SLUG:-$(read_env INDEX_SLUG)}"
+  LOGIN_SLUG="${LOGIN_SLUG:-$(read_env LOGIN_SLUG)}"
+fi
 CONTENT_PATH="${CONTENT_PATH:-$ROOT/Examples/content}"
 INDEX_SLUG="${INDEX_SLUG:-Home}"
 LOGIN_SLUG="${LOGIN_SLUG:-Login}"
 
 export PATH="${HOME}/.swiftly/bin:${PATH}"
 
-if ! swift sdk list 2>/dev/null | grep -qx "$SDK"; then
-  echo "error: wasm SDK '$SDK' not installed (see README → Swift WASM)" >&2
-  exit 1
-fi
+for required_sdk in "$SDK" "$CORE_SDK"; do
+  if ! swift sdk list 2>/dev/null | grep -qx "$required_sdk"; then
+    echo "error: wasm SDK '$required_sdk' not installed (see README → Swift WASM)" >&2
+    exit 1
+  fi
+done
 
 if ! command -v wasm-opt >/dev/null; then
   echo "error: wasm-opt not found (brew install binaryen)" >&2
@@ -54,19 +69,19 @@ copy_page_js_runtime() {
     "$OUT_JS/platforms/browser.js"
 }
 
-echo "Building WASMNav with ${SDK}..."
+echo "Building ShapeTreeCore with ${CORE_SDK}..."
 rm -rf "$BUILD_DIR" "$CLIENT/.build/plugins/PackageToJS/outputs/js.tmp"
 (
   cd "$CLIENT"
   # Reactor mode — required so the module can register JS listeners (not command/_start).
   unset JAVASCRIPTKIT_EXPERIMENTAL_EMBEDDED_WASM
   swift package \
-    --swift-sdk "$SDK" \
+    --swift-sdk "$CORE_SDK" \
     --allow-writing-to-package-directory \
-    js --product WASMNav --output "$BUILD_DIR" --configuration release --debug-info-format none
+    js --product ShapeTreeCore --output "$BUILD_DIR" --configuration release --debug-info-format none
 )
 
-WASM="$BUILD_DIR/WASMNav.wasm"
+WASM="$BUILD_DIR/ShapeTreeCore.wasm"
 if [[ ! -f "$WASM" ]]; then
   echo "error: wasm output missing at ${WASM}" >&2
   exit 1
@@ -78,7 +93,7 @@ rm -rf "$OUT_JS"
 mkdir -p "$OUT_JS/platforms"
 cp "$BUILD_DIR/index.js" "$BUILD_DIR/instantiate.js" "$BUILD_DIR/runtime.js" "$OUT_JS/"
 cp "$BUILD_DIR/platforms/browser.js" "$OUT_JS/platforms/"
-cp "$WASM" "$ASSETS/WASMNav.wasm"
+cp "$WASM" "$ASSETS/ShapeTreeCore.wasm"
 patch_client_index_js "$OUT_JS/index.js"
 
 # WASI shim is committed under Sources/ShapeTreeWebAssets/Vendor/ and served locally.
@@ -86,7 +101,7 @@ perl -pi -e "s|'\\@bjorn3/browser_wasi_shim'|'../browser_wasi_shim.js'|g" \
   "$OUT_JS/platforms/browser.js"
 
 echo "Wrote client JS to ${OUT_JS}"
-echo "Wrote ${ASSETS}/WASMNav.wasm"
+echo "Wrote ${ASSETS}/ShapeTreeCore.wasm"
 
 # --- Per-page WASM: generate one .wasm per markdown file ---
 

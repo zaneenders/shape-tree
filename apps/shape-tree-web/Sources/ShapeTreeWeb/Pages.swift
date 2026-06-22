@@ -15,7 +15,8 @@ enum WebPages {
     loginNext: String? = nil,
     bootVerify: Bool = false,
     verifyToken: String? = nil,
-    verifyNext: String? = nil
+    verifyNext: String? = nil,
+    bootCheckEmail: Bool = false
   ) -> HTML {
     var bodyAttrs: [HTMLAttr] = []
     bodyAttrs.append(.flag("data-home-slug=\"\(htmlAttrEscape(homeSlug))\""))
@@ -42,6 +43,9 @@ enum WebPages {
       if let verifyNext, !verifyNext.isEmpty {
         bodyAttrs.append(.flag("data-verify-next=\"\(htmlAttrEscape(verifyNext))\""))
       }
+    }
+    if bootCheckEmail {
+      bodyAttrs.append(.flag("data-boot-check-email=\"true\""))
     }
 
     let titleText = documentTitle ?? store.siteTitle

@@ -100,8 +100,8 @@ let package = Package(
       name: "ShapeTreeWebAssets",
       path: "Sources/ShapeTreeWebAssets",
       exclude: ["client"],
-      sources: ["Assets.swift", "ClientAssetCatalog.swift", "NavWasm.swift", "PostWasmAsset.swift"],
-      resources: [.copy("WASMNav.wasm"), .copy("WasmPosts")],
+      sources: ["Assets.swift", "ClientAssetCatalog.swift", "CoreWasm.swift", "PostWasmAsset.swift"],
+      resources: [.copy("ShapeTreeCore.wasm"), .copy("WasmPosts")],
       plugins: [
         .plugin(name: "EmbedWebAssets", package: "Lorikeet")
       ]

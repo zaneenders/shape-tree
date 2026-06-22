@@ -168,10 +168,8 @@ struct LoginFlowIntegrationTests: ~Copyable {
           headers: [.contentType: "application/x-www-form-urlencoded"],
           body: ByteBuffer(string: loginBody)
         ) { response in
-          #expect(response.status == .ok)
-          #expect(response.headers[.contentType] == "application/json; charset=utf-8")
-          let body = String(buffer: response.body)
-          #expect(body.contains("\"ok\":true"))
+          #expect(response.status == .seeOther)
+          #expect(response.headers[.location] == "/auth/check-email")
         }
 
         // 4. Poll IMAP for the login email and extract the token.
@@ -223,10 +221,8 @@ struct LoginFlowIntegrationTests: ~Copyable {
           ],
           body: ByteBuffer(string: verifyBody)
         ) { response in
-          #expect(response.status == .ok)
-          #expect(response.headers[.contentType] == "application/json; charset=utf-8")
-          let body = String(buffer: response.body)
-          #expect(body.contains("\(wasmPostPath)?signed-in=1"))
+          #expect(response.status == .seeOther)
+          #expect(response.headers[.location] == "\(wasmPostPath)?signed-in=1")
           if let setCookie = response.headers[.setCookie] {
             sessionCookie = Self.parseSessionCookie(setCookie)
           }

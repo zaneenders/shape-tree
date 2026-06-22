@@ -47,12 +47,18 @@ extension ShapeTreeWeb {
           verifyToken: verifyToken,
           verifyNext: AuthEmail.normalizedWasmNextPath(next)
         ).makeHTMLResponse()
+      },
+      spaCheckEmailPage: {
+        WebPages.shell(
+          store: store,
+          homeSlug: homeSlug,
+          documentTitle: "Check your email · \(store.siteTitle)",
+          bootCheckEmail: true
+        ).makeHTMLResponse()
       }
     )
 
     NavContentRoutes.register(on: router, store: store)
-    LoginContentRoutes.register(on: router, store: store)
-    PostContentRoutes.register(on: router, store: store)
 
     WasmPostRoutes.register(on: router, store: store, homeSlug: homeSlug)
 

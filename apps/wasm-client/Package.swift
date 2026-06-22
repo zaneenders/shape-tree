@@ -3,7 +3,7 @@
 import PackageDescription
 
 let package = Package(
-  name: "WASMNav",
+  name: "ShapeTreeCore",
   platforms: [
     .macOS(.v26)
   ],
@@ -12,7 +12,7 @@ let package = Package(
   ],
   targets: [
     .executableTarget(
-      name: "WASMNav",
+      name: "ShapeTreeCore",
       dependencies: [
         .product(name: "JavaScriptKit", package: "JavaScriptKit")
       ],

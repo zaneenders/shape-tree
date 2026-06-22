@@ -388,65 +388,6 @@ import Testing
   }
 }
 
-@Suite struct LoginContentResponseTests {
-  @Test func stripsLoginPlaceholderFromBody() throws {
-    let contentDir = FileManager.default.temporaryDirectory
-      .appendingPathComponent("login-content-\(UUID().uuidString)", isDirectory: true)
-    try FileManager.default.createDirectory(at: contentDir, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: contentDir) }
-
-    try """
-    ---
-    title: Sign in
-    ---
-    Welcome back.
-
-    {{login}}
-    """.write(to: contentDir.appendingPathComponent("login.md"), atomically: true, encoding: .utf8)
-
-    try "---\ntitle: Home\n---\n".write(
-      to: contentDir.appendingPathComponent("Home.md"),
-      atomically: true,
-      encoding: .utf8
-    )
-
-    let store = try ContentStore(
-      contentDirectory: contentDir,
-      indexSlug: "Home",
-      loginSlug: "login"
-    )
-
-    let response = store.loginContentResponse(next: "/wasm/posts/secret")
-    #expect(response.title == "Sign in")
-    #expect(response.next == "/wasm/posts/secret")
-    #expect(!response.bodyHTML.contains("{{login}}"))
-    #expect(response.bodyHTML.contains("Welcome back"))
-  }
-
-  @Test func fallbackWhenNoLoginPost() throws {
-    let contentDir = FileManager.default.temporaryDirectory
-      .appendingPathComponent("login-fallback-\(UUID().uuidString)", isDirectory: true)
-    try FileManager.default.createDirectory(at: contentDir, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: contentDir) }
-
-    try "---\ntitle: Home\n---\n".write(
-      to: contentDir.appendingPathComponent("Home.md"),
-      atomically: true,
-      encoding: .utf8
-    )
-
-    let store = try ContentStore(
-      contentDirectory: contentDir,
-      indexSlug: "Home",
-      loginSlug: "login"
-    )
-
-    let response = store.loginContentResponse(next: nil)
-    #expect(response.title == "Sign in")
-    #expect(response.bodyHTML.contains("Enter your email"))
-  }
-}
-
 @Suite struct MarkdownRendererTests {
   @Test func rendersHeadings() {
     let html = MarkdownRenderer.html(from: "# Title")

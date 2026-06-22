@@ -56,13 +56,20 @@ package enum AuthRoutes {
     auth: AuthServices,
     rateLimiter: LoginRateLimiter,
     spaLoginPage: @Sendable @escaping (String?) -> Response,
-    spaVerifyPage: @Sendable @escaping (String?, String?) -> Response
+    spaVerifyPage: @Sendable @escaping (String?, String?) -> Response,
+    spaCheckEmailPage: @Sendable @escaping () -> Response
   ) where C.Identity == User, C.Session == UUID {
     router.get("login") { request, _ in
       let next = request.uri.queryParameters.get("next")
       return spaLoginPage(next)
     }
 
+    router.get("auth/check-email") { _, _ in
+      spaCheckEmailPage()
+    }
+
+    // The login form is a real POST. Regardless of whether the address is known,
+    // redirect to the check-email page so we never leak which emails are registered.
     router.post("auth/login") { request, context async throws -> Response in
       let body = try await request.body.collect(upTo: 16 * 1024)
       let fields = FormParser.parseURLForm(String(buffer: body))
@@ -71,12 +78,12 @@ package enum AuthRoutes {
 
       guard let email = AuthEmail.validatedEmail(fields["email"] ?? "") else {
         context.logger.warning("Rejected malformed login email from \(ip)")
-        return loginSubmittedJSON()
+        return redirect(to: "/auth/check-email")
       }
 
       guard await rateLimiter.allow(ip: ip) else {
         context.logger.warning("Login rate limited for \(email) from \(ip)")
-        return loginSubmittedJSON()
+        return redirect(to: "/auth/check-email")
       }
 
       let (rawToken, tokenHash) = LoginTokenService.generate()
@@ -101,7 +108,7 @@ package enum AuthRoutes {
         }
       }
 
-      return loginSubmittedJSON()
+      return redirect(to: "/auth/check-email")
     }
 
     router.get("auth/verify") { request, _ async -> Response in
@@ -110,11 +117,13 @@ package enum AuthRoutes {
       return spaVerifyPage(token, next)
     }
 
+    // The confirm form is a real POST. On failure redirect back to the (tokenless)
+    // verify page, which renders the "link invalid" state in the core wasm.
     router.post("auth/verify") { request, context async throws -> Response in
       let body = try await request.body.collect(upTo: 16 * 1024)
       let fields = FormParser.parseURLForm(String(buffer: body))
       guard let rawToken = fields["token"], !rawToken.isEmpty else {
-        return verifyFailedJSON()
+        return redirect(to: "/auth/verify")
       }
 
       let tokenHash = LoginTokenService.hash(rawToken)
@@ -122,23 +131,23 @@ package enum AuthRoutes {
         let userID = try await auth.database.consumeLoginToken(hash: tokenHash, logger: context.logger),
         let user = try await auth.database.user(id: userID, logger: context.logger)
       else {
-        return verifyFailedJSON()
+        return redirect(to: "/auth/verify")
       }
 
       context.sessions.setSession(user.id, expiresIn: auth.settings.sessionTTL)
 
       let next = AuthEmail.normalizedWasmNextPath(fields["next"]) ?? "/"
-      let redirect = AuthEmail.signedInRedirect(to: next)
-      return verifySuccessJSON(redirect: redirect)
+      return redirect(to: AuthEmail.signedInRedirect(to: next))
     }
 
     router.post("auth/logout") { _, context async throws -> Response in
       context.sessions.clearSession()
-      return Response(
-        status: .seeOther,
-        headers: [.location: "/"],
-        body: .init())
+      return redirect(to: "/")
     }
+  }
+
+  private static func redirect(to location: String) -> Response {
+    Response(status: .seeOther, headers: [.location: location], body: .init())
   }
 
   private static func sendLoginEmail(
@@ -168,38 +177,6 @@ package enum AuthRoutes {
     )
     try await SMTPClient.send(email: email, settings: smtp.connection)
   }
-
-  private static func loginSubmittedJSON() -> Response {
-    Response(
-      status: .ok,
-      headers: [
-        .contentType: "application/json; charset=utf-8",
-        .cacheControl: "private, no-store",
-      ],
-      body: .init(byteBuffer: ByteBuffer(string: "{\"ok\":true}"))
-    )
-  }
-
-  private static func verifySuccessJSON(redirect: String) -> Response {
-    let payload = (try? JSONEncoder().encode(["redirect": redirect])) ?? Data("{\"redirect\":\"/\"}".utf8)
-    return Response(
-      status: .ok,
-      headers: [
-        .contentType: "application/json; charset=utf-8",
-        .cacheControl: "private, no-store",
-      ],
-      body: .init(byteBuffer: ByteBuffer(data: payload))
-    )
-  }
-
-  private static func verifyFailedJSON() -> Response {
-    Response(
-      status: .badRequest,
-      headers: [.contentType: "application/json; charset=utf-8"],
-      body: .init(byteBuffer: ByteBuffer(string: "{\"failed\":true}"))
-    )
-  }
-
 }
 
 extension SocketAddress {

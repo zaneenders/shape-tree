@@ -1,17 +1,19 @@
 import JavaScriptKit
 
 @main
-enum WASMNav {
+enum ShapeTreeCore {
   nonisolated(unsafe) static var listeners: [JSClosure] = []
 
   static func main() {
     let document = JSObject.global.document
     registerListeners(on: document)
+    Router.registerHistory()
     log("listeners registered")
+    Boot.run()
   }
 
   static func log(_ message: String) {
-    _ = JSObject.global.console.log("[wasm-nav] \(message)")
+    _ = JSObject.global.console.log("[shape-tree-core] \(message)")
   }
 }
 
@@ -29,11 +31,10 @@ private func registerListeners(on document: JSValue) {
     if target.checked.boolean == true {
       closeSiblingDisclosures(clicked: target)
     }
-    WASMNav.log("disclosure change")
     syncBackdrop(in: document)
     return .undefined
   }
-  WASMNav.listeners.append(changeListener)
+  ShapeTreeCore.listeners.append(changeListener)
   _ = document.addEventListener("change", JSValue.object(changeListener))
 
   let clickListener = JSClosure { arguments in
@@ -44,40 +45,39 @@ private func registerListeners(on document: JSValue) {
       return .undefined
     }
 
-    if let loginLink = target.closest!("a.nav-login-link").object {
+    if target.closest!("a.nav-login-link").object != nil {
       _ = event.preventDefault?()
-      WASMNav.log("login nav link")
-      loadLogin(next: nil, pushState: true)
+      ShapeTreeCore.log("login nav link")
+      Router.showLogin(next: nil, pushState: true)
       closeAll(in: document)
       return .undefined
     }
 
-    if let wasmLink = target.closest!("a.nav-wasm-link").object {
+    if let nodeLink = target.closest!("a.nav-node-link").object {
       _ = event.preventDefault?()
-      if let slug = wasmDataset(wasmLink, key: "wasmSlug") {
-        let title = wasmDataset(wasmLink, key: "wasmTitle")
-        let path = wasmDataset(wasmLink, key: "wasmPath")
-        WASMNav.log("wasm nav link: \(slug)")
-        loadWasmPost(slug: slug, title: title, pushState: true, path: path)
+      let slug = wasmDataset(nodeLink, key: "slug")
+      let title = wasmDataset(nodeLink, key: "title")
+      let path = wasmDataset(nodeLink, key: "path")
+      if let slug {
+        ShapeTreeCore.log("node nav link: \(slug)")
+        Router.mountNode(slug: slug, title: title, path: path, pushState: true)
       }
       closeAll(in: document)
       return .undefined
     }
 
     if !isContained(nav, target) {
-      WASMNav.log("click away")
       closeAll(in: document)
       return .undefined
     }
 
     if target.closest!("a.nav-link").object != nil {
-      WASMNav.log("nav link click")
       closeAll(in: document)
     }
 
     return .undefined
   }
-  WASMNav.listeners.append(clickListener)
+  ShapeTreeCore.listeners.append(clickListener)
   _ = document.addEventListener("click", JSValue.object(clickListener))
 
   let keydownListener = JSClosure { arguments in
@@ -86,10 +86,16 @@ private func registerListeners(on document: JSValue) {
     else {
       return .undefined
     }
-    WASMNav.log("escape")
     closeAll(in: document)
     return .undefined
   }
-  WASMNav.listeners.append(keydownListener)
+  ShapeTreeCore.listeners.append(keydownListener)
   _ = document.addEventListener("keydown", JSValue.object(keydownListener))
+}
+
+func wasmDataset(_ element: JSObject, key: String) -> String? {
+  guard let dataset = element.dataset.object else { return nil }
+  let value = dataset[key]
+  guard !value.isUndefined else { return nil }
+  return value.string
 }

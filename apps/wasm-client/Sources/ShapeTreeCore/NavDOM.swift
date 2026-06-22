@@ -44,11 +44,11 @@ func ensureBackdrop(in document: JSValue) -> JSObject? {
   backdrop.id = .string("nav-backdrop")
   _ = backdrop.setAttribute!("aria-hidden", "true")
   let backdropClick = JSClosure { _ in
-    WASMNav.log("backdrop click")
+    ShapeTreeCore.log("backdrop click")
     closeAll(in: document)
     return .undefined
   }
-  WASMNav.listeners.append(backdropClick)
+  ShapeTreeCore.listeners.append(backdropClick)
   _ = backdrop.addEventListener!("click", JSValue.object(backdropClick))
   _ = body.appendChild!(backdrop)
   return backdrop
