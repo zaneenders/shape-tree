@@ -41,7 +41,7 @@ import Testing
     let app = Application(router: router)
     try await app.test(TestingSetup.router) { client in
       try await client.execute(
-        uri: "/api/get-login-content?next=%2Fposts%2Fsecret",
+        uri: "/api/get-login-content?next=%2Fwasm%2Fposts%2Fsecret",
         method: .get
       ) { response in
         #expect(response.status == .ok)

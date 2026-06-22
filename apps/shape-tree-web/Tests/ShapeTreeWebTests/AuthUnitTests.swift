@@ -131,8 +131,8 @@ import Testing
     #expect(AuthEmail.normalizedWasmNextPath("/") == "/")
   }
 
-  @Test func normalizedWasmNextPathRewritesLegacyPostRoutes() {
-    #expect(AuthEmail.normalizedWasmNextPath("/posts/secret") == "/wasm/posts/secret")
+  @Test func normalizedWasmNextPathRejectsNonWasmRoutes() {
+    #expect(AuthEmail.normalizedWasmNextPath("/posts/secret") == nil)
     #expect(AuthEmail.normalizedWasmNextPath(nil) == nil)
     #expect(AuthEmail.normalizedWasmNextPath("//evil.com") == nil)
     #expect(AuthEmail.normalizedWasmNextPath("/other") == nil)

@@ -69,11 +69,4 @@ struct PrivateWasmPostTests {
       }
     }
   }
-
-  @Test
-  func notFoundArticleContainsExpectedCopy() throws {
-    let html = WebPages.notFoundArticle().render()
-    #expect(html.contains("<h1>404</h1>"))
-    #expect(html.contains("Page not found."))
-  }
 }

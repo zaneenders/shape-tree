@@ -1,6 +1,6 @@
 # shape-tree-web
 
-Markdown blog built on the [Lorikeet](https://github.com/zaneenders/lorikeet) HTML DSL (typed HTML + HTMX), [Hummingbird](https://github.com/hummingbird-project/hummingbird), and a Swift WASM client. Point it at a directory of `.md` files and it serves a readable site with HTMX-powered navigation — no JavaScript build step required.
+Markdown blog built on the [Lorikeet](https://github.com/zaneenders/lorikeet) HTML DSL (typed HTML), [Hummingbird](https://github.com/hummingbird-project/hummingbird), and a Swift WASM client. Point it at a directory of `.md` files and Hummingbird serves a slim HTML shell plus JSON APIs; a hand-written `bootstrap.js` drives client-side routing and auth UI, while Swift-compiled WASM modules render the navigation interactions and per-page content. Build the WASM client once with `./Scripts/build-client.sh`.
 
 Build the swift WASM client, then start the server using the bundled `.env.example` (no `.env` needed to try it out):
 
@@ -63,7 +63,7 @@ Posts inside a private directory are hidden from navigation and require signing 
 
 ### Optional: custom login page
 
-By default the `/login` page is a built-in form. To brand it with your own copy, add a `login.md` file to your content directory (the slug defaults to `login`, matched case-insensitively). The file's front matter `title` becomes the heading and its rendered body wraps the login form. Place a `{{login}}` marker anywhere in the body to control where the email field is rendered; if the marker is absent the form is appended to the body. The login post is excluded from the index and navigation, and `/posts/login` redirects to `/login`. When no `login.md` exists, the built-in shell is used.
+By default the `/login` page is a built-in form. To brand it with your own copy, add a `login.md` file to your content directory (the slug defaults to `login`, matched case-insensitively). The file's front matter `title` becomes the heading and its rendered body wraps the login form. Place a `{{login}}` marker anywhere in the body to control where the email field is rendered; if the marker is absent the form is appended to the body. The login post is excluded from the index and navigation, and is served at `/login`. When no `login.md` exists, the built-in shell is used.
 
 
 Markdown files support `---` front matter (`title`, `date`, `tags`, `excerpt`). An `index.md` file becomes the home page. Other files are listed as posts sorted by date. Files in subdirectories are grouped in navigation and on the index. Sample content lives in `Examples/content/`.

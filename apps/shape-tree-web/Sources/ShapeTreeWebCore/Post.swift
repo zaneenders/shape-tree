@@ -41,10 +41,6 @@ public struct Post: Sendable, Equatable, Identifiable {
     self.isPrivate = isPrivate
   }
 
-  public var path: String {
-    isIndex ? "/" : "/posts/\(slug)"
-  }
-
   /// Parent directory within the content root, if any (e.g. `notes` for `notes/post.md`).
   public var contentDirectory: String? {
     let parent = (relativePath as NSString).deletingLastPathComponent

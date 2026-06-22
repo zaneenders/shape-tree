@@ -76,13 +76,6 @@ enum WebPages {
     ).makeHTMLResponse(.notFound)
   }
 
-  static func notFoundArticle() -> HTML {
-    article {
-      h1 { "404" }
-      p { "Page not found." }
-    }
-  }
-
   static func post(forSlug rawSlug: String, store: ContentStore) -> Post? {
     let slug = PostWasmAsset.slugCandidates(for: rawSlug).first ?? rawSlug
     return store.post(slug: slug)

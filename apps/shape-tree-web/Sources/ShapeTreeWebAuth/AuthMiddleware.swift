@@ -44,20 +44,11 @@ package enum AuthEmail {
     return raw
   }
 
-  package static func wasmPostPath(slug: String) -> String {
-    "/wasm/posts/\(slug)"
-  }
-
-  /// Accepts wasm post paths and legacy `/posts/:slug` targets; returns a wasm route or `/`.
+  /// Accepts wasm post paths; returns the wasm route or `/`, rejecting everything else.
   package static func normalizedWasmNextPath(_ raw: String?) -> String? {
     guard let raw = safeNextPath(raw) else { return nil }
     if raw == "/" { return raw }
     if raw.hasPrefix("/wasm/posts/") { return raw }
-    if raw.hasPrefix("/posts/") {
-      let slug = String(raw.dropFirst("/posts/".count))
-      guard !slug.isEmpty, !slug.contains("/") else { return nil }
-      return wasmPostPath(slug: slug)
-    }
     return nil
   }
 

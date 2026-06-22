@@ -87,7 +87,7 @@ extension ContentStore {
     )
   }
 
-  /// Builds the nav JSON payload using the same visibility rules as server-rendered navigation.
+  /// Builds the nav JSON payload the client renders, applying per-viewer visibility rules.
   public func navContentResponse(viewer: NavViewer, wasmSlugs: Set<String>) -> NavContentResponse {
     let index = indexPost
     let homeSlug = index?.slug ?? configuredIndexSlug

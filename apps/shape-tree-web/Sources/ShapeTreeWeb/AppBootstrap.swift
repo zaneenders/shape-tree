@@ -21,26 +21,6 @@ extension ShapeTreeWeb {
       WebPages.shell(store: store, homeSlug: homeSlug).makeHTMLResponse()
     }
 
-    router.get("posts/:slug") { request, context in
-      let slug = try context.parameters.require("slug")
-      guard let post = store.post(slug: slug) else {
-        return WebPages.notFoundResponse(store: store, homeSlug: homeSlug)
-      }
-      if post.isLogin {
-        return Response(
-          status: .seeOther,
-          headers: [.location: "/login"],
-          body: .init())
-      }
-      if post.isPrivate, context.identity == nil {
-        return WebPages.notFoundResponse(store: store, homeSlug: homeSlug)
-      }
-      return Response(
-        status: .seeOther,
-        headers: [.location: "/wasm/posts/\(post.slug)"],
-        body: .init())
-    }
-
     AuthRoutes.addRoutes(
       to: router,
       auth: auth,
@@ -72,6 +52,7 @@ extension ShapeTreeWeb {
 
     NavContentRoutes.register(on: router, store: store)
     LoginContentRoutes.register(on: router, store: store)
+    PostContentRoutes.register(on: router, store: store)
 
     WasmPostRoutes.register(on: router, store: store, homeSlug: homeSlug)
 

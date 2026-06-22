@@ -35,7 +35,7 @@ private func loginFlowSuiteEnabled() -> Bool {
 ///
 /// 1. Asserts a private wasm route returns 404 when unauthenticated.
 /// 2. Asserts the navigation does not show the private directory when unauthenticated.
-/// 3. Triggers a login email via POST /auth/login (legacy `/posts/` next is normalized).
+/// 3. Triggers a login email via POST /auth/login with a wasm-post `next` target.
 /// 4. Polls IMAP for the login email and extracts the token from the link.
 /// 5. Verifies GET /auth/verify returns the slim shell with token for client-side confirm UI.
 /// 6. Verifies POST /auth/verify and captures the session cookie (wasm redirect target).
@@ -152,11 +152,6 @@ struct LoginFlowIntegrationTests: ~Copyable {
           #expect(response.status == .notFound)
         }
 
-        // 1b. Unauthenticated: legacy post URL stays hidden.
-        try await client.execute(uri: "/posts/\(secretSlug)", method: .get) { response in
-          #expect(response.status == .notFound)
-        }
-
         // 2. Unauthenticated: nav omits private content.
         try await client.execute(uri: "/api/get-nav-content", method: .get) { response in
           #expect(response.status == .ok)
@@ -166,7 +161,7 @@ struct LoginFlowIntegrationTests: ~Copyable {
         }
 
         // 3. Trigger login email.
-        let loginBody = "email=\(testEmail)&next=/posts/\(secretSlug)"
+        let loginBody = "email=\(testEmail)&next=\(wasmPostPath)"
         try await client.execute(
           uri: "/auth/login",
           method: .post,
@@ -206,7 +201,7 @@ struct LoginFlowIntegrationTests: ~Copyable {
 
         // 5. GET /auth/verify returns the slim shell with token for client-side confirm UI.
         try await client.execute(
-          uri: "/auth/verify?token=\(rawToken)&next=/posts/\(secretSlug)",
+          uri: "/auth/verify?token=\(rawToken)&next=\(wasmPostPath)",
           method: .get
         ) { response in
           #expect(response.status == .ok)
@@ -218,7 +213,7 @@ struct LoginFlowIntegrationTests: ~Copyable {
 
         // 6. POST /auth/verify with token.
         var sessionCookie: String?
-        let verifyBody = "token=\(rawToken)&next=/posts/\(secretSlug)"
+        let verifyBody = "token=\(rawToken)&next=\(wasmPostPath)"
         try await client.execute(
           uri: "/auth/verify",
           method: .post,
@@ -242,17 +237,7 @@ struct LoginFlowIntegrationTests: ~Copyable {
           return
         }
 
-        // 7. Authenticated: legacy post URL redirects to the wasm route.
-        try await client.execute(
-          uri: "/posts/\(secretSlug)",
-          method: .get,
-          headers: [.cookie: sessionCookie]
-        ) { response in
-          #expect(response.status == .seeOther)
-          #expect(response.headers[.location] == wasmPostPath)
-        }
-
-        // 7b. Authenticated: wasm post shell boots client-side content.
+        // 7. Authenticated: wasm post shell boots client-side content.
         try await client.execute(
           uri: wasmPostPath,
           method: .get,

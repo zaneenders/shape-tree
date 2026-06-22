@@ -181,13 +181,22 @@ function appendContentItem(list, item, homeSlug) {
   const leaf = document.createElement("li");
   leaf.className = "nav-leaf";
   const link = document.createElement("a");
-  link.className = "nav-link nav-wasm-link";
   link.href = item.href;
   link.textContent = item.title;
-  link.dataset.wasmSlug = item.slug;
-  link.dataset.wasmTitle = item.title;
-  if (item.slug === homeSlug) {
-    link.dataset.wasmPath = "/";
+  if (item.hasWasm) {
+    link.className = "nav-link nav-wasm-link";
+    link.dataset.wasmSlug = item.slug;
+    link.dataset.wasmTitle = item.title;
+    if (item.slug === homeSlug) {
+      link.dataset.wasmPath = "/";
+    }
+  } else {
+    link.className = "nav-link nav-post-link";
+    link.dataset.postSlug = item.slug;
+    link.dataset.postTitle = item.title;
+    if (item.slug === homeSlug) {
+      link.dataset.postPath = "/";
+    }
   }
   leaf.appendChild(link);
   list.appendChild(leaf);
@@ -336,6 +345,38 @@ const shapeTree = {
     }
   },
 
+  async loadPost(slug, { pushState = true, title = null, path = null } = {}) {
+    const main = document.getElementById("main");
+    if (!main) return;
+    setLoading(true);
+    const postPath = path ?? `/wasm/posts/${encodeURIComponent(slug)}`;
+    try {
+      const response = await fetch(
+        `/api/get-post-content/${encodeURIComponent(slug)}`,
+        { credentials: "include" }
+      );
+      if (response.status === 404) {
+        await shapeTree.loadNotFound({ pushState, path: postPath });
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const payload = await response.json();
+      main.innerHTML = payload.articleHTML;
+      const pageTitle = title ?? payload.title ?? slug;
+      document.title = pageTitleFromSite(readSiteTitle(), pageTitle);
+      if (pushState) {
+        history.pushState({ postSlug: slug, title: pageTitle }, "", postPath);
+      }
+    } catch (err) {
+      main.innerHTML = `<p style="color:red">Content load failed: ${err.message}</p>`;
+      console.error("[post] content load failed", err);
+    } finally {
+      setLoading(false);
+    }
+  },
+
   async loadWasmPost(slug, { pushState = true, title = null, path = null } = {}) {
     const main = document.getElementById("main");
     if (!main) return;
@@ -346,7 +387,7 @@ const shapeTree = {
     try {
       const response = await fetch(wasmPath, { cache: "no-store", credentials: "include" });
       if (response.status === 404) {
-        await shapeTree.loadNotFound({ pushState, path: postPath });
+        await shapeTree.loadPost(slug, { pushState, title, path });
         return;
       }
       if (!response.ok) {
@@ -369,10 +410,29 @@ const shapeTree = {
 
 globalThis.shapeTree = shapeTree;
 
+document.addEventListener("click", (event) => {
+  const link = event.target?.closest?.("a.nav-post-link");
+  if (!link) return;
+  event.preventDefault();
+  const slug = link.dataset.postSlug;
+  if (!slug) return;
+  void shapeTree.loadPost(slug, {
+    pushState: true,
+    title: link.dataset.postTitle ?? null,
+    path: link.dataset.postPath ?? null,
+  });
+});
+
 window.addEventListener("popstate", (event) => {
   const state = event.state;
   if (state?.wasmSlug) {
     void shapeTree.loadWasmPost(state.wasmSlug, {
+      pushState: false,
+      title: state.title ?? null,
+      path: state.path ?? null,
+    });
+  } else if (state?.postSlug) {
+    void shapeTree.loadPost(state.postSlug, {
       pushState: false,
       title: state.title ?? null,
       path: state.path ?? null,
