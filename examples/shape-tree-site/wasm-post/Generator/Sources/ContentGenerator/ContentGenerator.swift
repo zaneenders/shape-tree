@@ -5,12 +5,12 @@ import Markdown
 struct ContentGenerator {
   static func main() {
     let args = CommandLine.arguments
-    guard args.count >= 6 else {
+    guard args.count >= 7 else {
       FileHandle.standardError.write(
         Data(
           """
           Usage: ContentGenerator <output-pages-dir> <output-package-swift> <output-manifest> \
-          <output-meta-dir> <content-source-root> <input.md> [<input.md> ...]
+          <output-meta-dir> <content-source-root> <custom-pages-manifest|- > [<input.md> ...]
 
           """.utf8))
       exit(1)
@@ -21,7 +21,8 @@ struct ContentGenerator {
     let outputManifest = args[3]
     let outputMetaDir = args[4]
     let sourceRoot = URL(fileURLWithPath: args[5]).standardizedFileURL
-    let inputFiles = Array(args.dropFirst(6))
+    let customManifestArg = args[6]
+    let inputFiles = Array(args.dropFirst(7))
 
     var pages: [(path: String, title: String, html: String)] = []
 
@@ -40,6 +41,20 @@ struct ContentGenerator {
     }
 
     pages.sort { $0.path < $1.path }
+
+    let packageRoot = URL(fileURLWithPath: outputPackageSwift)
+      .deletingLastPathComponent()
+      .standardizedFileURL
+    let customPages = loadCustomPages(
+      manifestArg: customManifestArg,
+      packageRoot: packageRoot
+    )
+
+    guard !pages.isEmpty || !customPages.isEmpty else {
+      FileHandle.standardError.write(
+        Data("error: no markdown pages or custom pages to build\n".utf8))
+      exit(1)
+    }
 
     try? FileManager.default.createDirectory(
       atPath: outputPagesDir, withIntermediateDirectories: true)
@@ -82,17 +97,18 @@ struct ContentGenerator {
     pkg += "  targets: [\n"
     for (path, _, _) in pages {
       let safeName = safeTargetName(path)
-      pkg += "    .executableTarget(\n"
-      pkg += "      name: \"\(safeName)\",\n"
-      pkg += "      dependencies: [.product(name: \"JavaScriptKit\", package: \"JavaScriptKit\")],\n"
-      pkg += "      path: \"Sources/Pages\",\n"
-      pkg += "      sources: [\"\(safeName).swift\"],\n"
-      pkg += "      swiftSettings: [\n"
-      pkg += "        .enableExperimentalFeature(\"Extern\"),\n"
-      pkg += "        .swiftLanguageMode(.v5),\n"
-      pkg += "        .unsafeFlags([\"-Osize\"], .when(configuration: .release)),\n"
-      pkg += "      ]\n"
-      pkg += "    ),\n"
+      pkg += executableTarget(
+        name: safeName,
+        path: "Sources/Pages",
+        sources: ["\(safeName).swift"]
+      )
+    }
+    for custom in customPages {
+      pkg += executableTarget(
+        name: custom.targetName,
+        path: "Sources/CustomPages",
+        sources: [custom.sourceRelative]
+      )
     }
     pkg += "  ]\n"
     pkg += ")\n"
@@ -104,10 +120,84 @@ struct ContentGenerator {
       let safeName = safeTargetName(path)
       manifest += "\(safeName)=\(path)\n"
     }
+    for custom in customPages {
+      manifest += "\(custom.targetName)=\(custom.contentPath)\n"
+    }
     try? manifest.write(toFile: outputManifest, atomically: true, encoding: .utf8)
 
     FileHandle.standardOutput.write(
       Data("Generated \(pages.count) page(s)\n".utf8))
+    for custom in customPages {
+      FileHandle.standardOutput.write(
+        Data("Registered custom wasm page: \(custom.contentPath) (\(custom.sourceRelative))\n".utf8))
+    }
+  }
+
+  struct CustomPage {
+    var targetName: String
+    var contentPath: String
+    var sourceRelative: String
+  }
+
+  static func loadCustomPages(
+    manifestArg: String,
+    packageRoot: URL
+  ) -> [CustomPage] {
+    guard manifestArg != "-",
+      !manifestArg.isEmpty,
+      FileManager.default.fileExists(atPath: manifestArg)
+    else {
+      return []
+    }
+
+    guard let text = try? String(contentsOfFile: manifestArg, encoding: .utf8) else {
+      return []
+    }
+
+    var customPages: [CustomPage] = []
+    for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
+      let trimmed = line.trimmingCharacters(in: .whitespaces)
+      guard !trimmed.isEmpty, !trimmed.hasPrefix("#") else { continue }
+      let parts = trimmed.split(separator: "=", maxSplits: 1).map(String.init)
+      guard parts.count == 2 else { continue }
+      let targetName = parts[0]
+      let contentPath = parts[1]
+      let sourceRelative = "\(contentPath).swift"
+      let sourceURL = packageRoot
+        .appendingPathComponent("Sources/CustomPages")
+        .appendingPathComponent(sourceRelative)
+      guard FileManager.default.fileExists(atPath: sourceURL.path) else {
+        FileHandle.standardError.write(
+          Data(
+            "error: custom page source missing: Sources/CustomPages/\(sourceRelative)\n".utf8))
+        exit(1)
+      }
+      customPages.append(
+        CustomPage(
+          targetName: targetName,
+          contentPath: contentPath,
+          sourceRelative: sourceRelative
+        ))
+    }
+    return customPages
+  }
+
+  static func executableTarget(name: String, path: String, sources: [String]) -> String {
+    let sourceList = sources.map { "\"\($0)\"" }.joined(separator: ", ")
+    return """
+          .executableTarget(
+            name: "\(name)",
+            dependencies: [.product(name: "JavaScriptKit", package: "JavaScriptKit")],
+            path: "\(path)",
+            sources: [\(sourceList)],
+            swiftSettings: [
+              .enableExperimentalFeature("Extern"),
+              .swiftLanguageMode(.v5),
+              .unsafeFlags(["-Osize"], .when(configuration: .release)),
+            ]
+          ),
+
+    """
   }
 
   static func writeMeta(title: String, contentPath: String, outputMetaDir: String) {

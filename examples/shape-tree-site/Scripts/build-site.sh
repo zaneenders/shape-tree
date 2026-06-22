@@ -81,85 +81,24 @@ if [[ ${#SKIPPED_PATHS[@]} -gt 0 ]]; then
   echo "Skipping wasm build for login path(s): ${SKIPPED_PATHS[*]}"
 fi
 
-if [[ ${#BUILD_MD_FILES[@]} -eq 0 ]] && [[ ! -f "$POST_PKG/custom-pages.manifest" ]]; then
-  echo "error: no markdown files to build under ${CONTENT_SOURCE_PATH}" >&2
-  exit 1
+CUSTOM_MANIFEST="-"
+if [[ -f "$POST_PKG/custom-pages.manifest" ]]; then
+  CUSTOM_MANIFEST="$POST_PKG/custom-pages.manifest"
 fi
 
-if [[ ${#BUILD_MD_FILES[@]} -gt 0 ]]; then
-  "$GENERATOR" \
-    "$PAGES_DIR" \
-    "$POST_PKG/Package.swift" \
-    "$MANIFEST" \
-    "$META_DIR" \
-    "$CONTENT_SOURCE_PATH" \
-    "${BUILD_MD_FILES[@]}"
-else
-  : > "$MANIFEST"
-  cat > "$POST_PKG/Package.swift" <<'EOF'
-// swift-tools-version: 6.3
-
-import PackageDescription
-
-let package = Package(
-  name: "WasmPost",
-  platforms: [.macOS(.v26)],
-  dependencies: [
-    .package(url: "https://github.com/swiftwasm/JavaScriptKit.git", from: "0.37.0"),
-  ],
-  targets: [
-  ]
+GENERATOR_ARGS=(
+  "$PAGES_DIR"
+  "$POST_PKG/Package.swift"
+  "$MANIFEST"
+  "$META_DIR"
+  "$CONTENT_SOURCE_PATH"
+  "$CUSTOM_MANIFEST"
 )
-EOF
+if [[ ${#BUILD_MD_FILES[@]} -gt 0 ]]; then
+  GENERATOR_ARGS+=("${BUILD_MD_FILES[@]}")
 fi
 
-append_custom_page_targets() {
-  local custom="$POST_PKG/custom-pages.manifest"
-  local pkg="$POST_PKG/Package.swift"
-  local fragment="$POST_PKG/.build/custom-targets.fragment"
-  [[ -f "$custom" ]] || return 0
-
-  : > "$fragment"
-  while IFS='=' read -r target content_path; do
-    [[ -z "$target" || -z "$content_path" ]] && continue
-    local source="${content_path}.swift"
-    if [[ ! -f "$POST_PKG/Sources/CustomPages/$source" ]]; then
-      echo "error: custom page source missing: Sources/CustomPages/$source" >&2
-      exit 1
-    fi
-    echo "${target}=${content_path}" >> "$MANIFEST"
-    cat >> "$fragment" <<EOF
-    .executableTarget(
-      name: "${target}",
-      dependencies: [.product(name: "JavaScriptKit", package: "JavaScriptKit")],
-      path: "Sources/CustomPages",
-      sources: ["${source}"],
-      swiftSettings: [
-        .enableExperimentalFeature("Extern"),
-        .swiftLanguageMode(.v5),
-        .unsafeFlags(["-Osize"], .when(configuration: .release)),
-      ]
-    ),
-EOF
-    echo "Registered custom wasm page: ${content_path} (${source})"
-  done < "$custom"
-
-  python3 - "$pkg" "$fragment" <<'PY'
-import sys
-from pathlib import Path
-
-pkg_path = Path(sys.argv[1])
-fragment_path = Path(sys.argv[2])
-text = pkg_path.read_text()
-fragment = fragment_path.read_text()
-needle = "  ]\n)"
-if needle not in text:
-    raise SystemExit(f"could not find targets closing in {pkg_path}")
-pkg_path.write_text(text.replace(needle, fragment + needle, 1))
-PY
-}
-
-append_custom_page_targets
+"$GENERATOR" "${GENERATOR_ARGS[@]}"
 
 echo "Building per-page WASM modules into ${CONTENT_OUTPUT}..."
 rm -rf "$CONTENT_OUTPUT"
