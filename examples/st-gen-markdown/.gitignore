@@ -1,5 +1,3 @@
 .build/
 Package.resolved
 Sources/Pages/
-Package.swift
-!Generator/Package.swift

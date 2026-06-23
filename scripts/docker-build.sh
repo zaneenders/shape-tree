@@ -36,8 +36,30 @@ if [[ -f Scripts/build-core.sh ]]; then
 fi
 
 echo "=== Building example site content ==="
-if [[ -f "$ROOT/examples/shape-tree-site/Scripts/build-site.sh" ]]; then
-  bash "$ROOT/examples/shape-tree-site/Scripts/build-site.sh"
+SITE_DIR="$ROOT/examples/st-gen-markdown"
+if [[ -d "$SITE_DIR" && -f "$SITE_DIR/Package.swift" ]]; then
+  (
+    cd "$SITE_DIR"
+    # Build the BuildPage tool once, then use it for every markdown page.
+    # login.md is skipped by BuildPage (login UI lives in ShapeTreeCore).
+    swift build --product BuildPage || exit 1
+    BUILD_PAGE="$SITE_DIR/.build/debug/BuildPage"
+
+    while IFS= read -r -d '' md; do
+      echo "  BuildPage ${md#$SITE_DIR/}"
+      "$BUILD_PAGE" "$md" || exit 1
+    done < <(find "$SITE_DIR/content-src" -name '*.md' -type f -print0)
+  )
+fi
+
+echo "=== Building Canvas (custom wasm page) ==="
+CANVAS_DIR="$ROOT/examples/st-canvas-demo"
+if [[ -d "$CANVAS_DIR" && -f "$CANVAS_DIR/scripts/build.sh" ]]; then
+  bash "$CANVAS_DIR/scripts/build.sh"
+  # Copy canvas output into the site content tree.
+  if [[ -d "$CANVAS_DIR/dist" ]]; then
+    cp -R "$CANVAS_DIR/dist/." "$SITE_DIR/content/"
+  fi
 fi
 
 echo "=== Building ShapeTreeWeb (Linux) ==="

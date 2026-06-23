@@ -11,7 +11,7 @@ cp .env.example .env
 swift run ShapeTreeWeb
 ```
 
-Point `CONTENT_PATH` at a directory of `*.wasm` files (see [examples/shape-tree-site](../../examples/shape-tree-site) to build demo content).
+Point `CONTENT_PATH` at a directory of `*.wasm` files (see [examples/st-gen-markdown](../../examples/st-gen-markdown) to build demo content).
 
 ## Environment
 
@@ -52,7 +52,7 @@ brew install binaryen   # wasm-opt; apt: binaryen
 
 ## Example site
 
-Demo markdown → wasm pipeline lives in [`examples/shape-tree-site`](../../examples/shape-tree-site) — not part of this package.
+Demo markdown → wasm pipeline lives in [`examples/st-gen-markdown`](../../examples/st-gen-markdown) — not part of this package.
 
 ## Docker
 
@@ -62,7 +62,7 @@ From the repo root:
 ./scripts/docker-build.sh up
 ```
 
-Builds core wasm + example site content, copies `examples/shape-tree-site/content` to `/content` in the image.
+Builds core wasm + example site content, copies `examples/st-gen-markdown/content` to `/content` in the image.
 
 ## Tests
 
