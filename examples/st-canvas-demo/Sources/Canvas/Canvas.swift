@@ -1,4 +1,5 @@
 import JavaScriptKit
+import ShapeTreeKit
 
 @main
 enum CanvasPage {
@@ -9,6 +10,7 @@ enum CanvasPage {
   nonisolated(unsafe) static var pointerDown = false
   nonisolated(unsafe) static var width: Double = 800
   nonisolated(unsafe) static var height: Double = 500
+  nonisolated(unsafe) static var active = true
 
   static func main() {
     let document = JSObject.global.document
@@ -36,6 +38,8 @@ enum CanvasPage {
     seedParticles()
     bindPointer(canvas: canvas)
     scheduleFrame(canvas: canvas)
+    PageMessaging.ready(path: "Private/Canvas")
+    PageMessaging.setTitle("Canvas")
   }
 
   private static func resize(canvas: JSObject) {
@@ -98,6 +102,7 @@ enum CanvasPage {
 
   private static func scheduleFrame(canvas: JSObject) {
     let tick = JSClosure { _ in
+      guard active else { return .undefined }
       draw(canvas: canvas)
       scheduleFrame(canvas: canvas)
       return .undefined
@@ -161,6 +166,13 @@ enum CanvasPage {
 
   private static func sqrt(_ value: Double) -> Double {
     value.squareRoot()
+  }
+}
+
+@JS public func handleShellMessage(_ message: JSObject) {
+  let shellMessage = ShellMessage(unsafelyCopying: message)
+  if shellMessage.kind == ShellMessageKind.teardown {
+    CanvasPage.active = false
   }
 }
 

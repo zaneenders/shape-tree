@@ -50,10 +50,18 @@ fi
 
 wasm-opt -Oz --strip-debug --strip-producers "$WASM" -o "$WASM"
 
+BRIDGE="$BUILD_DIR/bridge-js.js"
+if [[ ! -f "$BRIDGE" ]]; then
+  echo "error: $BRIDGE missing" >&2
+  exit 1
+fi
+
 rm -rf "$DIST"
 mkdir -p "$(dirname "$DIST/$CONTENT_PATH")"
 cp "$WASM" "$DIST/$CONTENT_PATH.wasm"
+cp "$BRIDGE" "$DIST/$CONTENT_PATH.bridge-js.js"
 cp "$ROOT/meta.json" "$DIST/$CONTENT_PATH.meta.json"
 
 echo "Wrote ${DIST}/${CONTENT_PATH}.wasm"
+echo "Wrote ${DIST}/${CONTENT_PATH}.bridge-js.js"
 echo "Wrote ${DIST}/${CONTENT_PATH}.meta.json"

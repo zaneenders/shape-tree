@@ -14,6 +14,7 @@ enum ClientRoutes {
       "index.js",
       "bootstrap.js",
       "host-imports.js",
+      "message-bus.js",
       "instantiate.js",
       "runtime.js",
       "bridge-js.js",

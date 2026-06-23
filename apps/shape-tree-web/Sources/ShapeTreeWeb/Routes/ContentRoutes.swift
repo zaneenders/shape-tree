@@ -39,6 +39,16 @@ enum ContentRoutes {
       )
     }
 
+    if relative.hasSuffix(".bridge-js.js") {
+      let nodePath = String(relative.dropLast(".bridge-js.js".count))
+      return try bridgeJSResponse(
+        nodePath: nodePath,
+        store: store,
+        isAuthenticated: context.identity != nil,
+        head: head
+      )
+    }
+
     if relative.hasSuffix(".css") {
       guard store.canViewFile(
         relativePath: relative,
@@ -74,8 +84,42 @@ enum ContentRoutes {
     isAuthenticated: Bool,
     head: Bool
   ) throws -> Response {
+    try contentFileResponse(
+      nodePath: nodePath,
+      extension: "wasm",
+      contentType: "application/wasm",
+      store: store,
+      isAuthenticated: isAuthenticated,
+      head: head
+    )
+  }
+
+  private static func bridgeJSResponse(
+    nodePath: String,
+    store: ContentStore,
+    isAuthenticated: Bool,
+    head: Bool
+  ) throws -> Response {
+    try contentFileResponse(
+      nodePath: nodePath,
+      extension: "bridge-js.js",
+      contentType: "application/javascript; charset=utf-8",
+      store: store,
+      isAuthenticated: isAuthenticated,
+      head: head
+    )
+  }
+
+  private static func contentFileResponse(
+    nodePath: String,
+    extension fileExtension: String,
+    contentType: String,
+    store: ContentStore,
+    isAuthenticated: Bool,
+    head: Bool
+  ) throws -> Response {
     guard store.canView(path: nodePath, isAuthenticated: isAuthenticated),
-      let url = store.wasmURL(forPath: nodePath)
+      let url = store.resolveFile(relativePath: "\(nodePath).\(fileExtension)")
     else {
       throw HTTPError(.notFound)
     }
@@ -84,7 +128,7 @@ enum ContentRoutes {
       return Response(
         status: .ok,
         headers: [
-          .contentType: "application/wasm",
+          .contentType: contentType,
           .cacheControl: "no-cache",
         ],
         body: .init(byteBuffer: ByteBuffer())
@@ -96,7 +140,7 @@ enum ContentRoutes {
     return Response(
       status: .ok,
       headers: [
-        .contentType: "application/wasm",
+        .contentType: contentType,
         .cacheControl: "no-cache",
       ],
       body: .init(byteBuffer: ByteBuffer(bytes: bytes))

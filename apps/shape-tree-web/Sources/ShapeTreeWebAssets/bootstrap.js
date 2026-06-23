@@ -1,13 +1,14 @@
 import { init } from "./index.js";
-import { hostImports, shapeTreeHost } from "./host-imports.js";
+import { hostImports, registerShell, shapeTreeHost } from "./host-imports.js";
 
 globalThis.shapeTree = shapeTreeHost;
 
 async function boot() {
-  await init({
+  const result = await init({
     module: fetch("/assets/client/ShapeTreeCore.wasm", { cache: "no-store" }),
     getImports: hostImports,
   });
+  registerShell(result.exports);
 }
 
 function reportBootError(error) {

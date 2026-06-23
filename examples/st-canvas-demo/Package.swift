@@ -6,16 +6,26 @@ let package = Package(
   name: "STCanvasDemo",
   platforms: [.macOS(.v26)],
   dependencies: [
+    .package(path: "../../apps/wasm-client"),
     .package(url: "https://github.com/swiftwasm/JavaScriptKit.git", from: "0.55.0"),
   ],
   targets: [
     .executableTarget(
       name: "Canvas",
-      dependencies: [.product(name: "JavaScriptKit", package: "JavaScriptKit")],
+      dependencies: [
+        .product(name: "ShapeTreeKit", package: "wasm-client"),
+        .product(name: "JavaScriptKit", package: "JavaScriptKit"),
+      ],
       swiftSettings: [
         .enableExperimentalFeature("Extern"),
-        .swiftLanguageMode(.v5),
+        .swiftLanguageMode(.v6),
         .unsafeFlags(["-Osize"], .when(configuration: .release)),
+      ],
+      linkerSettings: [
+        .unsafeFlags(["-Xlinker", "-lswiftUnicodeDataTables"])
+      ],
+      plugins: [
+        .plugin(name: "BridgeJS", package: "JavaScriptKit")
       ]
     ),
   ]

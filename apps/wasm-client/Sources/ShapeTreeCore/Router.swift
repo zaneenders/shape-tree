@@ -1,5 +1,6 @@
 import HTML
 import JavaScriptKit
+import ShapeTreeKit
 
 enum Router {
   static func contentWasmURL(path: String) -> String {
@@ -14,6 +15,7 @@ enum Router {
 
   static func mountContent(path: String, title: String?, browserPath: String?, pushState: Bool) {
     guard let main = element("main") else { return }
+    teardownActivePage()
     setHTML(main, p { "Loading…" })
     setLoading(true)
     let resolvedPath = browserPath ?? contentBrowserPath(path: path)

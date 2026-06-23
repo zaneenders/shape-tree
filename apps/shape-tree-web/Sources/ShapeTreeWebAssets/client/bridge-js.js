@@ -56,6 +56,78 @@ export async function createInstantiator(options, swift) {
         return swift.memory.retain(real);
     };
 
+    const __bjs_createPageMessageHelpers = () => ({
+        lower: (value) => {
+            const bytes = textEncoder.encode(value.kind);
+            const id = swift.memory.retain(bytes);
+            i32Stack.push(bytes.length);
+            i32Stack.push(id);
+            const isSome = value.path != null ? 1 : 0;
+            if (isSome) {
+                const bytes1 = textEncoder.encode(value.path);
+                const id1 = swift.memory.retain(bytes1);
+                i32Stack.push(bytes1.length);
+                i32Stack.push(id1);
+            }
+            i32Stack.push(isSome);
+            const isSome1 = value.payload != null ? 1 : 0;
+            if (isSome1) {
+                const bytes2 = textEncoder.encode(value.payload);
+                const id2 = swift.memory.retain(bytes2);
+                i32Stack.push(bytes2.length);
+                i32Stack.push(id2);
+            }
+            i32Stack.push(isSome1);
+        },
+        lift: () => {
+            const isSome = i32Stack.pop();
+            let optValue;
+            if (isSome === 0) {
+                optValue = null;
+            } else {
+                const string = strStack.pop();
+                optValue = string;
+            }
+            const isSome1 = i32Stack.pop();
+            let optValue1;
+            if (isSome1 === 0) {
+                optValue1 = null;
+            } else {
+                const string1 = strStack.pop();
+                optValue1 = string1;
+            }
+            const string2 = strStack.pop();
+            return { kind: string2, path: optValue1, payload: optValue };
+        }
+    });
+    const __bjs_createShellMessageHelpers = () => ({
+        lower: (value) => {
+            const bytes = textEncoder.encode(value.kind);
+            const id = swift.memory.retain(bytes);
+            i32Stack.push(bytes.length);
+            i32Stack.push(id);
+            const isSome = value.payload != null ? 1 : 0;
+            if (isSome) {
+                const bytes1 = textEncoder.encode(value.payload);
+                const id1 = swift.memory.retain(bytes1);
+                i32Stack.push(bytes1.length);
+                i32Stack.push(id1);
+            }
+            i32Stack.push(isSome);
+        },
+        lift: () => {
+            const isSome = i32Stack.pop();
+            let optValue;
+            if (isSome === 0) {
+                optValue = null;
+            } else {
+                const string = strStack.pop();
+                optValue = string;
+            }
+            const string1 = strStack.pop();
+            return { kind: string1, payload: optValue };
+        }
+    });
     const __bjs_createNavContentItemHelpers = () => ({
         lower: (value) => {
             const bytes = textEncoder.encode(value.path);
@@ -446,6 +518,20 @@ export async function createInstantiator(options, swift) {
                 const copy = memory.buffer.slice(ptr, ptr + byteLen);
                 taStack.push(Array.from(new Ctor(copy)));
             }
+            bjs["swift_js_struct_lower_PageMessage"] = function(objectId) {
+                structHelpers.PageMessage.lower(swift.memory.getObject(objectId));
+            }
+            bjs["swift_js_struct_lift_PageMessage"] = function() {
+                const value = structHelpers.PageMessage.lift();
+                return swift.memory.retain(value);
+            }
+            bjs["swift_js_struct_lower_ShellMessage"] = function(objectId) {
+                structHelpers.ShellMessage.lower(swift.memory.getObject(objectId));
+            }
+            bjs["swift_js_struct_lift_ShellMessage"] = function() {
+                const value = structHelpers.ShellMessage.lift();
+                return swift.memory.retain(value);
+            }
             bjs["swift_js_struct_lower_NavContentItem"] = function(objectId) {
                 structHelpers.NavContentItem.lower(swift.memory.getObject(objectId));
             }
@@ -629,29 +715,24 @@ export async function createInstantiator(options, swift) {
                 };
                 return makeClosure(boxPtr, file, line, lower_closure_ShapeTreeCore_13ShapeTreeCoreSbSi_y);
             }
-            bjs["invoke_js_callback_ShapeTreeCore_13ShapeTreeCoreSq18NavContentResponseV_y"] = function(callbackId, param0) {
+            bjs["invoke_js_callback_ShapeTreeCore_13ShapeTreeCoreSq8JSObjectC_y"] = function(callbackId, param0IsSome, param0ObjectId) {
                 try {
                     const callback = swift.memory.getObject(callbackId);
-                    let optResult;
-                    if (param0) {
-                        const struct = structHelpers.NavContentResponse.lift();
-                        optResult = struct;
-                    } else {
-                        optResult = null;
-                    }
-                    callback(optResult);
+                    callback(param0IsSome ? swift.memory.getObject(param0ObjectId) : null);
                 } catch (error) {
                     setException(error);
                 }
             }
-            bjs["make_swift_closure_ShapeTreeCore_13ShapeTreeCoreSq18NavContentResponseV_y"] = function(boxPtr, file, line) {
-                const lower_closure_ShapeTreeCore_13ShapeTreeCoreSq18NavContentResponseV_y = function(param0) {
+            bjs["make_swift_closure_ShapeTreeCore_13ShapeTreeCoreSq8JSObjectC_y"] = function(boxPtr, file, line) {
+                const lower_closure_ShapeTreeCore_13ShapeTreeCoreSq8JSObjectC_y = function(param0) {
                     const isSome = param0 != null;
+                    let result;
                     if (isSome) {
-                        structHelpers.NavContentResponse.lower(param0);
+                        result = swift.memory.retain(param0);
+                    } else {
+                        result = 0;
                     }
-                    i32Stack.push(+isSome);
-                    instance.exports.invoke_swift_closure_ShapeTreeCore_13ShapeTreeCoreSq18NavContentResponseV_y(boxPtr);
+                    instance.exports.invoke_swift_closure_ShapeTreeCore_13ShapeTreeCoreSq8JSObjectC_y(boxPtr, +isSome, result);
                     if (tmpRetException) {
                         const error = swift.memory.getObject(tmpRetException);
                         swift.memory.release(tmpRetException);
@@ -659,7 +740,7 @@ export async function createInstantiator(options, swift) {
                         throw error;
                     }
                 };
-                return makeClosure(boxPtr, file, line, lower_closure_ShapeTreeCore_13ShapeTreeCoreSq18NavContentResponseV_y);
+                return makeClosure(boxPtr, file, line, lower_closure_ShapeTreeCore_13ShapeTreeCoreSq8JSObjectC_y);
             }
             const ShapeTreeCore = importObject["ShapeTreeCore"] = importObject["ShapeTreeCore"] || {};
             ShapeTreeCore["bjs_webDocument_get"] = function bjs_webDocument_get() {
@@ -719,6 +800,13 @@ export async function createInstantiator(options, swift) {
                 try {
                     const string = decodeString(urlBytes, urlCount);
                     imports.hostMountModule(string, swift.memory.getObject(completion));
+                } catch (error) {
+                    setException(error);
+                }
+            }
+            ShapeTreeCore["bjs_hostSendToPage"] = function bjs_hostSendToPage(message) {
+                try {
+                    imports.hostSendToPage(swift.memory.getObject(message));
                 } catch (error) {
                     setException(error);
                 }
@@ -1292,6 +1380,64 @@ export async function createInstantiator(options, swift) {
                     setException(error);
                 }
             }
+            const ShapeTreeKit = importObject["ShapeTreeKit"] = importObject["ShapeTreeKit"] || {};
+            ShapeTreeKit["bjs_pageDocument_get"] = function bjs_pageDocument_get() {
+                try {
+                    let ret = globalThis.document;
+                    return swift.memory.retain(ret);
+                } catch (error) {
+                    setException(error);
+                    return 0
+                }
+            }
+            ShapeTreeKit["bjs_pageConsole_get"] = function bjs_pageConsole_get() {
+                try {
+                    let ret = globalThis.console;
+                    return swift.memory.retain(ret);
+                } catch (error) {
+                    setException(error);
+                    return 0
+                }
+            }
+            ShapeTreeKit["bjs_hostPostToShell"] = function bjs_hostPostToShell(message) {
+                try {
+                    const value = swift.memory.getObject(message);
+                    swift.memory.release(message);
+                    imports.hostPostToShell(value);
+                } catch (error) {
+                    setException(error);
+                }
+            }
+            ShapeTreeKit["bjs_PageDocument_getElementById"] = function bjs_PageDocument_getElementById(self, idBytes, idCount) {
+                try {
+                    const string = decodeString(idBytes, idCount);
+                    let ret = swift.memory.getObject(self).getElementById(string);
+                    const isSome = ret != null;
+                    if (isSome) {
+                        const objId = swift.memory.retain(ret);
+                        i32Stack.push(objId);
+                    }
+                    i32Stack.push(isSome ? 1 : 0);
+                } catch (error) {
+                    setException(error);
+                }
+            }
+            ShapeTreeKit["bjs_PageHTMLElement_innerHTML_set"] = function bjs_PageHTMLElement_innerHTML_set(self, newValueBytes, newValueCount) {
+                try {
+                    const string = decodeString(newValueBytes, newValueCount);
+                    swift.memory.getObject(self).innerHTML = string;
+                } catch (error) {
+                    setException(error);
+                }
+            }
+            ShapeTreeKit["bjs_PageConsole_log"] = function bjs_PageConsole_log(self, messageBytes, messageCount) {
+                try {
+                    const string = decodeString(messageBytes, messageCount);
+                    swift.memory.getObject(self).log(string);
+                } catch (error) {
+                    setException(error);
+                }
+            }
         },
         setInstance: (i) => {
             instance = i;
@@ -1306,6 +1452,12 @@ export async function createInstantiator(options, swift) {
         /** @param {WebAssembly.Instance} instance */
         createExports: (instance) => {
             const js = swift.memory.heap;
+            const PageMessageHelpers = __bjs_createPageMessageHelpers();
+            structHelpers.PageMessage = PageMessageHelpers;
+
+            const ShellMessageHelpers = __bjs_createShellMessageHelpers();
+            structHelpers.ShellMessage = ShellMessageHelpers;
+
             const NavContentItemHelpers = __bjs_createNavContentItemHelpers();
             structHelpers.NavContentItem = NavContentItemHelpers;
 
@@ -1325,6 +1477,215 @@ export async function createInstantiator(options, swift) {
             structHelpers.HistoryState = HistoryStateHelpers;
 
             const exports = {
+                handlePageMessage: function bjs_handlePageMessage(message) {
+                    instance.exports.bjs_handlePageMessage(swift.memory.retain(message));
+                },
+                PageMessage: {
+                    init: function(kind, path, payload) {
+                        const kindBytes = textEncoder.encode(kind);
+                        const kindId = swift.memory.retain(kindBytes);
+                        const isSome = path != null;
+                        let result, result1;
+                        if (isSome) {
+                            const pathBytes = textEncoder.encode(path);
+                            const pathId = swift.memory.retain(pathBytes);
+                            result = pathId;
+                            result1 = pathBytes.length;
+                        } else {
+                            result = 0;
+                            result1 = 0;
+                        }
+                        const isSome1 = payload != null;
+                        let result2, result3;
+                        if (isSome1) {
+                            const payloadBytes = textEncoder.encode(payload);
+                            const payloadId = swift.memory.retain(payloadBytes);
+                            result2 = payloadId;
+                            result3 = payloadBytes.length;
+                        } else {
+                            result2 = 0;
+                            result3 = 0;
+                        }
+                        instance.exports.bjs_PageMessage_init(kindId, kindBytes.length, +isSome, result, result1, +isSome1, result2, result3);
+                        const structValue = structHelpers.PageMessage.lift();
+                        return structValue;
+                    },
+                },
+                ShellMessage: {
+                    init: function(kind, payload) {
+                        const kindBytes = textEncoder.encode(kind);
+                        const kindId = swift.memory.retain(kindBytes);
+                        const isSome = payload != null;
+                        let result, result1;
+                        if (isSome) {
+                            const payloadBytes = textEncoder.encode(payload);
+                            const payloadId = swift.memory.retain(payloadBytes);
+                            result = payloadId;
+                            result1 = payloadBytes.length;
+                        } else {
+                            result = 0;
+                            result1 = 0;
+                        }
+                        instance.exports.bjs_ShellMessage_init(kindId, kindBytes.length, +isSome, result, result1);
+                        const structValue = structHelpers.ShellMessage.lift();
+                        return structValue;
+                    },
+                },
+                NavContentItem: {
+                    init: function(path, slug, title, href, hasWasm) {
+                        const pathBytes = textEncoder.encode(path);
+                        const pathId = swift.memory.retain(pathBytes);
+                        const slugBytes = textEncoder.encode(slug);
+                        const slugId = swift.memory.retain(slugBytes);
+                        const titleBytes = textEncoder.encode(title);
+                        const titleId = swift.memory.retain(titleBytes);
+                        const hrefBytes = textEncoder.encode(href);
+                        const hrefId = swift.memory.retain(hrefBytes);
+                        instance.exports.bjs_NavContentItem_init(pathId, pathBytes.length, slugId, slugBytes.length, titleId, titleBytes.length, hrefId, hrefBytes.length, hasWasm);
+                        const structValue = structHelpers.NavContentItem.lift();
+                        return structValue;
+                    },
+                },
+                NavSignInAction: {
+                    init: function(href, label, spa) {
+                        const hrefBytes = textEncoder.encode(href);
+                        const hrefId = swift.memory.retain(hrefBytes);
+                        const labelBytes = textEncoder.encode(label);
+                        const labelId = swift.memory.retain(labelBytes);
+                        instance.exports.bjs_NavSignInAction_init(hrefId, hrefBytes.length, labelId, labelBytes.length, spa);
+                        const structValue = structHelpers.NavSignInAction.lift();
+                        return structValue;
+                    },
+                },
+                NavContentGroup: {
+                    init: function(label, directory, items) {
+                        const labelBytes = textEncoder.encode(label);
+                        const labelId = swift.memory.retain(labelBytes);
+                        const isSome = directory != null;
+                        let result, result1;
+                        if (isSome) {
+                            const directoryBytes = textEncoder.encode(directory);
+                            const directoryId = swift.memory.retain(directoryBytes);
+                            result = directoryId;
+                            result1 = directoryBytes.length;
+                        } else {
+                            result = 0;
+                            result1 = 0;
+                        }
+                        for (const elem of items) {
+                            structHelpers.NavContentItem.lower(elem);
+                        }
+                        i32Stack.push(items.length);
+                        instance.exports.bjs_NavContentGroup_init(labelId, labelBytes.length, +isSome, result, result1);
+                        const structValue = structHelpers.NavContentGroup.lift();
+                        return structValue;
+                    },
+                },
+                NavViewer: {
+                    init: function(isAuthenticated, email) {
+                        const isSome = email != null;
+                        let result, result1;
+                        if (isSome) {
+                            const emailBytes = textEncoder.encode(email);
+                            const emailId = swift.memory.retain(emailBytes);
+                            result = emailId;
+                            result1 = emailBytes.length;
+                        } else {
+                            result = 0;
+                            result1 = 0;
+                        }
+                        instance.exports.bjs_NavViewer_init(isAuthenticated, +isSome, result, result1);
+                        const structValue = structHelpers.NavViewer.lift();
+                        return structValue;
+                    },
+                },
+                NavContentResponse: {
+                    init: function(siteTitle, viewer, home, groups, signIn) {
+                        const siteTitleBytes = textEncoder.encode(siteTitle);
+                        const siteTitleId = swift.memory.retain(siteTitleBytes);
+                        structHelpers.NavViewer.lower(viewer);
+                        structHelpers.NavContentItem.lower(home);
+                        for (const elem of groups) {
+                            structHelpers.NavContentGroup.lower(elem);
+                        }
+                        i32Stack.push(groups.length);
+                        const isSome = signIn != null;
+                        if (isSome) {
+                            structHelpers.NavSignInAction.lower(signIn);
+                        }
+                        i32Stack.push(+isSome);
+                        instance.exports.bjs_NavContentResponse_init(siteTitleId, siteTitleBytes.length);
+                        const structValue = structHelpers.NavContentResponse.lift();
+                        return structValue;
+                    },
+                },
+                HistoryState: {
+                    init: function(node = null, contentPath = null, title = null, path = null, login = null, verify = null, checkEmail = null, notFound = null, next = null, token = null) {
+                        const isSome = node != null;
+                        const isSome1 = contentPath != null;
+                        let result, result1;
+                        if (isSome1) {
+                            const contentPathBytes = textEncoder.encode(contentPath);
+                            const contentPathId = swift.memory.retain(contentPathBytes);
+                            result = contentPathId;
+                            result1 = contentPathBytes.length;
+                        } else {
+                            result = 0;
+                            result1 = 0;
+                        }
+                        const isSome2 = title != null;
+                        let result2, result3;
+                        if (isSome2) {
+                            const titleBytes = textEncoder.encode(title);
+                            const titleId = swift.memory.retain(titleBytes);
+                            result2 = titleId;
+                            result3 = titleBytes.length;
+                        } else {
+                            result2 = 0;
+                            result3 = 0;
+                        }
+                        const isSome3 = path != null;
+                        let result4, result5;
+                        if (isSome3) {
+                            const pathBytes = textEncoder.encode(path);
+                            const pathId = swift.memory.retain(pathBytes);
+                            result4 = pathId;
+                            result5 = pathBytes.length;
+                        } else {
+                            result4 = 0;
+                            result5 = 0;
+                        }
+                        const isSome4 = login != null;
+                        const isSome5 = verify != null;
+                        const isSome6 = checkEmail != null;
+                        const isSome7 = notFound != null;
+                        const isSome8 = next != null;
+                        let result6, result7;
+                        if (isSome8) {
+                            const nextBytes = textEncoder.encode(next);
+                            const nextId = swift.memory.retain(nextBytes);
+                            result6 = nextId;
+                            result7 = nextBytes.length;
+                        } else {
+                            result6 = 0;
+                            result7 = 0;
+                        }
+                        const isSome9 = token != null;
+                        let result8, result9;
+                        if (isSome9) {
+                            const tokenBytes = textEncoder.encode(token);
+                            const tokenId = swift.memory.retain(tokenBytes);
+                            result8 = tokenId;
+                            result9 = tokenBytes.length;
+                        } else {
+                            result8 = 0;
+                            result9 = 0;
+                        }
+                        instance.exports.bjs_HistoryState_init(+isSome, isSome ? node ? 1 : 0 : 0, +isSome1, result, result1, +isSome2, result2, result3, +isSome3, result4, result5, +isSome4, isSome4 ? login ? 1 : 0 : 0, +isSome5, isSome5 ? verify ? 1 : 0 : 0, +isSome6, isSome6 ? checkEmail ? 1 : 0 : 0, +isSome7, isSome7 ? notFound ? 1 : 0 : 0, +isSome8, result6, result7, +isSome9, result8, result9);
+                        const structValue = structHelpers.HistoryState.lift();
+                        return structValue;
+                    },
+                },
             };
             _exports = exports;
             return exports;

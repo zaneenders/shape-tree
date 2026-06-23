@@ -1,4 +1,5 @@
 import JavaScriptKit
+import ShapeTreeKit
 
 enum Nav {
   static func fetchAndRender() {

@@ -1,4 +1,5 @@
 import JavaScriptKit
+import ShapeTreeKit
 
 enum Boot {
   static func run() {

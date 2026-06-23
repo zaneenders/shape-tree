@@ -22,6 +22,8 @@ public enum ClientAssetCatalog {
       return .script(bootstrap_js)
     case "host-imports.js":
       return .script(host_imports_js)
+    case "message-bus.js":
+      return .script(message_bus_js)
     case "instantiate.js":
       return .script(client_instantiate_js)
     case "runtime.js":

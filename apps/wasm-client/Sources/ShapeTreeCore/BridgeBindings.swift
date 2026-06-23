@@ -1,16 +1,19 @@
 import JavaScriptKit
+import ShapeTreeKit
 
-// MARK: - Host imports (implemented in bootstrap.js via getImports)
+// MARK: - Host imports (implemented in host-imports.js via getImports)
 
 @JSFunction func hostFetchJSON(
   _ url: String,
-  _ completion: @escaping (NavContentResponse?) -> Void
+  _ completion: @escaping (JSObject?) -> Void
 ) throws(JSException)
 
 @JSFunction func hostMountModule(
   _ url: String,
   _ completion: @escaping (Bool, Int) -> Void
 ) throws(JSException)
+
+@JSFunction func hostSendToPage(_ message: JSObject) throws(JSException)
 
 @JSFunction func encodeURIComponent(_ value: String) throws(JSException) -> String
 

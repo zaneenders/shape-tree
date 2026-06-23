@@ -1,5 +1,6 @@
 import HTML
 import JavaScriptKit
+import ShapeTreeKit
 
 struct MountResult {
   var ok: Bool
@@ -9,7 +10,13 @@ struct MountResult {
 // MARK: - Host
 
 func fetchNavContent(_ url: String, completion: @escaping (NavContentResponse?) -> Void) {
-  try? hostFetchJSON(url, completion)
+  try? hostFetchJSON(url) { object in
+    guard let object else {
+      completion(nil)
+      return
+    }
+    completion(NavContentResponse(unsafelyCopying: object))
+  }
 }
 
 func mountModule(_ url: String, completion: @escaping (MountResult) -> Void) {

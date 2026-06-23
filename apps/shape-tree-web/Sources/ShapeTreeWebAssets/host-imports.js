@@ -1,4 +1,11 @@
 // @ts-check
+import {
+  clearPage,
+  postToShell,
+  registerPage,
+  registerShell,
+  sendToPage,
+} from "./message-bus.js";
 import { instantiatePage } from "./page-instantiate.js";
 
 /** @returns {import('./instantiate.d').Imports} */
@@ -16,6 +23,9 @@ export function hostImports() {
         .then((result) => completion(result.ok, result.status))
         .catch(() => completion(false, 0));
     },
+    hostSendToPage(message) {
+      sendToPage(message);
+    },
     encodeURIComponent(value) {
       return globalThis.encodeURIComponent(value);
     },
@@ -28,9 +38,22 @@ export function hostImports() {
   };
 }
 
-// Page wasm uses classic JavaScriptKit (no BridgeJS imports).
+/** @returns {import('./instantiate.d').Imports} */
+export function pageHostImports() {
+  return {
+    hostPostToShell(message) {
+      postToShell(message);
+    },
+  };
+}
+
+export { registerShell, registerPage, clearPage };
+
 export const shapeTreeHost = {
   async mountPageWasm(url) {
+    sendToPage({ kind: "teardown" });
+    clearPage();
+
     const response = await fetch(url, { cache: "no-store", credentials: "include" });
     if (response.status === 404) {
       return { ok: false, status: 404 };
@@ -38,7 +61,9 @@ export const shapeTreeHost = {
     if (!response.ok) {
       throw new Error(`mount ${url}: ${response.status}`);
     }
-    await instantiatePage(response);
+
+    const page = await instantiatePage(response, url);
+    registerPage(page.exports, url);
     return { ok: true, status: response.status };
   },
 };
