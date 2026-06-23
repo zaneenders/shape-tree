@@ -6,7 +6,7 @@ CLIENT="$ROOT/../wasm-client"
 ASSETS="$ROOT/Sources/ShapeTreeWebAssets"
 OUT_JS="$ASSETS/client"
 BUILD_DIR="$CLIENT/.build/js"
-CORE_SDK="${SWIFT_WASM_CORE_SDK:-swift-6.3.2-RELEASE_wasm}"
+CORE_SDK="${SWIFT_WASM_CORE_SDK:-swift-6.3.2-RELEASE_wasm-embedded}"
 
 export PATH="${HOME}/.swiftly/bin:${PATH}"
 
@@ -24,7 +24,6 @@ echo "Building ShapeTreeCore with ${CORE_SDK}..."
 rm -rf "$BUILD_DIR" "$CLIENT/.build/plugins/PackageToJS/outputs/js.tmp"
 (
   cd "$CLIENT"
-  unset JAVASCRIPTKIT_EXPERIMENTAL_EMBEDDED_WASM
   swift package \
     --swift-sdk "$CORE_SDK" \
     --allow-writing-to-package-directory \

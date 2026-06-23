@@ -20,6 +20,9 @@ let package = Package(
         .enableExperimentalFeature("Extern"),
         .swiftLanguageMode(.v6),
         .unsafeFlags(["-Osize"], .when(configuration: .release)),
+      ],
+      linkerSettings: [
+        .unsafeFlags(["-Xlinker", "-lswiftUnicodeDataTables"])  // Swift String support
       ]
     )
   ]
