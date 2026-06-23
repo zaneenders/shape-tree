@@ -77,24 +77,29 @@ struct BuildPage {
     let html = renderArticle(
       source: source, path: contentPath, title: title)
     let resolvedTitle = title ?? humanize(contentPath)
-    let safeName = safeTargetName(contentPath)
-    log("page target:   \(safeName)")
     log("page title:     \(resolvedTitle)")
 
-    let pagesDir =
-      packageURL.appendingPathComponent("Sources/Pages")
-    let metaDir =
-      packageURL.appendingPathComponent(".build/meta")
+    // Write generated Swift + a throwaway Package.swift into a temp
+    // mini-package under .build/.  The SPM cache (compiled JavaScriptKit)
+    // persists between runs so only Page.swift is recompiled.
+    let tempPkgDir = scratchURL.appendingPathComponent("page-pkg")
+    let tempSrcDir = tempPkgDir.appendingPathComponent("Sources/Page")
+    let tempBuildDir = tempPkgDir.appendingPathComponent(".build")
 
-    log("Writing Swift source -> \(pagesDir.path)/\(safeName).swift")
-    let swiftSource = generatePageSwift(
-      targetName: safeName, contentPath: contentPath, html: html)
+    log("Writing temp package -> \(tempPkgDir.path)")
     try FileManager.default.createDirectory(
-      at: pagesDir, withIntermediateDirectories: true)
+      at: tempSrcDir, withIntermediateDirectories: true)
+    try tempPackageSwift().write(
+      to: tempPkgDir.appendingPathComponent("Package.swift"),
+      atomically: true, encoding: .utf8)
+    let swiftSource = generatePageSwift(
+      contentPath: contentPath, html: html)
     try swiftSource.write(
-      to: pagesDir.appendingPathComponent("\(safeName).swift"),
+      to: tempSrcDir.appendingPathComponent("Page.swift"),
       atomically: true, encoding: .utf8)
 
+    let metaDir =
+      packageURL.appendingPathComponent(".build/meta")
     log("Writing meta -> \(metaDir.path)/\(contentPath).meta.json")
     try FileManager.default.createDirectory(
       at: metaDir, withIntermediateDirectories: true)
@@ -107,24 +112,20 @@ struct BuildPage {
       MetaSidecar(title: resolvedTitle))
     try metaData.write(to: metaURL)
 
-    log("Regenerating Package.swift")
-    try regeneratePackageSwift(packageURL: packageURL)
-
-    let buildDir =
-      scratchURL.appendingPathComponent("js-\(safeName)")
-    log("Cleaning build dir: \(buildDir.path)")
-    try? FileManager.default.removeItem(at: buildDir)
+    let outputDir = tempPkgDir.appendingPathComponent("js")
+    log("Cleaning output dir: \(outputDir.path)")
+    try? FileManager.default.removeItem(at: outputDir)
 
     try runSwiftPackageJs(
-      target: safeName,
+      target: "Page",
       sdk: opts.sdk,
-      outputDir: buildDir,
-      packageURL: packageURL,
-      scratchURL: scratchURL,
+      outputDir: outputDir,
+      packageURL: tempPkgDir,
+      scratchURL: tempBuildDir,
       verbose: opts.verbose
     )
 
-    let wasmFile = buildDir.appendingPathComponent("\(safeName).wasm")
+    let wasmFile = outputDir.appendingPathComponent("Page.wasm")
     guard FileManager.default.fileExists(atPath: wasmFile.path) else {
       throw CLIError("wasm output missing: \(wasmFile.path)")
     }
@@ -155,75 +156,6 @@ struct BuildPage {
     try FileManager.default.copyItem(at: metaURL, to: metaDest)
 
     log("Done: \(contentPath) -> \(destWasm.path)")
-  }
-
-  // MARK: - Package.swift regeneration
-
-  static func regeneratePackageSwift(packageURL: URL) throws {
-    let pagesDir = packageURL.appendingPathComponent("Sources/Pages")
-
-    var pageTargets: [(name: String, source: String)] = []
-    if FileManager.default.fileExists(atPath: pagesDir.path) {
-      let entries = try FileManager.default.contentsOfDirectory(atPath: pagesDir.path)
-        .filter { $0.hasSuffix(".swift") }
-        .sorted()
-      for entry in entries {
-        pageTargets.append((name: (entry as NSString).deletingPathExtension, source: entry))
-      }
-    }
-    log("  page targets: \(pageTargets.map(\.name))")
-
-    var pkg = """
-      // swift-tools-version: 6.3
-      //
-      // This manifest is managed by BuildPage (Sources/BuildPage/BuildPage.swift).
-      // Per-page executable targets are appended automatically when you run
-      // `BuildPage <file.md>`; you should not normally edit the targets array by hand.
-
-      import PackageDescription
-
-      let package = Package(
-        name: "STGenMarkdown",
-        platforms: [.macOS(.v26)],
-        dependencies: [
-          .package(url: "https://github.com/swiftwasm/JavaScriptKit.git", from: "0.55.0"),
-          .package(url: "https://github.com/apple/swift-markdown.git", from: "0.5.0"),
-        ],
-        targets: [
-          .executableTarget(
-            name: "BuildPage",
-            dependencies: [
-              .product(name: "Markdown", package: "swift-markdown"),
-            ]
-          ),
-
-      """
-    for t in pageTargets {
-      pkg += executableTargetSnippet(name: t.name, path: "Sources/Pages", sources: [t.source])
-    }
-    pkg += "  ]\n)\n"
-
-    try pkg.write(
-      to: packageURL.appendingPathComponent("Package.swift"),
-      atomically: true, encoding: .utf8)
-  }
-
-  static func executableTargetSnippet(name: String, path: String, sources: [String]) -> String {
-    let sourceList = sources.map { "\"\($0)\"" }.joined(separator: ", ")
-    return """
-          .executableTarget(
-            name: "\(name)",
-            dependencies: [.product(name: "JavaScriptKit", package: "JavaScriptKit")],
-            path: "\(path)",
-            sources: [\(sourceList)],
-            swiftSettings: [
-              .enableExperimentalFeature("Extern"),
-              .swiftLanguageMode(.v5),
-              .unsafeFlags(["-Osize"], .when(configuration: .release)),
-            ]
-          ),
-
-    """
   }
 
   // MARK: - Subprocesses
@@ -312,10 +244,36 @@ struct BuildPage {
     }
   }
 
-  // MARK: - Markdown -> Swift source
+  // MARK: - Temp package + Markdown -> Swift source
+
+  static func tempPackageSwift() -> String {
+    """
+    // swift-tools-version: 6.3
+    // Throwaway package generated by BuildPage — do not edit.
+    import PackageDescription
+
+    let package = Package(
+      name: "Page",
+      dependencies: [
+        .package(url: "https://github.com/swiftwasm/JavaScriptKit.git", from: "0.55.0"),
+      ],
+      targets: [
+        .executableTarget(
+          name: "Page",
+          dependencies: [.product(name: "JavaScriptKit", package: "JavaScriptKit")],
+          swiftSettings: [
+            .enableExperimentalFeature("Extern"),
+            .swiftLanguageMode(.v5),
+            .unsafeFlags(["-Osize"], .when(configuration: .release)),
+          ]
+        ),
+      ]
+    )
+    """
+  }
 
   static func generatePageSwift(
-    targetName: String, contentPath: String, html: String
+    contentPath: String, html: String
   ) -> String {
     let escaped = escapeSwiftString(html)
     return """
@@ -324,7 +282,7 @@ struct BuildPage {
       import JavaScriptKit
 
       @main
-      struct \(targetName) {
+      struct Page {
         static func main() {
           let document = JSObject.global.document
           if let main = document.getElementById("main").object {
@@ -398,10 +356,6 @@ struct BuildPage {
       return (relative as NSString).deletingPathExtension
     }
     return (mdURL.lastPathComponent as NSString).deletingPathExtension
-  }
-
-  static func safeTargetName(_ path: String) -> String {
-    "Page_" + path.map { c in c.isLetter || c.isNumber ? String(c) : "_" }.joined()
   }
 
   static func humanize(_ path: String) -> String {

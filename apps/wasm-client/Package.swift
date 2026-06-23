@@ -18,7 +18,7 @@ let package = Package(
       ],
       swiftSettings: [
         .enableExperimentalFeature("Extern"),
-        .swiftLanguageMode(.v5),
+        .swiftLanguageMode(.v6),
         .unsafeFlags(["-Osize"], .when(configuration: .release)),
       ]
     )

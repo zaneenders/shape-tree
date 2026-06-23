@@ -6,10 +6,9 @@ Demo markdown → wasm pipeline and sample content. This is **not** part of the 
 
 ```
 examples/st-gen-markdown/
-  Package.swift             # SwiftPM manifest (managed by BuildPage)
+  Package.swift             # SwiftPM manifest (static — only BuildPage target)
   Sources/
     BuildPage/              # Swift CLI tool: md → wasm
-    Pages/                  # generated per-page Swift (gitignored)
   content-src/              # markdown source (committed)
   content/                  # generated wasm output (gitignored)
 ```
@@ -57,10 +56,10 @@ find content-src -name '*.md' -print0 \
 
 1. Reads the `.md` file, parses front matter (title, date) and markdown body via [swift-markdown](https://github.com/apple/swift-markdown)
 2. Renders the body to HTML and emits a `@main` Swift executable that sets `#main.innerHTML` at runtime
-3. Writes the generated Swift to `Sources/Pages/Page_<safe>.swift` and regenerates `Package.swift` with the new target
-4. Shells out to `swift package js --product Page_<safe> --swift-sdk <sdk>` (using a separate `--scratch-path` to avoid workspace lock conflicts)
+3. Writes a throwaway mini-package to `.build/wasm/page-pkg/` (Package.swift + Sources/Page/Page.swift) — the SPM cache persists between runs so only `Page.swift` is recompiled
+4. Shells out to `swift package js --product Page --swift-sdk <sdk>` in the temp package (separate `--scratch-path` avoids workspace lock conflicts)
 5. Optimizes the `.wasm` with `wasm-opt -Oz --strip-debug --strip-producers`
-6. Copies the `.wasm` and `.meta.json` into `content/`
+6. Copies the `.wasm` (renamed from `Page.wasm` to `<contentPath>.wasm`) and `.meta.json` into `content/`
 
 ## Docker
 
