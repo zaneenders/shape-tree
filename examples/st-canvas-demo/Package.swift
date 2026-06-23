@@ -6,7 +6,7 @@ let package = Package(
   name: "STCanvasDemo",
   platforms: [.macOS(.v26)],
   dependencies: [
-    .package(url: "https://github.com/swiftwasm/JavaScriptKit.git", from: "0.37.0"),
+    .package(url: "https://github.com/swiftwasm/JavaScriptKit.git", from: "0.55.0"),
   ],
   targets: [
     .executableTarget(

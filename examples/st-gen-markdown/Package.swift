@@ -10,7 +10,7 @@ let package = Package(
   name: "STGenMarkdown",
   platforms: [.macOS(.v26)],
   dependencies: [
-    .package(url: "https://github.com/swiftwasm/JavaScriptKit.git", from: "0.37.0"),
+    .package(url: "https://github.com/swiftwasm/JavaScriptKit.git", from: "0.55.0"),
     .package(url: "https://github.com/apple/swift-markdown.git", from: "0.5.0"),
   ],
   targets: [
