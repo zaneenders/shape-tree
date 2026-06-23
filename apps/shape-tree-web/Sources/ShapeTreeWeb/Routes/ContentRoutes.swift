@@ -39,6 +39,12 @@ enum ContentRoutes {
     }
 
     if relative.hasSuffix(".css") {
+      guard store.canViewFile(
+        relativePath: relative,
+        isAuthenticated: context.identity != nil
+      ) else {
+        throw HTTPError(.notFound)
+      }
       return try staticFileResponse(
         relativePath: relative,
         store: store,

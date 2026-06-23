@@ -39,4 +39,33 @@ import Testing
       }
     }
   }
+
+  @Test func unauthenticatedPrivateCssRoutesReturnNotFound() async throws {
+    let store = try TestContentFixtures.makeStore(
+      nodes: [
+        ("Home", "Home"),
+        ("Private/secret", "Secret Post"),
+      ],
+      privateDirectories: ["Private"]
+    )
+
+    let cssBytes = Data("body { color: red; }".utf8)
+    try cssBytes.write(to: store.contentRoot.appendingPathComponent("Private/secret.css"))
+    try cssBytes.write(to: store.contentRoot.appendingPathComponent("Home.css"))
+
+    let router = Router(context: AppRequestContext.self)
+    ContentRoutes.register(on: router, store: store)
+
+    let app = Application(router: router)
+    try await app.test(TestingSetup.router) { client in
+      try await client.execute(uri: "/content/Private/secret.css", method: .get) { response in
+        #expect(response.status == .notFound)
+      }
+
+      try await client.execute(uri: "/content/Home.css", method: .get) { response in
+        #expect(response.status == .ok)
+        #expect(String(buffer: response.body) == "body { color: red; }")
+      }
+    }
+  }
 }

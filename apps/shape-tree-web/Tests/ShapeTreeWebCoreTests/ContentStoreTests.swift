@@ -46,6 +46,41 @@ import Testing
     #expect(store.nodeGroups(includingPrivate: true).flatMap(\.nodes).contains { $0.path == "Private/secret" })
   }
 
+  @Test func canViewFileRejectsPrivateDirectoryFilesWhenUnauthenticated() throws {
+    let store = try Self.makeStore(
+      nodes: [
+        ("Home", "Home"),
+        ("Private/secret", "Secret Post"),
+      ],
+      privateDirectories: ["Private"]
+    )
+
+    #expect(store.canViewFile(relativePath: "Private/secret.css", isAuthenticated: false) == false)
+    #expect(store.canViewFile(relativePath: "Private/secret.css", isAuthenticated: true) == true)
+    #expect(store.canViewFile(relativePath: "Home.css", isAuthenticated: false) == true)
+    #expect(store.canViewFile(relativePath: "style.css", isAuthenticated: false) == true)
+  }
+
+  @Test func canViewFileRejectsNestedPrivateDirectoryFiles() throws {
+    let store = try Self.makeStore(
+      nodes: [
+        ("Home", "Home"),
+        ("Private/sub/secret", "Secret Post"),
+      ],
+      privateDirectories: ["Private"]
+    )
+
+    #expect(store.canViewFile(relativePath: "Private/sub/secret.css", isAuthenticated: false) == false)
+    #expect(store.canViewFile(relativePath: "Private/sub/secret.css", isAuthenticated: true) == true)
+  }
+
+  @Test func canViewFileRejectsTraversalAndEmptyPaths() throws {
+    let store = try Self.makeStore(nodes: [("Home", "Home")])
+
+    #expect(store.canViewFile(relativePath: "", isAuthenticated: true) == false)
+    #expect(store.canViewFile(relativePath: "../secret.css", isAuthenticated: true) == false)
+  }
+
   @Test func navContentUsesContentURLs() throws {
     let store = try Self.makeStore(nodes: [
       ("Home", "ShapeTree Web"),

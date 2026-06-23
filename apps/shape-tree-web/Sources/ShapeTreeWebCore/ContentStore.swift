@@ -1,4 +1,5 @@
 import Foundation
+import System
 
 public enum ContentStoreError: Error, CustomStringConvertible, Sendable {
   case directoryNotFound(URL)
@@ -20,6 +21,7 @@ public struct ContentStore: Sendable {
   public let indexPath: String
   public let nodes: [ContentNode]
   private let configuredSiteTitle: String?
+  private let privateDirectories: Set<String>
 
   public init(
     contentDirectory: URL,
@@ -34,6 +36,7 @@ public struct ContentStore: Sendable {
     self.contentRoot = contentDirectory.standardizedFileURL
     self.indexPath = indexPath
     self.configuredSiteTitle = siteTitle?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+    self.privateDirectories = privateDirectories
     let loaded = try Self.loadNodes(
       from: contentDirectory,
       indexPath: indexPath,
@@ -64,6 +67,21 @@ public struct ContentStore: Sendable {
   public func canView(path: String, isAuthenticated: Bool) -> Bool {
     guard let node = node(path: path) else { return false }
     return !node.isPrivate || isAuthenticated
+  }
+
+  public func canViewFile(relativePath: String, isAuthenticated: Bool) -> Bool {
+    let path = FilePath(relativePath)
+    guard !path.isEmpty,
+      !path.components.contains(where: { $0.kind == .parentDirectory })
+    else { return false }
+    let directory = path.removingLastComponent()
+    guard !directory.isEmpty else { return true }
+    for privateDir in privateDirectories {
+      if directory.components.starts(with: FilePath(privateDir).components) {
+        return isAuthenticated
+      }
+    }
+    return true
   }
 
   public var publishedNodes: [ContentNode] {
