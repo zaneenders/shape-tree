@@ -1,14 +1,5 @@
-// Embedded Swift ships no Unicode tables, so grapheme/normalization-based String
-// APIs (Array(String), lowercased(), String ==) are unavailable. Everything here
-// works on UTF-8 bytes, which only needs transcoding.
-
-func asciiLowercased(_ source: String) -> String {
-  var bytes = Array(source.utf8)
-  for index in bytes.indices where bytes[index] >= 65 && bytes[index] <= 90 {
-    bytes[index] += 32
-  }
-  return String(decoding: bytes, as: UTF8.self)
-}
+// Embedded Swift has no Foundation, so replacingOccurrences/of:with: is not
+// available. This helper works on UTF-8 bytes, which only needs transcoding.
 
 func stringReplacing(_ source: String, _ target: String, _ replacement: String) -> String {
   let bytes = Array(source.utf8)

@@ -95,11 +95,11 @@ func bodyFlag(_ key: String) -> Bool {
 }
 
 func setText(_ object: JSObject, _ text: String) {
-  object.textContent = .string(JSString(text))
+  object.textContent = .string(text)
 }
 
 func setHTML(_ object: JSObject, _ html: String) {
-  object.innerHTML = .string(JSString(html))
+  object.innerHTML = .string(html)
 }
 
 func setLoading(_ active: Bool) {
@@ -121,9 +121,9 @@ func siteTitle() -> String {
 func setDocumentTitle(_ pageTitle: String?) {
   let site = siteTitle()
   if let pageTitle, !pageTitle.isEmpty {
-    document.title = .string(JSString("\(pageTitle) · \(site)"))
+    document.title = .string("\(pageTitle) · \(site)")
   } else {
-    document.title = .string(JSString(site))
+    document.title = .string(site)
   }
 }
 
@@ -143,11 +143,11 @@ func locationIsRoot() -> Bool {
 }
 
 func pushHistory(state: JSObject, path: String) {
-  _ = JSObject.global.history.object?.pushState!(JSValue.object(state), JSValue.string(""), JSValue.string(JSString(path)))
+  _ = JSObject.global.history.object?.pushState!(state, "", path)
 }
 
 func replaceHistory(state: JSObject, path: String) {
-  _ = JSObject.global.history.object?.replaceState!(JSValue.object(state), JSValue.string(""), JSValue.string(JSString(path)))
+  _ = JSObject.global.history.object?.replaceState!(state, "", path)
 }
 
 func encodeURIComponent(_ value: String) -> String {

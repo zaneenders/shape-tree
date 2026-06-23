@@ -57,7 +57,7 @@ enum Nav {
       dataset.path = itemObject.path
       dataset.title = itemObject.title
       if let path = itemObject.path.string {
-        dataset.browserPath = .string(JSString(browserPath(forItemPath: path, href: itemObject.href.string, indexPath: indexPath)))
+        dataset.browserPath = .string(browserPath(forItemPath: path, href: itemObject.href.string, indexPath: indexPath))
       }
     }
     _ = leaf.appendChild!(link)
@@ -78,10 +78,10 @@ enum Nav {
 
     input.type = .string("checkbox")
     input.className = .string("nav-disclosure")
-    input.id = .string(JSString(branchID))
+    input.id = .string(branchID)
 
     label.className = .string("nav-branch-label")
-    label.htmlFor = .string(JSString(branchID))
+    label.htmlFor = .string(branchID)
     setText(label, groupObject.label.string ?? "")
 
     flyout.className = .string("nav-flyout")
@@ -104,7 +104,7 @@ enum Nav {
   }
 
   private static func navBranchID(_ directory: String) -> String {
-    let lowered = asciiLowercased(directory)
+    let lowered = directory.lowercased()
     let slashed = stringReplacing(lowered, "/", "-")
     return "nav-" + stringReplacing(slashed, " ", "-")
   }

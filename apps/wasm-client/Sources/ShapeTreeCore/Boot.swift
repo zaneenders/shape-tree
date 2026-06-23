@@ -70,23 +70,23 @@ enum Boot {
   private static func nodeState(path: String, browserPath: String) -> JSObject {
     let state = JSObject()
     state.node = .boolean(true)
-    state.contentPath = .string(JSString(path))
-    state.path = .string(JSString(browserPath))
+    state.contentPath = .string(path)
+    state.path = .string(browserPath)
     return state
   }
 
   private static func loginState(next: String?) -> JSObject {
     let state = JSObject()
     state.login = .boolean(true)
-    if let next { state.next = .string(JSString(next)) }
+    if let next { state.next = .string(next) }
     return state
   }
 
   private static func verifyState(token: String?, next: String?) -> JSObject {
     let state = JSObject()
     state.verify = .boolean(true)
-    if let token { state.token = .string(JSString(token)) }
-    if let next { state.next = .string(JSString(next)) }
+    if let token { state.token = .string(token) }
+    if let next { state.next = .string(next) }
     return state
   }
 
@@ -101,7 +101,7 @@ enum Boot {
   private static func stripSignedInQuery() {
     let search = locationSearch()
     guard let constructor = JSObject.global.URLSearchParams.function else { return }
-    let params = constructor.new(JSValue.string(JSString(search)))
+    let params = constructor.new(search)
     guard params.has!("signed-in").boolean == true else { return }
     _ = params.delete!("signed-in")
     let qs = params.toString!().string ?? ""
@@ -115,7 +115,7 @@ enum Boot {
 func readQueryParam(_ name: String) -> String? {
   let search = locationSearch()
   guard let constructor = JSObject.global.URLSearchParams.function else { return nil }
-  let params = constructor.new(JSValue.string(JSString(search)))
+  let params = constructor.new(search)
   let value = params.get!(name)
   guard !value.isNull, !value.isUndefined else { return nil }
   return value.string

@@ -37,7 +37,7 @@ enum Router {
     if pushState {
       let state = JSObject()
       state.notFound = .boolean(true)
-      state.path = .string(JSString(path))
+      state.path = .string(path)
       pushHistory(state: state, path: path)
     }
   }
@@ -49,7 +49,7 @@ enum Router {
     if pushState {
       let state = JSObject()
       state.login = .boolean(true)
-      if let next { state.next = .string(JSString(next)) }
+      if let next { state.next = .string(next) }
       let path = next.map { "/login?next=\(encodeURIComponent($0))" } ?? "/login"
       pushHistory(state: state, path: path)
     }
@@ -67,8 +67,8 @@ enum Router {
     if pushState {
       let state = JSObject()
       state.verify = .boolean(true)
-      if let token { state.token = .string(JSString(token)) }
-      if let next { state.next = .string(JSString(next)) }
+      if let token { state.token = .string(token) }
+      if let next { state.next = .string(next) }
       pushHistory(state: state, path: locationPathname() + locationSearch())
     }
   }
@@ -113,9 +113,9 @@ enum Router {
   private static func nodeState(path: String, title: String?, browserPath: String) -> JSObject {
     let state = JSObject()
     state.node = .boolean(true)
-    state.contentPath = .string(JSString(path))
-    if let title { state.title = .string(JSString(title)) }
-    state.path = .string(JSString(browserPath))
+    state.contentPath = .string(path)
+    if let title { state.title = .string(title) }
+    state.path = .string(browserPath)
     return state
   }
 
