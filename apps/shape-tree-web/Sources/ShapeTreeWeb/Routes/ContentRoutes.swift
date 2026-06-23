@@ -1,4 +1,5 @@
 import Foundation
+import HTMLNIO
 import Hummingbird
 import HTTPTypes
 import NIOCore

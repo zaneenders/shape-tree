@@ -11,7 +11,7 @@ let package = Package(
     .executable(name: "ShapeTreeWeb", targets: ["ShapeTreeWeb"])
   ],
   dependencies: [
-    .package(url: "https://github.com/zaneenders/lorikeet.git", revision: "30702f6"),
+    .package(url: "https://github.com/zaneenders/lorikeet.git", revision: "2c178eb"),
     .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.24.0"),
     .package(url: "https://github.com/hummingbird-project/hummingbird-auth.git", from: "2.0.0"),
     .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.21.0"),
@@ -80,6 +80,7 @@ let package = Package(
         "ShapeTreeWebAssets",
         "ShapeTreeWebAuth",
         .product(name: "HTML", package: "Lorikeet"),
+        .product(name: "HTMLNIO", package: "Lorikeet"),
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "NIOCore", package: "swift-nio"),
         .product(name: "Configuration", package: "swift-configuration"),

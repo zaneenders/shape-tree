@@ -8,13 +8,15 @@ let package = Package(
     .macOS(.v26)
   ],
   dependencies: [
-    .package(url: "https://github.com/swiftwasm/JavaScriptKit.git", from: "0.55.0")
+    .package(url: "https://github.com/swiftwasm/JavaScriptKit.git", from: "0.55.0"),
+    .package(url: "https://github.com/zaneenders/lorikeet.git", revision: "2c178eb"),
   ],
   targets: [
     .executableTarget(
       name: "ShapeTreeCore",
       dependencies: [
-        .product(name: "JavaScriptKit", package: "JavaScriptKit")
+        .product(name: "JavaScriptKit", package: "JavaScriptKit"),
+        .product(name: "HTML", package: "Lorikeet"),
       ],
       swiftSettings: [
         .enableExperimentalFeature("Extern"),

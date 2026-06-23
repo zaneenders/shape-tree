@@ -1,3 +1,4 @@
+import HTML
 import JavaScriptKit
 
 enum Router {
@@ -13,7 +14,7 @@ enum Router {
 
   static func mountContent(path: String, title: String?, browserPath: String?, pushState: Bool) {
     guard let main = element("main") else { return }
-    setHTML(main, "<p>Loading…</p>")
+    setHTML(main, p { "Loading…" })
     setLoading(true)
     let resolvedPath = browserPath ?? contentBrowserPath(path: path)
     mountModule(contentWasmURL(path: path)) { result in
@@ -34,7 +35,7 @@ enum Router {
 
   static func renderNotFound(path: String, pushState: Bool) {
     guard let main = element("main") else { return }
-    setHTML(main, "<article><h1>404</h1><p>Page not found.</p></article>")
+    setHTML(main, notFoundView())
     setDocumentTitle("Not Found")
     if pushState {
       var state = HistoryState()
@@ -110,6 +111,13 @@ enum Router {
     state.title = title
     state.path = browserPath
     return state
+  }
+
+  private static func notFoundView() -> HTML {
+    article {
+      h1 { "404" }
+      p { "Page not found." }
+    }
   }
 
   private static func displayTitle(forPath path: String) -> String {

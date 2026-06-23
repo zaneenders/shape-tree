@@ -1,5 +1,6 @@
 import Foundation
 import HTML
+import HTMLNIO
 import Hummingbird
 import NIOCore
 import ShapeTreeWebAuth
