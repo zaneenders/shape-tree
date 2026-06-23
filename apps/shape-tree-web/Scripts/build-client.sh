@@ -14,9 +14,10 @@ if [[ -d "$SITE_DIR" && -f "$SITE_DIR/Package.swift" ]]; then
   (
     cd "$SITE_DIR"
     swift build --product BuildPage || exit 1
+    CONTENT_SRC="$REPO_ROOT/examples/content-src"
     while IFS= read -r -d '' md; do
       "$SITE_DIR/.build/debug/BuildPage" "$md" || exit 1
-    done < <(find "$SITE_DIR/content-src" -name '*.md' -type f -print0)
+    done < <(find "$CONTENT_SRC" -name '*.md' -type f -print0)
   )
 fi
 

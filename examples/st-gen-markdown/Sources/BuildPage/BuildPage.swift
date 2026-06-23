@@ -43,7 +43,7 @@ struct BuildPage {
           Usage: BuildPage <path-to.md> [options]
             --package-root <path>  Package root (default: current directory)
             --sdk <name>           SwiftWasm SDK (default: $SWIFT_WASM_SDK or swift-6.3.2-RELEASE_wasm-embedded)
-            --content-src <path>   Content source root (default: content-src)
+            --content-src <path>   Content source root (default: ../content-src)
             --output <path>        Wasm output dir (default: content)
             --login-slug <slug>    Skip pages matching this slug (default: login)
             -v, --verbose          Print detailed progress
@@ -407,7 +407,7 @@ struct Options {
       mdPath: nil,
       sdk: env["SWIFT_WASM_SDK"] ?? "swift-6.3.2-RELEASE_wasm-embedded",
       packageRoot: FileManager.default.currentDirectoryPath,
-      contentSrc: "content-src",
+      contentSrc: "../content-src",
       output: "content",
       loginSlug: "login",
       verbose: false
@@ -441,7 +441,7 @@ struct Options {
             Usage: BuildPage <path-to.md> [options]
               --package-root <path>  Package root (default: current directory)
               --sdk <name>           SwiftWasm SDK (default: $SWIFT_WASM_SDK or swift-6.3.2-RELEASE_wasm-embedded)
-              --content-src <path>   Content source root (default: content-src)
+              --content-src <path>   Content source root (default: ../content-src)
               --output <path>        Wasm output dir (default: content)
               --login-slug <slug>    Skip pages matching this slug (default: login)
               -v, --verbose          Print detailed progress (including subprocess output)
