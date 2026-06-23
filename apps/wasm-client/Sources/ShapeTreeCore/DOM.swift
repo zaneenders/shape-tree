@@ -1,3 +1,4 @@
+import HTML
 import JavaScriptKit
 
 struct MountResult {
@@ -101,6 +102,10 @@ func setDataset(_ dataset: JSObject, key: String, value: String) {
 
 func setText(_ object: HTMLElement, _ text: String) {
   try? object.setTextContent(text)
+}
+
+func setHTML(_ object: HTMLElement, _ html: HTML) {
+  setHTML(object, html.render())
 }
 
 func setHTML(_ object: HTMLElement, _ html: String) {
