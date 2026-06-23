@@ -69,12 +69,22 @@ cp "$WASM" "$ASSETS/ShapeTreeCore.wasm"
 echo "Wrote ${ASSETS}/ShapeTreeCore.wasm"
 
 if [[ "$REGEN_JS" == true ]]; then
+  PAGE_INSTANTIATE=""
+  if [[ -f "$OUT_JS/page-instantiate.js" ]]; then
+    PAGE_INSTANTIATE="$(cat "$OUT_JS/page-instantiate.js")"
+  fi
   rm -rf "$OUT_JS"
   mkdir -p "$OUT_JS/platforms"
   cp "$BUILD_DIR/index.js" "$BUILD_DIR/instantiate.js" "$BUILD_DIR/runtime.js" "$OUT_JS/"
   cp "$BUILD_DIR/platforms/browser.js" "$OUT_JS/platforms/"
   if [[ -f "$BUILD_DIR/bridge-js.js" ]]; then
     cp "$BUILD_DIR/bridge-js.js" "$OUT_JS/"
+  fi
+  if [[ -n "$PAGE_INSTANTIATE" ]]; then
+    printf '%s' "$PAGE_INSTANTIATE" >"$OUT_JS/page-instantiate.js"
+  elif [[ ! -f "$OUT_JS/page-instantiate.js" ]]; then
+    echo "error: page-instantiate.js missing; restore it before --regen-js" >&2
+    exit 1
   fi
   JAVASCRIPTKIT_VERSION="$(
     python3 - "$CLIENT/Package.resolved" <<'PY'

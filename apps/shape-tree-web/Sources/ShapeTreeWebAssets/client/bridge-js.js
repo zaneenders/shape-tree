@@ -56,6 +56,320 @@ export async function createInstantiator(options, swift) {
         return swift.memory.retain(real);
     };
 
+    const __bjs_createNavContentItemHelpers = () => ({
+        lower: (value) => {
+            const bytes = textEncoder.encode(value.path);
+            const id = swift.memory.retain(bytes);
+            i32Stack.push(bytes.length);
+            i32Stack.push(id);
+            const bytes1 = textEncoder.encode(value.slug);
+            const id1 = swift.memory.retain(bytes1);
+            i32Stack.push(bytes1.length);
+            i32Stack.push(id1);
+            const bytes2 = textEncoder.encode(value.title);
+            const id2 = swift.memory.retain(bytes2);
+            i32Stack.push(bytes2.length);
+            i32Stack.push(id2);
+            const bytes3 = textEncoder.encode(value.href);
+            const id3 = swift.memory.retain(bytes3);
+            i32Stack.push(bytes3.length);
+            i32Stack.push(id3);
+            i32Stack.push(value.hasWasm ? 1 : 0);
+        },
+        lift: () => {
+            const bool = i32Stack.pop() !== 0;
+            const string = strStack.pop();
+            const string1 = strStack.pop();
+            const string2 = strStack.pop();
+            const string3 = strStack.pop();
+            return { path: string3, slug: string2, title: string1, href: string, hasWasm: bool };
+        }
+    });
+    const __bjs_createNavSignInActionHelpers = () => ({
+        lower: (value) => {
+            const bytes = textEncoder.encode(value.href);
+            const id = swift.memory.retain(bytes);
+            i32Stack.push(bytes.length);
+            i32Stack.push(id);
+            const bytes1 = textEncoder.encode(value.label);
+            const id1 = swift.memory.retain(bytes1);
+            i32Stack.push(bytes1.length);
+            i32Stack.push(id1);
+            i32Stack.push(value.spa ? 1 : 0);
+        },
+        lift: () => {
+            const bool = i32Stack.pop() !== 0;
+            const string = strStack.pop();
+            const string1 = strStack.pop();
+            return { href: string1, label: string, spa: bool };
+        }
+    });
+    const __bjs_createNavContentGroupHelpers = () => ({
+        lower: (value) => {
+            const bytes = textEncoder.encode(value.label);
+            const id = swift.memory.retain(bytes);
+            i32Stack.push(bytes.length);
+            i32Stack.push(id);
+            const isSome = value.directory != null ? 1 : 0;
+            if (isSome) {
+                const bytes1 = textEncoder.encode(value.directory);
+                const id1 = swift.memory.retain(bytes1);
+                i32Stack.push(bytes1.length);
+                i32Stack.push(id1);
+            }
+            i32Stack.push(isSome);
+            for (const elem of value.items) {
+                structHelpers.NavContentItem.lower(elem);
+            }
+            i32Stack.push(value.items.length);
+        },
+        lift: () => {
+            const arrayLen = i32Stack.pop();
+            let arrayResult;
+            if (arrayLen === -1) {
+                arrayResult = taStack.pop();
+            } else {
+                arrayResult = [];
+                for (let i = 0; i < arrayLen; i++) {
+                    const struct = structHelpers.NavContentItem.lift();
+                    arrayResult.push(struct);
+                }
+                arrayResult.reverse();
+            }
+            const isSome = i32Stack.pop();
+            let optValue;
+            if (isSome === 0) {
+                optValue = null;
+            } else {
+                const string = strStack.pop();
+                optValue = string;
+            }
+            const string1 = strStack.pop();
+            return { label: string1, directory: optValue, items: arrayResult };
+        }
+    });
+    const __bjs_createNavViewerHelpers = () => ({
+        lower: (value) => {
+            i32Stack.push(value.isAuthenticated ? 1 : 0);
+            const isSome = value.email != null ? 1 : 0;
+            if (isSome) {
+                const bytes = textEncoder.encode(value.email);
+                const id = swift.memory.retain(bytes);
+                i32Stack.push(bytes.length);
+                i32Stack.push(id);
+            }
+            i32Stack.push(isSome);
+        },
+        lift: () => {
+            const isSome = i32Stack.pop();
+            let optValue;
+            if (isSome === 0) {
+                optValue = null;
+            } else {
+                const string = strStack.pop();
+                optValue = string;
+            }
+            const bool = i32Stack.pop() !== 0;
+            return { isAuthenticated: bool, email: optValue };
+        }
+    });
+    const __bjs_createNavContentResponseHelpers = () => ({
+        lower: (value) => {
+            const bytes = textEncoder.encode(value.siteTitle);
+            const id = swift.memory.retain(bytes);
+            i32Stack.push(bytes.length);
+            i32Stack.push(id);
+            structHelpers.NavViewer.lower(value.viewer);
+            structHelpers.NavContentItem.lower(value.home);
+            for (const elem of value.groups) {
+                structHelpers.NavContentGroup.lower(elem);
+            }
+            i32Stack.push(value.groups.length);
+            const isSome = value.signIn != null ? 1 : 0;
+            if (isSome) {
+                structHelpers.NavSignInAction.lower(value.signIn);
+            }
+            i32Stack.push(isSome);
+        },
+        lift: () => {
+            const isSome = i32Stack.pop();
+            let optValue;
+            if (isSome === 0) {
+                optValue = null;
+            } else {
+                const struct = structHelpers.NavSignInAction.lift();
+                optValue = struct;
+            }
+            const arrayLen = i32Stack.pop();
+            let arrayResult;
+            if (arrayLen === -1) {
+                arrayResult = taStack.pop();
+            } else {
+                arrayResult = [];
+                for (let i = 0; i < arrayLen; i++) {
+                    const struct1 = structHelpers.NavContentGroup.lift();
+                    arrayResult.push(struct1);
+                }
+                arrayResult.reverse();
+            }
+            const struct2 = structHelpers.NavContentItem.lift();
+            const struct3 = structHelpers.NavViewer.lift();
+            const string = strStack.pop();
+            return { siteTitle: string, viewer: struct3, home: struct2, groups: arrayResult, signIn: optValue };
+        }
+    });
+    const __bjs_createHistoryStateHelpers = () => ({
+        lower: (value) => {
+            const isSome = value.node != null ? 1 : 0;
+            if (isSome) {
+                i32Stack.push(value.node ? 1 : 0);
+            }
+            i32Stack.push(isSome);
+            const isSome1 = value.contentPath != null ? 1 : 0;
+            if (isSome1) {
+                const bytes = textEncoder.encode(value.contentPath);
+                const id = swift.memory.retain(bytes);
+                i32Stack.push(bytes.length);
+                i32Stack.push(id);
+            }
+            i32Stack.push(isSome1);
+            const isSome2 = value.title != null ? 1 : 0;
+            if (isSome2) {
+                const bytes1 = textEncoder.encode(value.title);
+                const id1 = swift.memory.retain(bytes1);
+                i32Stack.push(bytes1.length);
+                i32Stack.push(id1);
+            }
+            i32Stack.push(isSome2);
+            const isSome3 = value.path != null ? 1 : 0;
+            if (isSome3) {
+                const bytes2 = textEncoder.encode(value.path);
+                const id2 = swift.memory.retain(bytes2);
+                i32Stack.push(bytes2.length);
+                i32Stack.push(id2);
+            }
+            i32Stack.push(isSome3);
+            const isSome4 = value.login != null ? 1 : 0;
+            if (isSome4) {
+                i32Stack.push(value.login ? 1 : 0);
+            }
+            i32Stack.push(isSome4);
+            const isSome5 = value.verify != null ? 1 : 0;
+            if (isSome5) {
+                i32Stack.push(value.verify ? 1 : 0);
+            }
+            i32Stack.push(isSome5);
+            const isSome6 = value.checkEmail != null ? 1 : 0;
+            if (isSome6) {
+                i32Stack.push(value.checkEmail ? 1 : 0);
+            }
+            i32Stack.push(isSome6);
+            const isSome7 = value.notFound != null ? 1 : 0;
+            if (isSome7) {
+                i32Stack.push(value.notFound ? 1 : 0);
+            }
+            i32Stack.push(isSome7);
+            const isSome8 = value.next != null ? 1 : 0;
+            if (isSome8) {
+                const bytes3 = textEncoder.encode(value.next);
+                const id3 = swift.memory.retain(bytes3);
+                i32Stack.push(bytes3.length);
+                i32Stack.push(id3);
+            }
+            i32Stack.push(isSome8);
+            const isSome9 = value.token != null ? 1 : 0;
+            if (isSome9) {
+                const bytes4 = textEncoder.encode(value.token);
+                const id4 = swift.memory.retain(bytes4);
+                i32Stack.push(bytes4.length);
+                i32Stack.push(id4);
+            }
+            i32Stack.push(isSome9);
+        },
+        lift: () => {
+            const isSome = i32Stack.pop();
+            let optValue;
+            if (isSome === 0) {
+                optValue = null;
+            } else {
+                const string = strStack.pop();
+                optValue = string;
+            }
+            const isSome1 = i32Stack.pop();
+            let optValue1;
+            if (isSome1 === 0) {
+                optValue1 = null;
+            } else {
+                const string1 = strStack.pop();
+                optValue1 = string1;
+            }
+            const isSome2 = i32Stack.pop();
+            let optValue2;
+            if (isSome2 === 0) {
+                optValue2 = null;
+            } else {
+                const bool = i32Stack.pop() !== 0;
+                optValue2 = bool;
+            }
+            const isSome3 = i32Stack.pop();
+            let optValue3;
+            if (isSome3 === 0) {
+                optValue3 = null;
+            } else {
+                const bool1 = i32Stack.pop() !== 0;
+                optValue3 = bool1;
+            }
+            const isSome4 = i32Stack.pop();
+            let optValue4;
+            if (isSome4 === 0) {
+                optValue4 = null;
+            } else {
+                const bool2 = i32Stack.pop() !== 0;
+                optValue4 = bool2;
+            }
+            const isSome5 = i32Stack.pop();
+            let optValue5;
+            if (isSome5 === 0) {
+                optValue5 = null;
+            } else {
+                const bool3 = i32Stack.pop() !== 0;
+                optValue5 = bool3;
+            }
+            const isSome6 = i32Stack.pop();
+            let optValue6;
+            if (isSome6 === 0) {
+                optValue6 = null;
+            } else {
+                const string2 = strStack.pop();
+                optValue6 = string2;
+            }
+            const isSome7 = i32Stack.pop();
+            let optValue7;
+            if (isSome7 === 0) {
+                optValue7 = null;
+            } else {
+                const string3 = strStack.pop();
+                optValue7 = string3;
+            }
+            const isSome8 = i32Stack.pop();
+            let optValue8;
+            if (isSome8 === 0) {
+                optValue8 = null;
+            } else {
+                const string4 = strStack.pop();
+                optValue8 = string4;
+            }
+            const isSome9 = i32Stack.pop();
+            let optValue9;
+            if (isSome9 === 0) {
+                optValue9 = null;
+            } else {
+                const bool4 = i32Stack.pop() !== 0;
+                optValue9 = bool4;
+            }
+            return { node: optValue9, contentPath: optValue8, title: optValue7, path: optValue6, login: optValue5, verify: optValue4, checkEmail: optValue3, notFound: optValue2, next: optValue1, token: optValue };
+        }
+    });
 
     return {
         /**
@@ -131,6 +445,48 @@ export async function createInstantiator(options, swift) {
                 const byteLen = count * Ctor.BYTES_PER_ELEMENT;
                 const copy = memory.buffer.slice(ptr, ptr + byteLen);
                 taStack.push(Array.from(new Ctor(copy)));
+            }
+            bjs["swift_js_struct_lower_NavContentItem"] = function(objectId) {
+                structHelpers.NavContentItem.lower(swift.memory.getObject(objectId));
+            }
+            bjs["swift_js_struct_lift_NavContentItem"] = function() {
+                const value = structHelpers.NavContentItem.lift();
+                return swift.memory.retain(value);
+            }
+            bjs["swift_js_struct_lower_NavSignInAction"] = function(objectId) {
+                structHelpers.NavSignInAction.lower(swift.memory.getObject(objectId));
+            }
+            bjs["swift_js_struct_lift_NavSignInAction"] = function() {
+                const value = structHelpers.NavSignInAction.lift();
+                return swift.memory.retain(value);
+            }
+            bjs["swift_js_struct_lower_NavContentGroup"] = function(objectId) {
+                structHelpers.NavContentGroup.lower(swift.memory.getObject(objectId));
+            }
+            bjs["swift_js_struct_lift_NavContentGroup"] = function() {
+                const value = structHelpers.NavContentGroup.lift();
+                return swift.memory.retain(value);
+            }
+            bjs["swift_js_struct_lower_NavViewer"] = function(objectId) {
+                structHelpers.NavViewer.lower(swift.memory.getObject(objectId));
+            }
+            bjs["swift_js_struct_lift_NavViewer"] = function() {
+                const value = structHelpers.NavViewer.lift();
+                return swift.memory.retain(value);
+            }
+            bjs["swift_js_struct_lower_NavContentResponse"] = function(objectId) {
+                structHelpers.NavContentResponse.lower(swift.memory.getObject(objectId));
+            }
+            bjs["swift_js_struct_lift_NavContentResponse"] = function() {
+                const value = structHelpers.NavContentResponse.lift();
+                return swift.memory.retain(value);
+            }
+            bjs["swift_js_struct_lower_HistoryState"] = function(objectId) {
+                structHelpers.HistoryState.lower(swift.memory.getObject(objectId));
+            }
+            bjs["swift_js_struct_lift_HistoryState"] = function() {
+                const value = structHelpers.HistoryState.lift();
+                return swift.memory.retain(value);
             }
             const __bjs_promiseSettlers = Symbol("JavaScriptKit.promiseSettlers");
             bjs["swift_js_make_promise"] = function() {
@@ -273,24 +629,29 @@ export async function createInstantiator(options, swift) {
                 };
                 return makeClosure(boxPtr, file, line, lower_closure_ShapeTreeCore_13ShapeTreeCoreSbSi_y);
             }
-            bjs["invoke_js_callback_ShapeTreeCore_13ShapeTreeCoreSq8JSObjectC_y"] = function(callbackId, param0IsSome, param0ObjectId) {
+            bjs["invoke_js_callback_ShapeTreeCore_13ShapeTreeCoreSq18NavContentResponseV_y"] = function(callbackId, param0) {
                 try {
                     const callback = swift.memory.getObject(callbackId);
-                    callback(param0IsSome ? swift.memory.getObject(param0ObjectId) : null);
+                    let optResult;
+                    if (param0) {
+                        const struct = structHelpers.NavContentResponse.lift();
+                        optResult = struct;
+                    } else {
+                        optResult = null;
+                    }
+                    callback(optResult);
                 } catch (error) {
                     setException(error);
                 }
             }
-            bjs["make_swift_closure_ShapeTreeCore_13ShapeTreeCoreSq8JSObjectC_y"] = function(boxPtr, file, line) {
-                const lower_closure_ShapeTreeCore_13ShapeTreeCoreSq8JSObjectC_y = function(param0) {
+            bjs["make_swift_closure_ShapeTreeCore_13ShapeTreeCoreSq18NavContentResponseV_y"] = function(boxPtr, file, line) {
+                const lower_closure_ShapeTreeCore_13ShapeTreeCoreSq18NavContentResponseV_y = function(param0) {
                     const isSome = param0 != null;
-                    let result;
                     if (isSome) {
-                        result = swift.memory.retain(param0);
-                    } else {
-                        result = 0;
+                        structHelpers.NavContentResponse.lower(param0);
                     }
-                    instance.exports.invoke_swift_closure_ShapeTreeCore_13ShapeTreeCoreSq8JSObjectC_y(boxPtr, +isSome, result);
+                    i32Stack.push(+isSome);
+                    instance.exports.invoke_swift_closure_ShapeTreeCore_13ShapeTreeCoreSq18NavContentResponseV_y(boxPtr);
                     if (tmpRetException) {
                         const error = swift.memory.getObject(tmpRetException);
                         swift.memory.release(tmpRetException);
@@ -298,7 +659,7 @@ export async function createInstantiator(options, swift) {
                         throw error;
                     }
                 };
-                return makeClosure(boxPtr, file, line, lower_closure_ShapeTreeCore_13ShapeTreeCoreSq8JSObjectC_y);
+                return makeClosure(boxPtr, file, line, lower_closure_ShapeTreeCore_13ShapeTreeCoreSq18NavContentResponseV_y);
             }
             const ShapeTreeCore = importObject["ShapeTreeCore"] = importObject["ShapeTreeCore"] || {};
             ShapeTreeCore["bjs_webDocument_get"] = function bjs_webDocument_get() {
@@ -945,6 +1306,24 @@ export async function createInstantiator(options, swift) {
         /** @param {WebAssembly.Instance} instance */
         createExports: (instance) => {
             const js = swift.memory.heap;
+            const NavContentItemHelpers = __bjs_createNavContentItemHelpers();
+            structHelpers.NavContentItem = NavContentItemHelpers;
+
+            const NavSignInActionHelpers = __bjs_createNavSignInActionHelpers();
+            structHelpers.NavSignInAction = NavSignInActionHelpers;
+
+            const NavContentGroupHelpers = __bjs_createNavContentGroupHelpers();
+            structHelpers.NavContentGroup = NavContentGroupHelpers;
+
+            const NavViewerHelpers = __bjs_createNavViewerHelpers();
+            structHelpers.NavViewer = NavViewerHelpers;
+
+            const NavContentResponseHelpers = __bjs_createNavContentResponseHelpers();
+            structHelpers.NavContentResponse = NavContentResponseHelpers;
+
+            const HistoryStateHelpers = __bjs_createHistoryStateHelpers();
+            structHelpers.HistoryState = HistoryStateHelpers;
+
             const exports = {
             };
             _exports = exports;

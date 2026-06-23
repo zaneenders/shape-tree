@@ -72,32 +72,32 @@ enum Boot {
     nonEmpty(readQueryParam(name))
   }
 
-  private static func nodeState(path: String, browserPath: String) -> JSObject {
-    let state = JSObject()
-    state.node = .boolean(true)
-    state.contentPath = .string(path)
-    state.path = .string(browserPath)
+  private static func nodeState(path: String, browserPath: String) -> HistoryState {
+    var state = HistoryState()
+    state.node = true
+    state.contentPath = path
+    state.path = browserPath
     return state
   }
 
-  private static func loginState(next: String?) -> JSObject {
-    let state = JSObject()
-    state.login = .boolean(true)
-    if let next { state.next = .string(next) }
+  private static func loginState(next: String?) -> HistoryState {
+    var state = HistoryState()
+    state.login = true
+    state.next = next
     return state
   }
 
-  private static func verifyState(token: String?, next: String?) -> JSObject {
-    let state = JSObject()
-    state.verify = .boolean(true)
-    if let token { state.token = .string(token) }
-    if let next { state.next = .string(next) }
+  private static func verifyState(token: String?, next: String?) -> HistoryState {
+    var state = HistoryState()
+    state.verify = true
+    state.token = token
+    state.next = next
     return state
   }
 
-  private static func checkEmailState() -> JSObject {
-    let state = JSObject()
-    state.checkEmail = .boolean(true)
+  private static func checkEmailState() -> HistoryState {
+    var state = HistoryState()
+    state.checkEmail = true
     return state
   }
 
@@ -108,18 +108,6 @@ enum Boot {
     try? params.delete("signed-in")
     let qs = (try? params.toString()) ?? ""
     let path = locationPathname() + (qs.isEmpty ? "" : "?\(qs)")
-    let state = (try? webHistory.state) ?? JSObject()
-    replaceHistory(state: state, path: path)
+    replaceHistory(state: currentHistoryState(), path: path)
   }
-}
-
-func readQueryParam(_ name: String) -> String? {
-  let search = locationSearch()
-  guard let params = try? createURLSearchParams(search) else { return nil }
-  return try? params.get(name)
-}
-
-func nonEmpty(_ value: String?) -> String? {
-  guard let value, !value.isEmpty else { return nil }
-  return value
 }

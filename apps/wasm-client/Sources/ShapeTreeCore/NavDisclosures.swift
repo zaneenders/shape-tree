@@ -15,21 +15,21 @@ func closeSiblingDisclosures(clicked: HTMLElement) {
   guard let listItem = try? clicked.closest("li"),
     let parent = try? listItem.parentElement,
     let children = try? parent.children,
-    Bridge.tagName(parent) == "UL"
+    (try? parent.tagName) == "UL"
   else {
     return
   }
 
-  let childCount = Bridge.collectionLength(children)
-  let clickedID = Bridge.elementID(clicked)
+  let childCount = Int((try? children.length) ?? 0)
+  let clickedID = try? clicked.id
   for index in 0..<childCount {
     guard let sibling = try? children.item(Double(index)),
-      Bridge.tagName(sibling) == "LI",
+      (try? sibling.tagName) == "LI",
       let other = try? sibling.querySelector(":scope > input.nav-disclosure")
     else {
       continue
     }
-    if let clickedID, let otherID = Bridge.elementID(other), !clickedID.isEmpty, clickedID == otherID {
+    if let clickedID, let otherID = try? other.id, !clickedID.isEmpty, clickedID == otherID {
       continue
     }
     try? other.setChecked(false)

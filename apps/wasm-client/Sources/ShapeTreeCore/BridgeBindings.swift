@@ -4,7 +4,7 @@ import JavaScriptKit
 
 @JSFunction func hostFetchJSON(
   _ url: String,
-  _ completion: @escaping (JSObject?) -> Void
+  _ completion: @escaping (NavContentResponse?) -> Void
 ) throws(JSException)
 
 @JSFunction func hostMountModule(

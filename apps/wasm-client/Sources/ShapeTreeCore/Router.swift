@@ -24,7 +24,10 @@ enum Router {
       }
       setDocumentTitle(title ?? displayTitle(forPath: path))
       if pushState {
-        pushHistory(state: nodeState(path: path, title: title, browserPath: resolvedPath), path: resolvedPath)
+        pushHistory(
+          state: nodeState(path: path, title: title, browserPath: resolvedPath),
+          path: resolvedPath
+        )
       }
     }
   }
@@ -34,9 +37,9 @@ enum Router {
     setHTML(main, "<article><h1>404</h1><p>Page not found.</p></article>")
     setDocumentTitle("Not Found")
     if pushState {
-      let state = historyState()
-      state.notFound = .boolean(true)
-      state.path = .string(path)
+      var state = HistoryState()
+      state.notFound = true
+      state.path = path
       pushHistory(state: state, path: path)
     }
   }
@@ -46,9 +49,9 @@ enum Router {
     AuthViews.renderLogin(into: main, next: next)
     setDocumentTitle("Sign in")
     if pushState {
-      let state = historyState()
-      state.login = .boolean(true)
-      if let next { state.next = .string(next) }
+      var state = HistoryState()
+      state.login = true
+      state.next = next
       let path = next.map { "/login?next=\(encodedPathComponent($0))" } ?? "/login"
       pushHistory(state: state, path: path)
     }
@@ -64,10 +67,10 @@ enum Router {
       setDocumentTitle("Sign in failed")
     }
     if pushState {
-      let state = historyState()
-      state.verify = .boolean(true)
-      if let token { state.token = .string(token) }
-      if let next { state.next = .string(next) }
+      var state = HistoryState()
+      state.verify = true
+      state.token = token
+      state.next = next
       pushHistory(state: state, path: locationPathname() + locationSearch())
     }
   }
@@ -77,40 +80,35 @@ enum Router {
     AuthViews.renderCheckEmail(into: main)
     setDocumentTitle("Check your email")
     if pushState {
-      let state = historyState()
-      state.checkEmail = .boolean(true)
+      var state = HistoryState()
+      state.checkEmail = true
       pushHistory(state: state, path: locationPathname())
     }
   }
 
   static func registerHistory() {
     try? webWindow.addEventListener("popstate") { event in
-      guard let state = Bridge.eventState(event) else { return }
-      if state.node.boolean == true, let path = Bridge.jsObjectPropertyString(state, "contentPath") {
-        let title = Bridge.jsObjectPropertyString(state, "title")
-        let browserPath = Bridge.jsObjectPropertyString(state, "path")
-        mountContent(path: path, title: title, browserPath: browserPath, pushState: false)
-      } else if state.login.boolean == true {
-        let next = Bridge.jsObjectPropertyString(state, "next")
-        showLogin(next: next, pushState: false)
-      } else if state.verify.boolean == true {
-        let token = Bridge.jsObjectPropertyString(state, "token")
-        let next = Bridge.jsObjectPropertyString(state, "next")
-        showVerify(token: token, next: next, pushState: false)
-      } else if state.checkEmail.boolean == true {
+      guard let state = historyState(from: event) else { return }
+      if state.node == true, let path = state.contentPath {
+        mountContent(path: path, title: state.title, browserPath: state.path, pushState: false)
+      } else if state.login == true {
+        showLogin(next: state.next, pushState: false)
+      } else if state.verify == true {
+        showVerify(token: state.token, next: state.next, pushState: false)
+      } else if state.checkEmail == true {
         showCheckEmail(pushState: false)
-      } else if state.notFound.boolean == true {
-        renderNotFound(path: Bridge.jsObjectPropertyString(state, "path") ?? locationPathname(), pushState: false)
+      } else if state.notFound == true {
+        renderNotFound(path: state.path ?? locationPathname(), pushState: false)
       }
     }
   }
 
-  private static func nodeState(path: String, title: String?, browserPath: String) -> JSObject {
-    let state = historyState()
-    state.node = .boolean(true)
-    state.contentPath = .string(path)
-    if let title { state.title = .string(title) }
-    state.path = .string(browserPath)
+  private static func nodeState(path: String, title: String?, browserPath: String) -> HistoryState {
+    var state = HistoryState()
+    state.node = true
+    state.contentPath = path
+    state.title = title
+    state.path = browserPath
     return state
   }
 
@@ -121,8 +119,4 @@ enum Router {
   private static func encodedContentPath(_ path: String) -> String {
     path.split(separator: "/").map { encodedPathComponent(String($0)) }.joined(separator: "/")
   }
-}
-
-private func historyState() -> JSObject {
-  JSObject()
 }

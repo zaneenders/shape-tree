@@ -13,6 +13,7 @@ enum ClientRoutes {
       "ShapeTreeCore.wasm",
       "index.js",
       "bootstrap.js",
+      "host-imports.js",
       "instantiate.js",
       "runtime.js",
       "bridge-js.js",
