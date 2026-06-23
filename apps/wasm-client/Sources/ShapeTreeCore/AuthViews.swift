@@ -3,7 +3,7 @@ import JavaScriptKit
 /// Auth chrome rendered entirely in Swift. Forms are real POSTs; the server
 /// replies with redirects, so no client-side fetch/JSON is involved.
 enum AuthViews {
-  static func renderLogin(into main: JSObject, next: String?) {
+  static func renderLogin(into main: HTMLElement, next: String?) {
     let nextField = next.map {
       "<input type=\"hidden\" name=\"next\" value=\"\(escapeAttr($0))\">"
     } ?? ""
@@ -24,7 +24,7 @@ enum AuthViews {
     )
   }
 
-  static func renderCheckEmail(into main: JSObject) {
+  static func renderCheckEmail(into main: HTMLElement) {
     setHTML(
       main,
       """
@@ -37,7 +37,7 @@ enum AuthViews {
     )
   }
 
-  static func renderVerifyConfirm(into main: JSObject, token: String, next: String?) {
+  static func renderVerifyConfirm(into main: HTMLElement, token: String, next: String?) {
     let nextField = next.map {
       "<input type=\"hidden\" name=\"next\" value=\"\(escapeAttr($0))\">"
     } ?? ""
@@ -57,7 +57,7 @@ enum AuthViews {
     )
   }
 
-  static func renderVerifyFailed(into main: JSObject) {
+  static func renderVerifyFailed(into main: HTMLElement) {
     setHTML(
       main,
       """

@@ -2,16 +2,15 @@ import JavaScriptKit
 
 enum Router {
   static func contentWasmURL(path: String) -> String {
-    let encoded = encodeContentPath(path)
+    let encoded = encodedContentPath(path)
     return "/content/\(encoded).wasm"
   }
 
   static func contentBrowserPath(path: String, isHome: Bool = false) -> String {
     if isHome { return "/" }
-    return "/content/\(encodeContentPath(path))"
+    return "/content/\(encodedContentPath(path))"
   }
 
-  /// Fetches and instantiates a content wasm into `#main`, updating title and history.
   static func mountContent(path: String, title: String?, browserPath: String?, pushState: Bool) {
     guard let main = element("main") else { return }
     setHTML(main, "<p>Loading…</p>")
@@ -35,7 +34,7 @@ enum Router {
     setHTML(main, "<article><h1>404</h1><p>Page not found.</p></article>")
     setDocumentTitle("Not Found")
     if pushState {
-      let state = JSObject()
+      let state = historyState()
       state.notFound = .boolean(true)
       state.path = .string(path)
       pushHistory(state: state, path: path)
@@ -47,10 +46,10 @@ enum Router {
     AuthViews.renderLogin(into: main, next: next)
     setDocumentTitle("Sign in")
     if pushState {
-      let state = JSObject()
+      let state = historyState()
       state.login = .boolean(true)
       if let next { state.next = .string(next) }
-      let path = next.map { "/login?next=\(encodeURIComponent($0))" } ?? "/login"
+      let path = next.map { "/login?next=\(encodedPathComponent($0))" } ?? "/login"
       pushHistory(state: state, path: path)
     }
   }
@@ -65,7 +64,7 @@ enum Router {
       setDocumentTitle("Sign in failed")
     }
     if pushState {
-      let state = JSObject()
+      let state = historyState()
       state.verify = .boolean(true)
       if let token { state.token = .string(token) }
       if let next { state.next = .string(next) }
@@ -78,40 +77,36 @@ enum Router {
     AuthViews.renderCheckEmail(into: main)
     setDocumentTitle("Check your email")
     if pushState {
-      let state = JSObject()
+      let state = historyState()
       state.checkEmail = .boolean(true)
       pushHistory(state: state, path: locationPathname())
     }
   }
 
   static func registerHistory() {
-    let popstate = JSClosure { arguments in
-      guard let event = arguments[0].object else { return .undefined }
-      let state: JSValue = event.state
-      if state.node.boolean == true, let path = state.contentPath.string {
-        let title = state.title.string
-        let browserPath = state.path.string
+    try? webWindow.addEventListener("popstate") { event in
+      guard let state = Bridge.eventState(event) else { return }
+      if state.node.boolean == true, let path = Bridge.jsObjectPropertyString(state, "contentPath") {
+        let title = Bridge.jsObjectPropertyString(state, "title")
+        let browserPath = Bridge.jsObjectPropertyString(state, "path")
         mountContent(path: path, title: title, browserPath: browserPath, pushState: false)
       } else if state.login.boolean == true {
-        let next = state.next.string
+        let next = Bridge.jsObjectPropertyString(state, "next")
         showLogin(next: next, pushState: false)
       } else if state.verify.boolean == true {
-        let token = state.token.string
-        let next = state.next.string
+        let token = Bridge.jsObjectPropertyString(state, "token")
+        let next = Bridge.jsObjectPropertyString(state, "next")
         showVerify(token: token, next: next, pushState: false)
       } else if state.checkEmail.boolean == true {
         showCheckEmail(pushState: false)
       } else if state.notFound.boolean == true {
-        renderNotFound(path: state.path.string ?? locationPathname(), pushState: false)
+        renderNotFound(path: Bridge.jsObjectPropertyString(state, "path") ?? locationPathname(), pushState: false)
       }
-      return .undefined
     }
-    ShapeTreeCore.listeners.append(popstate)
-    _ = JSObject.global.addEventListener!("popstate", JSValue.object(popstate))
   }
 
   private static func nodeState(path: String, title: String?, browserPath: String) -> JSObject {
-    let state = JSObject()
+    let state = historyState()
     state.node = .boolean(true)
     state.contentPath = .string(path)
     if let title { state.title = .string(title) }
@@ -123,7 +118,11 @@ enum Router {
     path.split(separator: "/").last.map(String.init) ?? path
   }
 
-  private static func encodeContentPath(_ path: String) -> String {
-    path.split(separator: "/").map { encodeURIComponent(String($0)) }.joined(separator: "/")
+  private static func encodedContentPath(_ path: String) -> String {
+    path.split(separator: "/").map { encodedPathComponent(String($0)) }.joined(separator: "/")
   }
+}
+
+private func historyState() -> JSObject {
+  JSObject()
 }

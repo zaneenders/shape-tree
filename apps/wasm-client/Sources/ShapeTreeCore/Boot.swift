@@ -45,7 +45,12 @@ enum Boot {
       let indexPath = bodyDataset("indexPath") ?? "Home"
       let browserPath = "/"
       replaceHistory(state: nodeState(path: indexPath, browserPath: browserPath), path: browserPath)
-      Router.mountContent(path: indexPath, title: bodyDataset("siteTitle"), browserPath: browserPath, pushState: false)
+      Router.mountContent(
+        path: indexPath,
+        title: bodyDataset("siteTitle"),
+        browserPath: browserPath,
+        pushState: false
+      )
     }
   }
 
@@ -59,7 +64,7 @@ enum Boot {
 
   private static func decodeContentPath(_ encoded: String) -> String {
     encoded.split(separator: "/").map { segment in
-      JSObject.global.decodeURIComponent!(String(segment)).string ?? String(segment)
+      (try? decodeURIComponent(String(segment))) ?? String(segment)
     }.joined(separator: "/")
   }
 
@@ -96,29 +101,22 @@ enum Boot {
     return state
   }
 
-  /// After magic-link verify the server redirects to `next?signed-in=1`; nav was
-  /// already fetched with the authed cookie, so just drop the marker from the URL.
   private static func stripSignedInQuery() {
     let search = locationSearch()
-    guard let constructor = JSObject.global.URLSearchParams.function else { return }
-    let params = constructor.new(search)
-    guard params.has!("signed-in").boolean == true else { return }
-    _ = params.delete!("signed-in")
-    let qs = params.toString!().string ?? ""
+    guard let params = try? createURLSearchParams(search) else { return }
+    guard (try? params.has("signed-in")) == true else { return }
+    try? params.delete("signed-in")
+    let qs = (try? params.toString()) ?? ""
     let path = locationPathname() + (qs.isEmpty ? "" : "?\(qs)")
-    let current: JSValue = JSObject.global.history.state
-    let state = current.object ?? JSObject()
+    let state = (try? webHistory.state) ?? JSObject()
     replaceHistory(state: state, path: path)
   }
 }
 
 func readQueryParam(_ name: String) -> String? {
   let search = locationSearch()
-  guard let constructor = JSObject.global.URLSearchParams.function else { return nil }
-  let params = constructor.new(search)
-  let value = params.get!(name)
-  guard !value.isNull, !value.isUndefined else { return nil }
-  return value.string
+  guard let params = try? createURLSearchParams(search) else { return nil }
+  return try? params.get(name)
 }
 
 func nonEmpty(_ value: String?) -> String? {

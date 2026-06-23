@@ -7,6 +7,34 @@ ASSETS="$ROOT/Sources/ShapeTreeWebAssets"
 OUT_JS="$ASSETS/client"
 BUILD_DIR="$CLIENT/.build/js"
 CORE_SDK="${SWIFT_WASM_CORE_SDK:-swift-6.3.2-RELEASE_wasm-embedded}"
+REGEN_JS=false
+
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") [--regen-js]
+
+  (default)  Rebuild ShapeTreeCore.wasm (gitignored); keep vendored client/*.js.
+  --regen-js Also refresh JavaScriptKit / BridgeJS glue in Sources/ShapeTreeWebAssets/client/.
+             Run after bumping JavaScriptKit or the wasm SDK.
+
+Requires: Swiftly wasm SDK ($CORE_SDK), wasm-opt (binaryen).
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  --regen-js) REGEN_JS=true; shift ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "error: unknown argument: $1" >&2
+    usage >&2
+    exit 1
+    ;;
+  esac
+done
 
 export PATH="${HOME}/.swiftly/bin:${PATH}"
 
@@ -37,12 +65,45 @@ if [[ ! -f "$WASM" ]]; then
 fi
 
 wasm-opt -Oz --strip-debug --strip-producers "$WASM" -o "$WASM"
-
-rm -rf "$OUT_JS"
-mkdir -p "$OUT_JS/platforms"
-cp "$BUILD_DIR/index.js" "$BUILD_DIR/instantiate.js" "$BUILD_DIR/runtime.js" "$OUT_JS/"
-cp "$BUILD_DIR/platforms/browser.js" "$OUT_JS/platforms/"
 cp "$WASM" "$ASSETS/ShapeTreeCore.wasm"
-
-echo "Wrote client JS to ${OUT_JS}"
 echo "Wrote ${ASSETS}/ShapeTreeCore.wasm"
+
+if [[ "$REGEN_JS" == true ]]; then
+  rm -rf "$OUT_JS"
+  mkdir -p "$OUT_JS/platforms"
+  cp "$BUILD_DIR/index.js" "$BUILD_DIR/instantiate.js" "$BUILD_DIR/runtime.js" "$OUT_JS/"
+  cp "$BUILD_DIR/platforms/browser.js" "$OUT_JS/platforms/"
+  if [[ -f "$BUILD_DIR/bridge-js.js" ]]; then
+    cp "$BUILD_DIR/bridge-js.js" "$OUT_JS/"
+  fi
+  JAVASCRIPTKIT_VERSION="$(
+    python3 - "$CLIENT/Package.resolved" <<'PY'
+import json, pathlib, sys
+path = pathlib.Path(sys.argv[1])
+if not path.is_file():
+    print("unknown")
+    raise SystemExit(0)
+data = json.loads(path.read_text())
+for pin in data.get("pins", []):
+    if pin.get("identity") == "javascriptkit":
+        print(pin["state"]["version"])
+        break
+else:
+    print("unknown")
+PY
+  )"
+  cat >"$OUT_JS/VENDOR.txt" <<EOF
+# Vendored JavaScriptKit browser glue for ShapeTreeCore.
+# Regenerate with: ./Scripts/build-core.sh --regen-js
+javascriptkit=${JAVASCRIPTKIT_VERSION}
+swift-wasm-sdk=${CORE_SDK}
+generated=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+EOF
+  echo "Refreshed vendored client JS in ${OUT_JS}"
+else
+  if [[ ! -f "$OUT_JS/index.js" || ! -f "$OUT_JS/runtime.js" ]]; then
+    echo "error: vendored client JS missing at ${OUT_JS}; run with --regen-js" >&2
+    exit 1
+  fi
+  echo "Kept vendored client JS in ${OUT_JS} (pass --regen-js to refresh)"
+fi

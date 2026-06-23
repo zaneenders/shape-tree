@@ -1,41 +1,44 @@
 import JavaScriptKit
 
-func closeAll(in document: JSValue) {
-  guard let nav = navigationRoot(in: document) else {
-    syncBackdrop(in: document)
+func closeAll() {
+  guard let nav = navigationRoot() else {
+    syncBackdrop()
     return
   }
   for checkbox in checkedDisclosures(in: nav) {
-    checkbox.checked = .boolean(false)
+    try? checkbox.setChecked(false)
   }
-  syncBackdrop(in: document)
+  syncBackdrop()
 }
 
-func closeSiblingDisclosures(clicked: JSObject) {
-  guard let listItem = clicked.closest!("li").object,
-    let parent = listItem.parentElement.object,
-    jsEquals(parent.tagName, "UL")
+func closeSiblingDisclosures(clicked: HTMLElement) {
+  guard let listItem = try? clicked.closest("li"),
+    let parent = try? listItem.parentElement,
+    let children = try? parent.children,
+    Bridge.tagName(parent) == "UL"
   else {
     return
   }
 
-  let childCount = Int(parent.children.length.number ?? 0)
+  let childCount = Bridge.collectionLength(children)
+  let clickedID = Bridge.elementID(clicked)
   for index in 0..<childCount {
-    guard let sibling = parent.children.item(Double(index)).object,
-      sibling != listItem,
-      jsEquals(sibling.tagName, "LI"),
-      let other = sibling.querySelector!(":scope > input.nav-disclosure").object,
-      other != clicked
+    guard let sibling = try? children.item(Double(index)),
+      Bridge.tagName(sibling) == "LI",
+      let other = try? sibling.querySelector(":scope > input.nav-disclosure")
     else {
       continue
     }
-    other.checked = .boolean(false)
+    if let clickedID, let otherID = Bridge.elementID(other), !clickedID.isEmpty, clickedID == otherID {
+      continue
+    }
+    try? other.setChecked(false)
   }
 }
 
-func syncBackdrop(in document: JSValue) {
-  guard let backdrop = ensureBackdrop(in: document) else { return }
-  let nav = navigationRoot(in: document)
+func syncBackdrop() {
+  guard let backdrop = ensureBackdrop() else { return }
+  let nav = navigationRoot()
   let hasOpen = nav.map { !checkedDisclosures(in: $0).isEmpty } ?? false
-  backdrop.hidden = .boolean(!hasOpen)
+  try? backdrop.setHidden(!hasOpen)
 }

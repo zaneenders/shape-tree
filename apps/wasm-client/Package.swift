@@ -23,6 +23,9 @@ let package = Package(
       ],
       linkerSettings: [
         .unsafeFlags(["-Xlinker", "-lswiftUnicodeDataTables"])  // Swift String support
+      ],
+      plugins: [
+        .plugin(name: "BridgeJS", package: "JavaScriptKit")
       ]
     )
   ]

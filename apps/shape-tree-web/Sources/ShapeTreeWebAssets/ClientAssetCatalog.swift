@@ -24,6 +24,10 @@ public enum ClientAssetCatalog {
       return .script(client_instantiate_js)
     case "runtime.js":
       return .script(client_runtime_js)
+    case "bridge-js.js":
+      return .script(client_bridge_js_js)
+    case "page-instantiate.js":
+      return .script(client_page_instantiate_js)
     case "platforms/browser.js":
       return .script(client_platforms_browser_js)
     case "browser_wasi_shim.js":

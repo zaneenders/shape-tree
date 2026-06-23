@@ -1,5 +1,4 @@
 import Foundation
-import System
 
 public enum ContentStoreError: Error, CustomStringConvertible, Sendable {
   case directoryNotFound(URL)
@@ -70,14 +69,11 @@ public struct ContentStore: Sendable {
   }
 
   public func canViewFile(relativePath: String, isAuthenticated: Bool) -> Bool {
-    let path = FilePath(relativePath)
-    guard !path.isEmpty,
-      !path.components.contains(where: { $0.kind == .parentDirectory })
-    else { return false }
-    let directory = path.removingLastComponent()
+    guard !relativePath.isEmpty, !relativePath.contains("..") else { return false }
+    let directory = (relativePath as NSString).deletingLastPathComponent
     guard !directory.isEmpty else { return true }
     for privateDir in privateDirectories {
-      if directory.components.starts(with: FilePath(privateDir).components) {
+      if directory == privateDir || directory.hasPrefix(privateDir + "/") {
         return isAuthenticated
       }
     }

@@ -2,100 +2,71 @@ import JavaScriptKit
 
 @main
 enum ShapeTreeCore {
-  nonisolated(unsafe) static var listeners: [JSClosure] = []
-
   static func main() {
-    let document = JSObject.global.document
-    registerListeners(on: document)
+    registerListeners()
     Router.registerHistory()
-    log("listeners registered")
+    Bridge.log("listeners registered")
     Boot.run()
-  }
-
-  static func log(_ message: String) {
-    _ = JSObject.global.console.log("[shape-tree-core] \(message)")
   }
 }
 
-private func registerListeners(on document: JSValue) {
-  let changeListener = JSClosure { arguments in
-    guard let event = arguments[0].object,
-      let target = event.target.object,
-      jsEquals(target.type, "checkbox"),
+private func registerListeners() {
+  try? webDocument.addEventListener("change") { event in
+    guard let target = Bridge.eventTarget(event),
       hasClass(target, "nav-disclosure"),
-      let nav = navigationRoot(in: document),
-      isContained(nav, target)
+      let nav = navigationRoot()
     else {
-      return .undefined
+      return
     }
-    if target.checked.boolean == true {
+    guard isContained(nav, target) else { return }
+    if Bridge.isChecked(target) {
       closeSiblingDisclosures(clicked: target)
     }
-    syncBackdrop(in: document)
-    return .undefined
+    syncBackdrop()
   }
-  ShapeTreeCore.listeners.append(changeListener)
-  _ = document.addEventListener("change", JSValue.object(changeListener))
 
-  let clickListener = JSClosure { arguments in
-    guard let event = arguments[0].object,
-      let target = event.target.object,
-      let nav = navigationRoot(in: document)
-    else {
-      return .undefined
-    }
+  try? webDocument.addEventListener("click") { event in
+    guard let target = Bridge.eventTarget(event),
+      let nav = navigationRoot()
+    else { return }
 
-    if target.closest!("a.nav-login-link").object != nil {
-      _ = event.preventDefault?()
-      ShapeTreeCore.log("login nav link")
+    if let _ = try? target.closest("a.nav-login-link") {
+      try? event.preventDefault()
+      Bridge.log("login nav link")
       Router.showLogin(next: nil, pushState: true)
-      closeAll(in: document)
-      return .undefined
+      closeAll()
+      return
     }
 
-    if let nodeLink = target.closest!("a.nav-node-link").object {
-      _ = event.preventDefault?()
+    if let nodeLink = try? target.closest("a.nav-node-link") {
+      try? event.preventDefault()
       let path = wasmDataset(nodeLink, key: "path")
       let title = wasmDataset(nodeLink, key: "title")
       let browserPath = wasmDataset(nodeLink, key: "browserPath")
       if let path {
-        ShapeTreeCore.log("node nav link: \(path)")
+        Bridge.log("node nav link: \(path)")
         Router.mountContent(path: path, title: title, browserPath: browserPath, pushState: true)
       }
-      closeAll(in: document)
-      return .undefined
+      closeAll()
+      return
     }
 
     if !isContained(nav, target) {
-      closeAll(in: document)
-      return .undefined
+      closeAll()
+      return
     }
 
-    if target.closest!("a.nav-link").object != nil {
-      closeAll(in: document)
+    if let _ = try? target.closest("a.nav-link") {
+      closeAll()
     }
-
-    return .undefined
   }
-  ShapeTreeCore.listeners.append(clickListener)
-  _ = document.addEventListener("click", JSValue.object(clickListener))
 
-  let keydownListener = JSClosure { arguments in
-    guard let event = arguments[0].object,
-      jsEquals(event.key, "Escape")
-    else {
-      return .undefined
-    }
-    closeAll(in: document)
-    return .undefined
+  try? webDocument.addEventListener("keydown") { event in
+    guard Bridge.eventKey(event) == "Escape" else { return }
+    closeAll()
   }
-  ShapeTreeCore.listeners.append(keydownListener)
-  _ = document.addEventListener("keydown", JSValue.object(keydownListener))
 }
 
-func wasmDataset(_ element: JSObject, key: String) -> String? {
-  guard let dataset = element.dataset.object else { return nil }
-  let value = dataset[key]
-  guard !value.isUndefined else { return nil }
-  return value.string
+func wasmDataset(_ element: HTMLElement, key: String) -> String? {
+  Bridge.datasetString(element, key)
 }

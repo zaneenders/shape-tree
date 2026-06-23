@@ -6,9 +6,21 @@ Wasm host on [Lorikeet](https://github.com/zaneenders/lorikeet) + [Hummingbird](
 
 ```bash
 cd apps/shape-tree-web
-./Scripts/build-core.sh        # embed ShapeTreeCore.wasm (required once)
+./Scripts/build-core.sh   # required: produces ShapeTreeCore.wasm (gitignored)
 cp .env.example .env
 swift run ShapeTreeWeb
+```
+
+The JavaScriptKit glue under `Sources/ShapeTreeWebAssets/client/` is **vendored** in git — you only need a wasm SDK to rebuild the `.wasm` binary. After editing `apps/wasm-client` Swift:
+
+```bash
+./Scripts/build-core.sh
+```
+
+After bumping JavaScriptKit or the wasm SDK, refresh the vendored JS too:
+
+```bash
+./Scripts/build-core.sh --regen-js
 ```
 
 Point `CONTENT_PATH` at a directory of `*.wasm` files (see [examples/st-gen-markdown](../../examples/st-gen-markdown) to build demo content).
@@ -45,7 +57,8 @@ swift sdk install \
   https://download.swift.org/swift-6.3.2-release/wasm-sdk/swift-6.3.2-RELEASE/swift-6.3.2-RELEASE_wasm.artifactbundle.tar.gz \
   --checksum a61f0584c93283589f8b2f42db05c1f9a182b506c2957271402992655591dd7c
 brew install binaryen   # wasm-opt; apt: binaryen
-./Scripts/build-core.sh
+./Scripts/build-core.sh          # wasm only (default)
+./Scripts/build-core.sh --regen-js   # wasm + refresh vendored client/*.js
 ```
 
 `build-client.sh` runs `build-core.sh` plus the example site build for convenience.

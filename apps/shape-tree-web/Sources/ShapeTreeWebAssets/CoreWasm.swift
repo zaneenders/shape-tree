@@ -10,8 +10,11 @@ public enum CoreWasm {
     else {
       fatalError(
         """
-        ShapeTreeCore.wasm is missing or empty. Build the wasm client before launching the server:
+        ShapeTreeCore.wasm is missing or empty. Build the wasm client (requires wasm SDK):
           ./Scripts/build-core.sh
+        JavaScriptKit glue is vendored under Sources/ShapeTreeWebAssets/client/.
+        Refresh it after a JavaScriptKit bump with:
+          ./Scripts/build-core.sh --regen-js
         """
       )
     }

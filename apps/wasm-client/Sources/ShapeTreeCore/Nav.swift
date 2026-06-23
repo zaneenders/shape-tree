@@ -4,97 +4,113 @@ enum Nav {
   static func fetchAndRender() {
     fetchJSON("/api/get-nav-content") { payload in
       guard let payload else {
-        ShapeTreeCore.log("nav fetch failed")
+        Bridge.log("nav fetch failed")
         return
       }
       render(payload)
     }
   }
 
-  static func render(_ payload: JSValue) {
+  static func render(_ payload: JSObject) {
     guard let nav = element("styled-navigation") else { return }
-    _ = nav.replaceChildren!()
+    try? nav.replaceChildren()
 
     guard let list = createElement("ul") else { return }
-    list.className = .string("nav-root")
+    try? list.setClassName("nav-root")
 
-    let indexPath = bodyDataset("indexPath") ?? payload.home.path.string ?? "Home"
+    let indexPath = bodyDataset("indexPath")
+      ?? (payload["home"].object.flatMap { Bridge.jsObjectPropertyString($0, "path") })
+      ?? "Home"
 
-    appendItem(to: list, item: payload.home, indexPath: indexPath)
+    if let home = payload["home"].object {
+      appendItem(to: list, item: home, indexPath: indexPath)
+    }
 
-    let signIn: JSValue = payload.signIn
-    if let signInObject = signIn.object, let leaf = createElement("li") {
-      leaf.className = .string("nav-leaf")
+    if let signInObject = payload["signIn"].object, let leaf = createElement("li") {
+      try? leaf.setClassName("nav-leaf")
       if let link = createElement("a") {
-        let spa = signInObject.spa.boolean ?? false
-        link.className = .string(spa ? "nav-link nav-login-link" : "nav-link")
-        link.href = signInObject.href
-        setText(link, signInObject.label.string ?? "Sign in")
-        _ = leaf.appendChild!(link)
+        let spa = Bridge.jsObjectPropertyBool(signInObject, "spa") ?? false
+        try? link.setClassName(spa ? "nav-link nav-login-link" : "nav-link")
+        if let href = Bridge.jsObjectPropertyString(signInObject, "href") {
+          try? link.setHref(href)
+        }
+        try? link.setTextContent(Bridge.jsObjectPropertyString(signInObject, "label") ?? "Sign in")
+        _ = try? leaf.appendChild(link)
       }
-      _ = list.appendChild!(leaf)
+      _ = try? list.appendChild(leaf)
     }
 
-    let groups: JSValue = payload.groups
-    let groupCount = Int(groups.object?.length.number ?? 0)
+    let groups = payload["groups"]
+    let groupCount = Bridge.jsArrayLength(groups)
     for index in 0..<groupCount {
-      appendGroup(to: list, group: groups[index], indexPath: indexPath)
-    }
-
-    _ = nav.appendChild!(list)
-  }
-
-  private static func appendItem(to list: JSObject, item: JSValue, indexPath: String) {
-    guard let itemObject = item.object,
-      let leaf = createElement("li"),
-      let link = createElement("a")
-    else { return }
-    leaf.className = .string("nav-leaf")
-    link.className = .string("nav-link nav-node-link")
-    link.href = itemObject.href
-    setText(link, itemObject.title.string ?? "")
-    if let dataset = link.dataset.object {
-      dataset.path = itemObject.path
-      dataset.title = itemObject.title
-      if let path = itemObject.path.string {
-        dataset.browserPath = .string(browserPath(forItemPath: path, href: itemObject.href.string, indexPath: indexPath))
+      let group = Bridge.jsArrayElement(groups, index)
+      if let groupObject = group.object {
+        appendGroup(to: list, group: groupObject, indexPath: indexPath)
       }
     }
-    _ = leaf.appendChild!(link)
-    _ = list.appendChild!(leaf)
+
+    _ = try? nav.appendChild(list)
   }
 
-  private static func appendGroup(to list: JSObject, group: JSValue, indexPath: String) {
-    guard let groupObject = group.object,
-      let branch = createElement("li"),
+  private static func appendItem(to list: HTMLElement, item: JSObject, indexPath: String) {
+    guard let leaf = createElement("li"), let link = createElement("a") else { return }
+    try? leaf.setClassName("nav-leaf")
+    try? link.setClassName("nav-link nav-node-link")
+    if let href = Bridge.jsObjectPropertyString(item, "href") {
+      try? link.setHref(href)
+    }
+    try? link.setTextContent(Bridge.jsObjectPropertyString(item, "title") ?? "")
+    if let dataset = Bridge.elementDataset(link) {
+      if let path = Bridge.jsObjectPropertyString(item, "path") {
+        Bridge.setDataset(dataset, "path", .string(path))
+        Bridge.setDataset(
+          dataset,
+          "browserPath",
+          .string(browserPath(forItemPath: path, href: Bridge.jsObjectPropertyString(item, "href"), indexPath: indexPath))
+        )
+      }
+      if let title = Bridge.jsObjectPropertyString(item, "title") {
+        Bridge.setDataset(dataset, "title", .string(title))
+      }
+    }
+    _ = try? leaf.appendChild(link)
+    _ = try? list.appendChild(leaf)
+  }
+
+  private static func appendGroup(to list: HTMLElement, group: JSObject, indexPath: String) {
+    guard let branch = createElement("li"),
       let input = createElement("input"),
       let label = createElement("label"),
       let flyout = createElement("ul")
     else { return }
 
-    branch.className = .string("nav-branch")
-    let directory = groupObject.directory.string ?? groupObject.label.string ?? ""
+    try? branch.setClassName("nav-branch")
+    let directory = Bridge.jsObjectPropertyString(group, "directory")
+      ?? Bridge.jsObjectPropertyString(group, "label") ?? ""
     let branchID = navBranchID(directory)
 
-    input.type = .string("checkbox")
-    input.className = .string("nav-disclosure")
-    input.id = .string(branchID)
+    try? input.setAttribute("type", "checkbox")
+    try? input.setClassName("nav-disclosure")
+    try? input.setId(branchID)
 
-    label.className = .string("nav-branch-label")
-    label.htmlFor = .string(branchID)
-    setText(label, groupObject.label.string ?? "")
+    try? label.setClassName("nav-branch-label")
+    try? label.setHtmlFor(branchID)
+    try? label.setTextContent(Bridge.jsObjectPropertyString(group, "label") ?? "")
 
-    flyout.className = .string("nav-flyout")
-    let items: JSValue = groupObject.items
-    let itemCount = Int(items.object?.length.number ?? 0)
+    try? flyout.setClassName("nav-flyout")
+    let items = group["items"]
+    let itemCount = Bridge.jsArrayLength(items)
     for index in 0..<itemCount {
-      appendItem(to: flyout, item: items[index], indexPath: indexPath)
+      let item = Bridge.jsArrayElement(items, index)
+      if let itemObject = item.object {
+        appendItem(to: flyout, item: itemObject, indexPath: indexPath)
+      }
     }
 
-    _ = branch.appendChild!(input)
-    _ = branch.appendChild!(label)
-    _ = branch.appendChild!(flyout)
-    _ = list.appendChild!(branch)
+    _ = try? branch.appendChild(input)
+    _ = try? branch.appendChild(label)
+    _ = try? branch.appendChild(flyout)
+    _ = try? list.appendChild(branch)
   }
 
   private static func browserPath(forItemPath path: String, href: String?, indexPath: String) -> String {

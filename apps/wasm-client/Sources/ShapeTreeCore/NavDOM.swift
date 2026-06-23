@@ -1,55 +1,45 @@
 import JavaScriptKit
 
-func jsEquals(_ lhs: JSValue, _ rhs: JSString) -> Bool {
-  guard let left = lhs.jsString else { return false }
-  return left == rhs
+func hasClass(_ element: HTMLElement, _ className: String) -> Bool {
+  (try? element.classList.contains(className)) == true
 }
 
-func jsEquals(_ lhs: JSValue, _ rhs: String) -> Bool {
-  jsEquals(lhs, JSString(rhs))
+func isContained(_ parent: HTMLElement, _ child: HTMLElement) -> Bool {
+  (try? parent.contains(child)) == true
 }
 
-func hasClass(_ element: JSObject, _ className: String) -> Bool {
-  guard let classList = element.classList.object else { return false }
-  return classList.contains!(className).boolean == true
+func navigationRoot() -> HTMLElement? {
+  try? webDocument.getElementById("styled-navigation")
 }
 
-func isContained(_ parent: JSObject, _ child: JSObject) -> Bool {
-  parent.contains!(child).boolean == true
-}
-
-func navigationRoot(in document: JSValue) -> JSObject? {
-  document.getElementById("styled-navigation").object
-}
-
-func checkedDisclosures(in nav: JSObject) -> [JSObject] {
-  let nodeList = nav.querySelectorAll!("input.nav-disclosure[type=\"checkbox\"]:checked")
-  let length = Int(nodeList.length.number ?? 0)
-  var values: [JSObject] = []
+func checkedDisclosures(in nav: HTMLElement) -> [HTMLElement] {
+  guard let nodeList = try? nav.querySelectorAll("input.nav-disclosure[type=\"checkbox\"]:checked") else {
+    return []
+  }
+  let length = Bridge.nodeListLength(nodeList)
+  var values: [HTMLElement] = []
   values.reserveCapacity(length)
   for index in 0..<length {
-    if let value = nodeList.item(Double(index)).object {
+    if let value = try? nodeList.item(Double(index)) {
       values.append(value)
     }
   }
   return values
 }
 
-func ensureBackdrop(in document: JSValue) -> JSObject? {
-  if let existing = document.getElementById("nav-backdrop").object {
+func ensureBackdrop() -> HTMLElement? {
+  if let existing = try? webDocument.getElementById("nav-backdrop") {
     return existing
   }
-  guard let body = document.body.object else { return nil }
-  guard let backdrop = document.createElement("div").object else { return nil }
-  backdrop.id = .string("nav-backdrop")
-  _ = backdrop.setAttribute!("aria-hidden", "true")
-  let backdropClick = JSClosure { _ in
-    ShapeTreeCore.log("backdrop click")
-    closeAll(in: document)
-    return .undefined
+  guard let body = try? webDocument.body,
+    let backdrop = try? webDocument.createElement("div")
+  else { return nil }
+  try? backdrop.setId("nav-backdrop")
+  try? backdrop.setAttribute("aria-hidden", "true")
+  try? backdrop.addEventListener("click") { _ in
+    Bridge.log("backdrop click")
+    closeAll()
   }
-  ShapeTreeCore.listeners.append(backdropClick)
-  _ = backdrop.addEventListener!("click", JSValue.object(backdropClick))
-  _ = body.appendChild!(backdrop)
+  _ = try? body.appendChild(backdrop)
   return backdrop
 }
