@@ -6,7 +6,7 @@ enum AuthEmailError: Error {
   case invalid
 }
 
-enum AuthEmail {
+package enum AuthEmail {
   private static func normalizedEmail(_ raw: String) -> String {
     raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
   }
@@ -14,7 +14,7 @@ enum AuthEmail {
   /// Normalizes and validates an email address, returning the normalized value
   /// only when it matches a basic `local@domain.tld` shape. Returns `nil` for
   /// malformed input.
-  static func validatedEmail(_ raw: String) -> String? {
+  package static func validatedEmail(_ raw: String) -> String? {
     let normalized = normalizedEmail(raw)
     let localCharacter = CharacterClass(
       ("a"..."z"),
@@ -37,10 +37,31 @@ enum AuthEmail {
     return normalized
   }
 
-  static func safeNextPath(_ raw: String?) -> String? {
+  package static func safeNextPath(_ raw: String?) -> String? {
     guard let raw, raw.hasPrefix("/"), !raw.hasPrefix("//") else {
       return nil
     }
     return raw
+  }
+
+  /// Accepts content paths; returns the path or `/`, rejecting everything else.
+  package static func normalizedContentNextPath(_ raw: String?) -> String? {
+    guard let raw = safeNextPath(raw) else { return nil }
+    if raw == "/" { return raw }
+    if raw.hasPrefix("/content/") { return raw }
+    return nil
+  }
+
+  /// Backwards-compatible alias while callers migrate.
+  package static func normalizedWasmNextPath(_ raw: String?) -> String? {
+    normalizedContentNextPath(raw)
+  }
+
+  /// Appends `signed-in=1` so the SPA can refresh nav after magic-link verify.
+  package static func signedInRedirect(to path: String) -> String {
+    if path.contains("?") {
+      return "\(path)&signed-in=1"
+    }
+    return "\(path)?signed-in=1"
   }
 }

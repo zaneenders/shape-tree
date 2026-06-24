@@ -14,196 +14,210 @@ public enum ContentStoreError: Error, CustomStringConvertible, Sendable {
   }
 }
 
-public struct PostGroup: Sendable, Equatable {
-  public var directory: String?
-  public var posts: [Post]
-
-  public var label: String {
-    guard let directory else { return "Root" }
-    return
-      directory
-      .split(separator: "/")
-      .map { ContentStore.humanizedName(String($0)) }
-      .joined(separator: " / ")
-  }
-}
-
 public struct ContentStore: Sendable {
-  private let root: URL
-  private let postsBySlug: [String: Post]
-  private let indexSlug: String
-  private let loginSlug: String
+  public let contentRoot: URL
+  private let nodesByPath: [String: ContentNode]
+  public let indexPath: String
+  public let nodes: [ContentNode]
+  private let configuredSiteTitle: String?
   private let privateDirectories: Set<String>
-  public let posts: [Post]
 
   public init(
     contentDirectory: URL,
-    indexSlug: String,
-    loginSlug: String,
+    indexPath: String,
+    siteTitle: String? = nil,
     privateDirectories: Set<String> = []
   ) throws {
     guard FileManager.default.fileExists(atPath: contentDirectory.path) else {
       throw ContentStoreError.directoryNotFound(contentDirectory)
     }
 
-    self.root = contentDirectory.standardizedFileURL
-    self.indexSlug = indexSlug
-    self.loginSlug = loginSlug
+    self.contentRoot = contentDirectory.standardizedFileURL
+    self.indexPath = indexPath
+    self.configuredSiteTitle = siteTitle?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
     self.privateDirectories = privateDirectories
-    let loaded = try Self.loadPosts(
+    let loaded = try Self.loadNodes(
       from: contentDirectory,
-      indexSlug: indexSlug,
-      loginSlug: loginSlug,
+      indexPath: indexPath,
       privateDirectories: privateDirectories
     )
-    self.posts = loaded.sorted { $0.date > $1.date }
-    self.postsBySlug = Dictionary(uniqueKeysWithValues: loaded.map { ($0.slug, $0) })
+    self.nodes = loaded.sorted { $0.path.localizedCaseInsensitiveCompare($1.path) == .orderedAscending }
+    self.nodesByPath = Dictionary(uniqueKeysWithValues: loaded.map { ($0.path, $0) })
   }
 
   public var siteTitle: String {
-    indexPost?.title ?? "ShapeTree Web"
+    if let configuredSiteTitle { return configuredSiteTitle }
+    return homeNode?.title ?? "ShapeTree Web"
   }
 
-  public func post(slug: String) -> Post? {
-    postsBySlug[slug]
+  public var homeNode: ContentNode? {
+    nodesByPath[indexPath] ?? nodes.first { $0.isHome }
   }
 
-  public var indexPost: Post? {
-    posts.first { $0.isIndex }
+  public func node(path rawPath: String) -> ContentNode? {
+    for candidate in Self.pathCandidates(for: rawPath) {
+      if let node = nodesByPath[candidate] {
+        return node
+      }
+    }
+    return nil
   }
 
-  public var loginPost: Post? {
-    posts.first { $0.isLogin }
+  public func canView(path: String, isAuthenticated: Bool) -> Bool {
+    guard let node = node(path: path) else { return false }
+    return !node.isPrivate || isAuthenticated
   }
 
-  public var publishedPosts: [Post] {
-    posts.filter { !$0.isIndex && !$0.isLogin && !$0.isPrivate }
+  public func canViewFile(relativePath: String, isAuthenticated: Bool) -> Bool {
+    guard !relativePath.isEmpty, !relativePath.contains("..") else { return false }
+    let directory = (relativePath as NSString).deletingLastPathComponent
+    guard !directory.isEmpty else { return true }
+    for privateDir in privateDirectories {
+      if directory == privateDir || directory.hasPrefix(privateDir + "/") {
+        return isAuthenticated
+      }
+    }
+    return true
   }
 
-  public var publishedPostGroups: [PostGroup] {
-    postGroups(includingPrivate: false)
+  public var publishedNodes: [ContentNode] {
+    nodes.filter { !$0.isHome && !$0.isPrivate }
   }
 
-  /// Post groups for navigation. Private posts are included only when
-  /// `includingPrivate` is true (i.e. the viewer is authenticated).
-  public func postGroups(includingPrivate: Bool) -> [PostGroup] {
-    let visible = posts.filter { post in
-      guard !post.isIndex && !post.isLogin else { return false }
-      if post.isPrivate { return includingPrivate }
+  public func nodeGroups(includingPrivate: Bool) -> [ContentNodeGroup] {
+    let visible = nodes.filter { node in
+      guard !node.isHome else { return false }
+      if node.isPrivate { return includingPrivate }
       return true
     }
-    return Self.groupPosts(visible)
+    return Self.groupNodes(visible)
   }
 
-  private static func groupPosts(_ posts: [Post]) -> [PostGroup] {
-    var grouped: [String?: [Post]] = [:]
-    for post in posts {
-      grouped[post.contentDirectory, default: []].append(post)
-    }
-
-    let sortedKeys = grouped.keys.sorted { lhs, rhs in
-      switch (lhs, rhs) {
-      case (nil, nil):
-        return false
-      case (nil, _):
-        return true
-      case (_, nil):
-        return false
-      case (let lhs?, let rhs?):
-        return lhs.localizedCaseInsensitiveCompare(rhs) == .orderedAscending
-      }
-    }
-
-    return sortedKeys.map { directory in
-      PostGroup(
-        directory: directory,
-        posts: (grouped[directory] ?? []).sorted { $0.date > $1.date }
-      )
-    }
+  public func resolveFile(relativePath: String) -> URL? {
+    guard !relativePath.isEmpty, !relativePath.contains("..") else { return nil }
+    let url = contentRoot.appendingPathComponent(relativePath).standardizedFileURL
+    let rootPath = contentRoot.standardizedFileURL.path
+    guard url.path == rootPath || url.path.hasPrefix(rootPath + "/") else { return nil }
+    guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+    return url
   }
 
-  private static func loadPosts(
-    from root: URL,
-    indexSlug: String,
-    loginSlug: String,
-    privateDirectories: Set<String>
-  ) throws -> [Post] {
-    let fileManager = FileManager.default
-    guard
-      let enumerator = fileManager.enumerator(
-        at: root,
-        includingPropertiesForKeys: [.contentModificationDateKey],
-        options: [.skipsHiddenFiles]
-      )
-    else {
-      return []
-    }
-
-    var posts: [Post] = []
-    for case let fileURL as URL in enumerator {
-      guard fileURL.pathExtension.lowercased() == "md" else { continue }
-      let relativePath = fileURL.path(
-        from: root
-      )
-      let source: String
-      do {
-        source = try String(contentsOf: fileURL, encoding: .utf8)
-      } catch {
-        throw ContentStoreError.unreadableFile(fileURL, underlying: error)
-      }
-
-      let (frontMatter, body) = FrontMatterParser.split(source)
-      let slug = fileURL.deletingPathExtension().lastPathComponent
-      let title = frontMatter.title ?? humanizedName(slug)
-      let directory = (relativePath as NSString).deletingLastPathComponent
-      let isPrivate = !directory.isEmpty && privateDirectories.contains(directory)
-      let isLogin = slug.lowercased() == loginSlug.lowercased()
-      let date =
-        frontMatter.date
-        ?? dateFromFilename(slug)
-        ?? (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
-        ?? .distantPast
-
-      posts.append(
-        Post(
-          slug: slug,
-          title: title,
-          date: date,
-          tags: frontMatter.tags,
-          excerpt: frontMatter.excerpt,
-          bodyMarkdown: body,
-          bodyHTML: MarkdownRenderer.html(from: body, strippingTitle: title),
-          relativePath: relativePath,
-          isIndex: slug.lowercased() == indexSlug.lowercased(),
-          isLogin: isLogin,
-          isPrivate: isPrivate
-        )
-      )
-    }
-    return posts
+  public func wasmURL(forPath path: String) -> URL? {
+    resolveFile(relativePath: "\(path).wasm")
   }
 
-  static func humanizedName(_ value: String) -> String {
+  public static func humanizedName(_ value: String) -> String {
     value
       .replacingOccurrences(of: "-", with: " ")
       .replacingOccurrences(of: "_", with: " ")
       .capitalized
   }
 
-  private static func dateFromFilename(_ slug: String) -> Date? {
-    let prefix = slug.prefix(while: { $0.isNumber || $0 == "-" })
-    guard prefix.count == 10 else { return nil }
-    return DateFormatting.date(fromFilename: String(prefix))
+  private static func loadNodes(
+    from root: URL,
+    indexPath: String,
+    privateDirectories: Set<String>
+  ) throws -> [ContentNode] {
+    let fileManager = FileManager.default
+    guard
+      let enumerator = fileManager.enumerator(
+        at: root,
+        includingPropertiesForKeys: nil,
+        options: [.skipsHiddenFiles]
+      )
+    else {
+      return []
+    }
+
+    var nodes: [ContentNode] = []
+    for case let fileURL as URL in enumerator {
+      guard fileURL.pathExtension.lowercased() == "wasm" else { continue }
+      let relativePath = fileURL.path(from: root)
+      let path = (relativePath as NSString).deletingPathExtension
+      guard !path.isEmpty, !path.contains("..") else { continue }
+
+      let metaURL = fileURL.deletingPathExtension().appendingPathExtension("meta.json")
+      let title = try title(forWasmAt: fileURL, metaURL: metaURL, path: path)
+      let directory = (path as NSString).deletingLastPathComponent
+      let isPrivate = !directory.isEmpty && privateDirectories.contains(directory)
+      nodes.append(
+        ContentNode(
+          path: path,
+          title: title,
+          isPrivate: isPrivate,
+          isHome: path == indexPath
+        )
+      )
+    }
+    return nodes
+  }
+
+  private static func title(forWasmAt wasmURL: URL, metaURL: URL, path: String) throws -> String {
+    if FileManager.default.fileExists(atPath: metaURL.path) {
+      do {
+        let data = try Data(contentsOf: metaURL)
+        let meta = try JSONDecoder().decode(ContentMeta.self, from: data)
+        if let title = meta.title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
+          return title
+        }
+      } catch {
+        throw ContentStoreError.unreadableFile(metaURL, underlying: error)
+      }
+    }
+    return humanizedName((path as NSString).lastPathComponent)
+  }
+
+  private static func groupNodes(_ nodes: [ContentNode]) -> [ContentNodeGroup] {
+    var grouped: [String?: [ContentNode]] = [:]
+    for node in nodes {
+      grouped[node.contentDirectory, default: []].append(node)
+    }
+
+    let sortedKeys = grouped.keys.sorted { lhs, rhs in
+      switch (lhs, rhs) {
+      case (nil, nil): return false
+      case (nil, _): return true
+      case (_, nil): return false
+      case (let lhs?, let rhs?):
+        return lhs.localizedCaseInsensitiveCompare(rhs) == .orderedAscending
+      }
+    }
+
+    return sortedKeys.map { directory in
+      ContentNodeGroup(
+        directory: directory,
+        nodes: (grouped[directory] ?? []).sorted {
+          $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending
+        }
+      )
+    }
+  }
+
+  static func pathCandidates(for rawPath: String) -> [String] {
+    var candidates: [String] = []
+    if let decoded = rawPath.removingPercentEncoding, decoded != rawPath {
+      candidates.append(decoded)
+    }
+    candidates.append(rawPath)
+    if rawPath.contains("+") {
+      candidates.append(rawPath.replacingOccurrences(of: "+", with: " "))
+    }
+    var seen = Set<String>()
+    return candidates.filter { seen.insert($0).inserted }
   }
 }
 
 extension URL {
   fileprivate func path(from root: URL) -> String {
     let rootPath = root.standardizedFileURL.path + "/"
-    let fullPath = standardizedFileURL.path + "/"
+    let fullPath = standardizedFileURL.path
     if fullPath.hasPrefix(rootPath) {
-      return String(fullPath.dropFirst(rootPath.count).dropLast())
+      return String(fullPath.dropFirst(rootPath.count))
     }
     return lastPathComponent
   }
+}
+
+extension String {
+  fileprivate var nilIfEmpty: String? { isEmpty ? nil : self }
 }

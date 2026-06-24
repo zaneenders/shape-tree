@@ -37,7 +37,9 @@ enum ShapeTreeWeb {
     let adminHost = try config.requiredString(forKey: "ADMIN_HOST")
     let adminPort = try config.requiredInt(forKey: "ADMIN_PORT")
     let contentPath = try config.requiredString(forKey: "CONTENT_PATH")
-    let indexSlug = try config.requiredString(forKey: "INDEX_SLUG")
+    let indexPath = config.string(forKey: "INDEX_PATH")
+      ?? config.string(forKey: "INDEX_SLUG", default: "Home")
+    let siteTitle = config.string(forKey: "SITE_TITLE")
     let otel = try OtelSettings.load(from: config)
     let siteURL = try config.requiredString(forKey: "SITE_URL")
     let privateDirectories = parsePrivateDirectories(
@@ -51,11 +53,10 @@ enum ShapeTreeWeb {
       fileURLWithPath: contentPath, relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
     let store = try ContentStore(
       contentDirectory: contentURL,
-      indexSlug: indexSlug,
-      loginSlug: "Login",
+      indexPath: indexPath,
+      siteTitle: siteTitle,
       privateDirectories: privateDirectories
     )
-    let initial = store.indexPost ?? store.publishedPosts.first ?? fallbackIndexPost(slug: indexSlug)
 
     let router = Router(context: AppRequestContext.self)
     if !otel.disabled {
@@ -69,8 +70,6 @@ enum ShapeTreeWeb {
     ShapeTreeWeb.configureRouter(
       router,
       store: store,
-      initial: initial,
-      indexSlug: indexSlug,
       auth: authBundle.services
     )
 
@@ -101,7 +100,7 @@ enum ShapeTreeWeb {
       app.addServices(try OtelTracing.bootstrap(settings: otel, logger: app.logger))
     }
 
-    app.logger.info("Serving \(store.posts.count) markdown file(s) from \(contentURL.path)")
+    app.logger.info("Serving \(store.nodes.count) wasm node(s) from \(contentURL.path)")
     if !privateDirectories.isEmpty {
       app.logger.info("Private directories: \(privateDirectories.sorted().joined(separator: ", "))")
     }

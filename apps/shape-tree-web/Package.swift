@@ -11,8 +11,7 @@ let package = Package(
     .executable(name: "ShapeTreeWeb", targets: ["ShapeTreeWeb"])
   ],
   dependencies: [
-    .package(url: "https://github.com/zaneenders/lorikeet.git", revision: "30702f6"),
-    .package(url: "https://github.com/apple/swift-markdown.git", from: "0.7.0"),
+    .package(url: "https://github.com/zaneenders/lorikeet.git", revision: "2c178eb"),
     .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.24.0"),
     .package(url: "https://github.com/hummingbird-project/hummingbird-auth.git", from: "2.0.0"),
     .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.21.0"),
@@ -32,9 +31,6 @@ let package = Package(
   targets: [
     .target(
       name: "ShapeTreeWebCore",
-      dependencies: [
-        .product(name: "Markdown", package: "swift-markdown")
-      ],
       swiftSettings: [
         .swiftLanguageMode(.v6),
         .treatAllWarnings(as: .error),
@@ -60,9 +56,7 @@ let package = Package(
       name: "ShapeTreeWebAuth",
       dependencies: [
         "ShapeTreeWebCore",
-        "ShapeTreeWebAssets",
         "ShapeTreeWebEmail",
-        .product(name: "HTML", package: "Lorikeet"),
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "HummingbirdAuth", package: "hummingbird-auth"),
         .product(name: "PostgresNIO", package: "postgres-nio"),
@@ -86,8 +80,7 @@ let package = Package(
         "ShapeTreeWebAssets",
         "ShapeTreeWebAuth",
         .product(name: "HTML", package: "Lorikeet"),
-        .product(name: "HTMX", package: "Lorikeet"),
-        .product(name: "HTMXExtras", package: "Lorikeet"),
+        .product(name: "HTMLNIO", package: "Lorikeet"),
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "NIOCore", package: "swift-nio"),
         .product(name: "Configuration", package: "swift-configuration"),
@@ -104,8 +97,8 @@ let package = Package(
       name: "ShapeTreeWebAssets",
       path: "Sources/ShapeTreeWebAssets",
       exclude: ["client"],
-      sources: ["Assets.swift", "ClientAssetCatalog.swift", "ClientWasm.swift"],
-      resources: [.copy("ClientWasm.wasm")],
+      sources: ["Assets.swift", "ClientAssetCatalog.swift", "CoreWasm.swift"],
+      resources: [.copy("ShapeTreeCore.wasm")],
       plugins: [
         .plugin(name: "EmbedWebAssets", package: "Lorikeet")
       ]
@@ -123,6 +116,7 @@ let package = Package(
       dependencies: [
         "ShapeTreeWeb",
         "ShapeTreeWebCore",
+        "ShapeTreeWebAssets",
         "ShapeTreeWebAuth",
         "ShapeTreeWebEmail",
         .product(name: "Hummingbird", package: "hummingbird"),

@@ -116,6 +116,28 @@ import Testing
   @Test func safeNextPathRejectsEmpty() {
     #expect(AuthEmail.safeNextPath("") == nil)
   }
+
+  @Test func signedInRedirectAppendsQueryParam() {
+    #expect(AuthEmail.signedInRedirect(to: "/") == "/?signed-in=1")
+    #expect(AuthEmail.signedInRedirect(to: "/content/Private/secret") == "/content/Private/secret?signed-in=1")
+    #expect(
+      AuthEmail.signedInRedirect(to: "/content/Private/secret?foo=bar")
+        == "/content/Private/secret?foo=bar&signed-in=1"
+    )
+  }
+
+  @Test func normalizedContentNextPathAcceptsContentRoutes() {
+    #expect(AuthEmail.normalizedContentNextPath("/content/Private/secret") == "/content/Private/secret")
+    #expect(AuthEmail.normalizedWasmNextPath("/content/Private/secret") == "/content/Private/secret")
+    #expect(AuthEmail.normalizedContentNextPath("/") == "/")
+  }
+
+  @Test func normalizedContentNextPathRejectsNonContentRoutes() {
+    #expect(AuthEmail.normalizedContentNextPath("/posts/secret") == nil)
+    #expect(AuthEmail.normalizedContentNextPath(nil) == nil)
+    #expect(AuthEmail.normalizedContentNextPath("//evil.com") == nil)
+    #expect(AuthEmail.normalizedContentNextPath("/other") == nil)
+  }
 }
 
 @Suite struct SMTPMessageEncodingTests {

@@ -33,13 +33,14 @@ private func loginFlowSuiteEnabled() -> Bool {
 /// Exercises the entire magic-link login flow in-process via Hummingbird's
 /// `.router` test framework:
 ///
-/// 1. Asserts a private post returns 404 (hidden) when unauthenticated.
+/// 1. Asserts a private wasm route returns 404 when unauthenticated.
 /// 2. Asserts the navigation does not show the private directory when unauthenticated.
-/// 3. Triggers a login email via POST /auth/login.
+/// 3. Triggers a login email via POST /auth/login with a wasm-post `next` target.
 /// 4. Polls IMAP for the login email and extracts the token from the link.
-/// 5. Verifies the token via POST /auth/verify and captures the session cookie.
-/// 6. Asserts the private post is now visible (200 OK with content).
-/// 7. Asserts the navigation now shows the private directory.
+/// 5. Verifies GET /auth/verify returns the slim shell with token for client-side confirm UI.
+/// 6. Verifies POST /auth/verify and captures the session cookie (wasm redirect target).
+/// 7. Asserts the private wasm post shell is reachable when authenticated.
+/// 8. Asserts the navigation now shows the private directory.
 ///
 /// The suite automatically starts the docker-compose `postgres` service in
 /// ``init`` and stops it in ``deinit`` — no manual setup needed. SMTP/IMAP
@@ -118,11 +119,10 @@ struct LoginFlowIntegrationTests: ~Copyable {
 
       let store = try ContentStore(
         contentDirectory: contentDir,
-        indexSlug: "Home",
+        indexPath: "Home",
         privateDirectories: ["Private"]
       )
-      let initial = store.indexPost ?? store.publishedPosts.first!
-      let secretSlug = "secret"
+      let secretPath = "Private/secret"
 
       let auth = AuthServices(
         database: database,
@@ -137,43 +137,38 @@ struct LoginFlowIntegrationTests: ~Copyable {
       ShapeTreeWeb.configureRouter(
         router,
         store: store,
-        initial: initial,
-        indexSlug: "Home",
         auth: auth
       )
 
       let app = Application(router: router)
 
       try await app.test(.router) { client in
-        let htmxHeader = HTTPField.Name("HX-Request")!
+        let contentPath = "/content/\(secretPath)"
+        let documentHeaders: HTTPFields = [HTTPField.Name("Sec-Fetch-Dest")!: "document"]
 
-        // 1. Unauthenticated: private post returns 404 (hidden, not redirected).
-        try await client.execute(uri: "/posts/\(secretSlug)", method: .get) { response in
+        // 1. Unauthenticated: private wasm bytes return 404 (hidden, not redirected).
+        try await client.execute(uri: "\(contentPath).wasm", method: .get) { response in
           #expect(response.status == .notFound)
         }
 
         // 2. Unauthenticated: nav omits private content.
-        try await client.execute(
-          uri: "/htmx/content/nav",
-          method: .get,
-          headers: [htmxHeader: "true"]
-        ) { response in
+        try await client.execute(uri: "/api/get-nav-content", method: .get) { response in
           #expect(response.status == .ok)
           let body = String(buffer: response.body)
-          #expect(!body.contains(contentMarker))
+          let payload = try JSONDecoder().decode(NavContentResponse.self, from: Data(body.utf8))
+          #expect(!payload.groups.flatMap(\.items).contains { $0.path == secretPath })
         }
 
         // 3. Trigger login email.
-        let loginBody = "email=\(testEmail)&next=/posts/\(secretSlug)"
+        let loginBody = "email=\(testEmail)&next=\(contentPath)"
         try await client.execute(
           uri: "/auth/login",
           method: .post,
           headers: [.contentType: "application/x-www-form-urlencoded"],
           body: ByteBuffer(string: loginBody)
         ) { response in
-          #expect(response.status == .ok)
-          let body = String(buffer: response.body)
-          #expect(body.contains("Check your email"))
+          #expect(response.status == .seeOther)
+          #expect(response.headers[.location] == "/auth/check-email")
         }
 
         // 4. Poll IMAP for the login email and extract the token.
@@ -201,29 +196,32 @@ struct LoginFlowIntegrationTests: ~Copyable {
           return
         }
 
-        // 5. GET /auth/verify shows the confirm page.
+        // 5. GET /auth/verify returns the slim shell with token for client-side confirm UI.
         try await client.execute(
-          uri: "/auth/verify?token=\(rawToken)&next=/posts/\(secretSlug)",
+          uri: "/auth/verify?token=\(rawToken)&next=\(contentPath)",
           method: .get
         ) { response in
           #expect(response.status == .ok)
           let body = String(buffer: response.body)
-          #expect(body.contains("Confirm sign in"))
+          #expect(body.contains("data-index-path=\"Home\""))
+          #expect(body.contains("/assets/client/bootstrap.js"))
+          #expect(!body.contains("data-boot-verify"))
         }
 
         // 6. POST /auth/verify with token.
         var sessionCookie: String?
-        let verifyBody = "token=\(rawToken)&next=/posts/\(secretSlug)"
+        let verifyBody = "token=\(rawToken)&next=\(contentPath)"
         try await client.execute(
           uri: "/auth/verify",
           method: .post,
           headers: [
-            .contentType: "application/x-www-form-urlencoded"
+            .contentType: "application/x-www-form-urlencoded",
+            .accept: "application/json",
           ],
           body: ByteBuffer(string: verifyBody)
         ) { response in
           #expect(response.status == .seeOther)
-          #expect(response.headers[.location] == "/posts/\(secretSlug)")
+          #expect(response.headers[.location] == "\(contentPath)?signed-in=1")
           if let setCookie = response.headers[.setCookie] {
             sessionCookie = Self.parseSessionCookie(setCookie)
           }
@@ -234,26 +232,40 @@ struct LoginFlowIntegrationTests: ~Copyable {
           return
         }
 
-        // 7. Authenticated: private post is now visible.
+        // 7. Authenticated: content shell is unified; wasm bytes are available.
+        var authedDocument = documentHeaders
+        authedDocument[.cookie] = sessionCookie
         try await client.execute(
-          uri: "/posts/\(secretSlug)",
+          uri: contentPath,
+          method: .get,
+          headers: authedDocument
+        ) { response in
+          #expect(response.status == .ok)
+          let body = String(buffer: response.body)
+          #expect(body.contains("data-index-path=\"Home\""))
+          #expect(body.contains("id=\"styled-navigation\""))
+          #expect(!body.contains(contentMarker))
+        }
+
+        try await client.execute(
+          uri: "\(contentPath).wasm",
+          method: .get,
+          headers: [.cookie: sessionCookie]
+        ) { response in
+          #expect(response.status == .ok)
+          #expect(response.headers[.contentType] == "application/wasm")
+        }
+
+        // 8. Authenticated: nav now includes private content.
+        try await client.execute(
+          uri: "/api/get-nav-content",
           method: .get,
           headers: [.cookie: sessionCookie]
         ) { response in
           #expect(response.status == .ok)
           let body = String(buffer: response.body)
-          #expect(body.contains(contentMarker))
-        }
-
-        // 8. Authenticated: nav now includes private content.
-        try await client.execute(
-          uri: "/htmx/content/nav",
-          method: .get,
-          headers: [htmxHeader: "true", .cookie: sessionCookie]
-        ) { response in
-          #expect(response.status == .ok)
-          let body = String(buffer: response.body)
-          #expect(body.contains(contentMarker))
+          let payload = try JSONDecoder().decode(NavContentResponse.self, from: Data(body.utf8))
+          #expect(payload.groups.flatMap(\.items).contains { $0.path == secretPath })
         }
       }
     }
@@ -406,23 +418,8 @@ struct LoginFlowIntegrationTests: ~Copyable {
   }
 
   private static func createTestContent(at dir: URL, marker: String) throws {
-    let homeMarkdown = "---\ntitle: Test Site\n---\nWelcome to the test site."
-    try homeMarkdown.write(
-      to: dir.appendingPathComponent("Home.md"),
-      atomically: true,
-      encoding: .utf8
-    )
-    let privateDir = dir.appendingPathComponent("Private", isDirectory: true)
-    try FileManager.default.createDirectory(
-      at: privateDir,
-      withIntermediateDirectories: true
-    )
-    let secretMarkdown = "---\ntitle: \(marker)\n---\n\(marker)"
-    try secretMarkdown.write(
-      to: privateDir.appendingPathComponent("secret.md"),
-      atomically: true,
-      encoding: .utf8
-    )
+    try TestContentFixtures.writeNode(in: dir, path: "Home", title: "Test Site")
+    try TestContentFixtures.writeNode(in: dir, path: "Private/secret", title: marker)
   }
 
   private static func extractToken(from body: String) -> String? {

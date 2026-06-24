@@ -2,54 +2,24 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-CLIENT="$ROOT/../wasm-client"
-ASSETS="$ROOT/Sources/ShapeTreeWebAssets"
-OUT_JS="$ASSETS/client"
-BUILD_DIR="$CLIENT/.build/js"
-SDK="${SWIFT_WASM_SDK:-swift-6.3.2-RELEASE_wasm-embedded}"
+REPO_ROOT="$(cd "$ROOT/../.." && pwd)"
 
-export PATH="${HOME}/.swiftly/bin:${PATH}"
+echo "=== ShapeTree framework (core wasm) ==="
+bash "$ROOT/Scripts/build-core.sh"
 
-if ! swift sdk list 2>/dev/null | grep -qx "$SDK"; then
-  echo "error: wasm SDK '$SDK' not installed (see README → Swift WASM)" >&2
-  exit 1
+SITE_DIR="$REPO_ROOT/examples/st-gen-markdown"
+if [[ -d "$SITE_DIR" && -f "$SITE_DIR/Package.swift" ]]; then
+  echo ""
+  echo "=== Example site (demo content) ==="
+  (
+    cd "$SITE_DIR"
+    swift build --product BuildPage || exit 1
+    CONTENT_SRC="$REPO_ROOT/examples/content-src"
+    while IFS= read -r -d '' md; do
+      "$SITE_DIR/.build/debug/BuildPage" "$md" || exit 1
+    done < <(find "$CONTENT_SRC" -name '*.md' -type f -print0)
+  )
 fi
 
-if ! command -v wasm-opt >/dev/null; then
-  echo "error: wasm-opt not found (brew install binaryen)" >&2
-  exit 1
-fi
-
-echo "Building WASM client with ${SDK}..."
-rm -rf "$BUILD_DIR" "$CLIENT/.build/plugins/PackageToJS/outputs/js.tmp"
-(
-  cd "$CLIENT"
-  # Reactor mode — required so the module can register JS listeners (not command/_start).
-  unset JAVASCRIPTKIT_EXPERIMENTAL_EMBEDDED_WASM
-  swift package \
-    --swift-sdk "$SDK" \
-    --allow-writing-to-package-directory \
-    js --output "$BUILD_DIR" --configuration release --debug-info-format none
-)
-
-WASM="$BUILD_DIR/WASMClient.wasm"
-if [[ ! -f "$WASM" ]]; then
-  echo "error: wasm output missing at ${WASM}" >&2
-  exit 1
-fi
-
-wasm-opt -Oz --strip-debug --strip-producers "$WASM" -o "$WASM"
-
-rm -rf "$OUT_JS"
-mkdir -p "$OUT_JS/platforms"
-cp "$BUILD_DIR/index.js" "$BUILD_DIR/instantiate.js" "$BUILD_DIR/runtime.js" "$OUT_JS/"
-cp "$BUILD_DIR/platforms/browser.js" "$OUT_JS/platforms/"
-cp "$WASM" "$ASSETS/ClientWasm.wasm"
-
-# WASI shim is committed under Sources/ShapeTreeWebAssets/Vendor/ and served locally.
-perl -pi -e "s|'\\@bjorn3/browser_wasi_shim'|'../browser_wasi_shim.js'|g" \
-  "$OUT_JS/platforms/browser.js"
-
-echo "Wrote client JS to ${OUT_JS}"
-echo "Wrote ${ASSETS}/ClientWasm.wasm"
-echo "Run: swift build && swift run ShapeTreeWeb"
+echo ""
+echo "Run: cd apps/shape-tree-web && swift build && swift run ShapeTreeWeb"

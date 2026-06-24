@@ -8,20 +8,30 @@ public enum ClientAssetCatalog {
   }
 
   public static var isAvailable: Bool {
-    ClientWasm.isAvailable
+    CoreWasm.isAvailable
   }
 
   public static func entry(forRelativePath path: String) -> Entry? {
     switch path {
-    case "WASMClient.wasm":
-      guard ClientWasm.isAvailable else { return nil }
-      return .wasm(ClientWasm.bytes)
+    case "ShapeTreeCore.wasm":
+      guard CoreWasm.isAvailable else { return nil }
+      return .wasm(CoreWasm.bytes)
     case "index.js":
       return .script(client_index_js)
+    case "bootstrap.js":
+      return .script(bootstrap_js)
+    case "host-imports.js":
+      return .script(host_imports_js)
+    case "message-bus.js":
+      return .script(message_bus_js)
     case "instantiate.js":
       return .script(client_instantiate_js)
     case "runtime.js":
       return .script(client_runtime_js)
+    case "bridge-js.js":
+      return .script(client_bridge_js_js)
+    case "page-instantiate.js":
+      return .script(client_page_instantiate_js)
     case "platforms/browser.js":
       return .script(client_platforms_browser_js)
     case "browser_wasi_shim.js":

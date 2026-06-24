@@ -55,33 +55,35 @@ package enum AuthRoutes {
     to router: Router<C>,
     auth: AuthServices,
     rateLimiter: LoginRateLimiter,
-    siteTitle: String,
-    loginPost: Post? = nil
+    spaLoginPage: @Sendable @escaping (String?) -> Response,
+    spaVerifyPage: @Sendable @escaping (String?, String?) -> Response,
+    spaCheckEmailPage: @Sendable @escaping () -> Response
   ) where C.Identity == User, C.Session == UUID {
     router.get("login") { request, _ in
       let next = request.uri.queryParameters.get("next")
-      return AuthPages.login(
-        next: next,
-        siteURL: auth.siteURL,
-        siteTitle: siteTitle,
-        loginPost: loginPost
-      )
+      return spaLoginPage(next)
     }
 
+    router.get("auth/check-email") { _, _ in
+      spaCheckEmailPage()
+    }
+
+    // The login form is a real POST. Regardless of whether the address is known,
+    // redirect to the check-email page so we never leak which emails are registered.
     router.post("auth/login") { request, context async throws -> Response in
       let body = try await request.body.collect(upTo: 16 * 1024)
       let fields = FormParser.parseURLForm(String(buffer: body))
-      let next = AuthEmail.safeNextPath(fields["next"])
+      let next = AuthEmail.normalizedWasmNextPath(fields["next"])
       let ip = context.remoteAddress?.ipAddress ?? "unknown"
 
       guard let email = AuthEmail.validatedEmail(fields["email"] ?? "") else {
         context.logger.warning("Rejected malformed login email from \(ip)")
-        return AuthPages.checkEmail(siteURL: auth.siteURL, siteTitle: siteTitle)
+        return redirect(to: "/auth/check-email")
       }
 
       guard await rateLimiter.allow(ip: ip) else {
         context.logger.warning("Login rate limited for \(email) from \(ip)")
-        return AuthPages.checkEmail(siteURL: auth.siteURL, siteTitle: siteTitle)
+        return redirect(to: "/auth/check-email")
       }
 
       let (rawToken, tokenHash) = LoginTokenService.generate()
@@ -106,27 +108,22 @@ package enum AuthRoutes {
         }
       }
 
-      return AuthPages.checkEmail(siteURL: auth.siteURL, siteTitle: siteTitle)
+      return redirect(to: "/auth/check-email")
     }
 
     router.get("auth/verify") { request, _ async -> Response in
-      guard let token = request.uri.queryParameters.get("token"), !token.isEmpty else {
-        return AuthPages.verifyFailed(siteURL: auth.siteURL, siteTitle: siteTitle)
-      }
-      let next = AuthEmail.safeNextPath(request.uri.queryParameters.get("next"))
-      return AuthPages.verifyConfirm(
-        token: token,
-        next: next,
-        siteURL: auth.siteURL,
-        siteTitle: siteTitle
-      )
+      let token = request.uri.queryParameters.get("token")
+      let next = AuthEmail.normalizedWasmNextPath(request.uri.queryParameters.get("next"))
+      return spaVerifyPage(token, next)
     }
 
+    // The confirm form is a real POST. On failure redirect back to the (tokenless)
+    // verify page, which renders the "link invalid" state in the core wasm.
     router.post("auth/verify") { request, context async throws -> Response in
       let body = try await request.body.collect(upTo: 16 * 1024)
       let fields = FormParser.parseURLForm(String(buffer: body))
       guard let rawToken = fields["token"], !rawToken.isEmpty else {
-        return AuthPages.verifyFailed(siteURL: auth.siteURL, siteTitle: siteTitle)
+        return redirect(to: "/auth/verify")
       }
 
       let tokenHash = LoginTokenService.hash(rawToken)
@@ -134,25 +131,23 @@ package enum AuthRoutes {
         let userID = try await auth.database.consumeLoginToken(hash: tokenHash, logger: context.logger),
         let user = try await auth.database.user(id: userID, logger: context.logger)
       else {
-        return AuthPages.verifyFailed(siteURL: auth.siteURL, siteTitle: siteTitle)
+        return redirect(to: "/auth/verify")
       }
 
       context.sessions.setSession(user.id, expiresIn: auth.settings.sessionTTL)
 
-      let redirect = AuthEmail.safeNextPath(fields["next"]) ?? "/"
-      return Response(
-        status: .seeOther,
-        headers: [.location: redirect],
-        body: .init())
+      let next = AuthEmail.normalizedWasmNextPath(fields["next"]) ?? "/"
+      return redirect(to: AuthEmail.signedInRedirect(to: next))
     }
 
     router.post("auth/logout") { _, context async throws -> Response in
       context.sessions.clearSession()
-      return Response(
-        status: .seeOther,
-        headers: [.location: "/"],
-        body: .init())
+      return redirect(to: "/")
     }
+  }
+
+  private static func redirect(to location: String) -> Response {
+    Response(status: .seeOther, headers: [.location: location], body: .init())
   }
 
   private static func sendLoginEmail(
@@ -182,7 +177,6 @@ package enum AuthRoutes {
     )
     try await SMTPClient.send(email: email, settings: smtp.connection)
   }
-
 }
 
 extension SocketAddress {

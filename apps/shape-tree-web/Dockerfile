@@ -18,6 +18,8 @@ FROM alpine:3.21
 COPY --from=selected /ShapeTreeWeb /usr/local/bin/
 COPY --from=selected /resources /usr/local/bin/shape-tree-web_ShapeTreeWebAssets.resources
 
+RUN mkdir -p /content
+
 RUN adduser -D -h /home/web web
 USER web
 WORKDIR /data
