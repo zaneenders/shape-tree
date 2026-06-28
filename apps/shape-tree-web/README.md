@@ -45,6 +45,22 @@ For traces, also `docker compose up jaeger -d` — or set `OTEL_SDK_DISABLED=tru
 System environment variables override Dockerfile `ENV` defaults at runtime (in Docker, the
 `docker-compose.yml` `environment:` block and the `env_file:` file both override Dockerfile `ENV`).
 
+## Provisioning a login user
+
+The Postgres defaults match `docker-compose.yml` (host `postgres`, db/user/pass
+`shape_tree`). Run it natively against the compose-backed Postgres (exposed on
+`127.0.0.1:5432`):
+
+```sh
+PGHOST=127.0.0.1 PGPORT=5432 \
+PGUSER=shape_tree PGPASSWORD=shape_tree PGDATABASE=shape_tree PGSSLMODE=disable \
+  swift run --package-path apps/shape-tree-web shape-tree-add-user <email>
+```
+
+This runs any pending migrations, then inserts the user. It skips insertion (and
+logs a notice) if the email already exists. The `PG*` vars are read from the
+environment or a `.env` file in the working directory.
+
 ## Testing 
 
 ### Email Integration

@@ -47,7 +47,7 @@ RUN SWIFT_MUSL_SDK="$(cat /.swift-musl-sdk)" \
 # -----------------------------------------------------------------------------
 # Runtime: static binary on Alpine (git + openssh-client for journal commits)
 # -----------------------------------------------------------------------------
-FROM alpine:3.21
+FROM alpine:3.24
 
 RUN apk add --no-cache git openssh-client
 
