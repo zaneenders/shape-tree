@@ -43,6 +43,7 @@ COPY Package.swift .swift-version Package.resolved ./
 RUN swift package resolve
 
 COPY Sources ./Sources
+COPY Tests ./Tests
 COPY frontend/ ./frontend/
 RUN cd frontend && swift package resolve
 

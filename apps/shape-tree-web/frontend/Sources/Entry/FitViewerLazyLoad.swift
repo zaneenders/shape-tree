@@ -2,6 +2,55 @@ import JavaScriptKit
 import ShapeTreeDOM
 
 func wireFitViewerLazyLoad(fitSection: JSValue) {
+  let promise = fetchURL("/api/session")
+  promise.then(success: { response in
+    let jsonPromise = JSPromise(response.json().object!)!
+    jsonPromise.then(success: { jsonValue in
+      guard let body = jsonValue.object else {
+        showFitSignInPrompt(fitSection: fitSection)
+        return .undefined
+      }
+      let session = SessionInfo(unsafelyCopying: body)
+      if session.authenticated {
+        installFitViewerObserver(fitSection: fitSection)
+      } else {
+        showFitSignInPrompt(fitSection: fitSection)
+      }
+      return .undefined
+    })
+    jsonPromise.catch(failure: { _ in
+      showFitSignInPrompt(fitSection: fitSection)
+      return .undefined
+    })
+    return .undefined
+  })
+  promise.catch(failure: { _ in
+    showFitSignInPrompt(fitSection: fitSection)
+    return .undefined
+  })
+}
+
+@JS struct SessionInfo {
+  var authenticated: Bool
+  var email: String?
+}
+
+private func showFitSignInPrompt(fitSection: JSValue) {
+  guard let container = elementById("fit-container") else { return }
+  setInnerHTML(container, "")
+
+  let prompt = createElement(
+    "p",
+    className: "fit-auth-prompt",
+    innerText: "Sign in to view your activity data."
+  )
+  append(prompt, to: container)
+
+  let link = createElement("a", innerText: "Sign in", attributes: ["href": "/login?next=/"])
+  append(link, to: container)
+}
+
+private func installFitViewerObserver(fitSection: JSValue) {
   let options = JSObject()
   options.rootMargin = .string("200px")
 

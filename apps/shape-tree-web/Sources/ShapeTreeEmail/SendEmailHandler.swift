@@ -79,6 +79,9 @@ final class SendEmailHandler: ChannelInboundHandler {
       self.currentlyWaitingFor = .okForOurHello
     case .okForOurHello:
       switch self.serverConfiguration.tlsMode {
+      case .plain:
+        self.send(context: context, command: .mailFrom(self.email.senderEmail))
+        self.currentlyWaitingFor = .okAfterMailFrom
       case .startTLS:
         self.send(context: context, command: .startTLS)
         self.currentlyWaitingFor = .okForStartTLS
@@ -139,6 +142,8 @@ final class SendEmailHandler: ChannelInboundHandler {
 
   private func sendAuthenticationStart(context: ChannelHandlerContext) {
     switch self.serverConfiguration.tlsMode {
+    case .plain:
+      return
     case .implicitTLS, .startTLS:
       do {
         _ = try context.channel.pipeline.syncOperations.handler(type: NIOSSLClientHandler.self)

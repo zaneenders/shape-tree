@@ -4,35 +4,22 @@ Swift Hummingbird server + WASM frontend (JavaScriptKit). Part of the [shape-tre
 
 ## Build & run
 
-Requires [bun](https://bun.com/), [Swift with WASM SDK](https://www.swift.org/install/macos/), and [binaryen](https://github.com/WebAssembly/binaryen).
+The server runs without any backing services, but to enable email login + fit-viewer protection you
+need Postgres in the background:
 
-```sh
-cd apps/shape-tree-web
-cp .env.example .env
-swift run ShapeTreeWeb
-# open http://127.0.0.1:8080
+```
+docker compose up postgres -d
 ```
 
-`swift run ShapeTreeWeb` builds the WASM frontend via `shape-tree-web-builder` unless `SKIP_SHAPE_TREE_WEB_BUILD=1`.
+(The shipped `.env` already targets `127.0.0.1:5432`, so `swift run ShapeTreeWeb` picks it up
+directly.) For traces, also `docker compose up jaeger -d` — or set `OTEL_SDK_DISABLED=true` to skip.
 
-## Docker
+## Testing 
 
-From the repo root:
+### Email Integration
 
-```sh
-./scripts/docker-build.sh up
-# web -> http://127.0.0.1:42069
-```
-
-The web image builds WASM + server inside Docker (self-contained `Dockerfile`).
-
-## Frontend
-
-WASM products live in `frontend/` (`Entry`, `FitViewer`, `ArticleViewer`). Bun bundles bootstrap JS into `dist/`.
+After configuing your email in the `.env` you can run the end to end email test with: 
 
 ```sh
-cd frontend
-bun install
-cd ..
-swift run shape-tree-web-builder   # or let ShapeTreeWeb run it at startup
+set -a && source apps/shape-tree-web/.env && set +a && SMTP_INTEGRATION_TEST=true swift test --package-path apps/shape-tree-web --filter LoginFlowIntegrationTests
 ```

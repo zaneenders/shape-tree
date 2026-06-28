@@ -2,6 +2,20 @@
 
 Hummingbird server wrapping ScribeAgent.
 
+## Local development
+
+The only hard dependency is **Ollama** running on the host. The shipped `.env` targets
+`http://host.docker.internal:11434` (for Docker compose); for a native `swift run` override it:
+
+```bash
+OLLAMA_URL=http://127.0.0.1:11434 swift run ShapeTree
+```
+
+Traces are optional — `docker compose up jaeger -d` and set
+`OTEL_EXPORTER_OTLP_BASE_ENDPOINT=http://127.0.0.1:4318`, or `OTEL_SDK_DISABLED=true` to skip. There
+is no database; the journal is a git working tree under `DATA_PATH`, so the runtime image ships
+`git` + `openssh-client`.
+
 ## Configuration
 
 All values are **required**. Copy `.env.example` to `.env` and edit:

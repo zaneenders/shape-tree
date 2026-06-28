@@ -31,7 +31,14 @@ h2 {
   opacity: 0.75;
 }
 
-/* --- Tab bar --- */
+.fit-auth-prompt {
+  margin: 0 0 0.5rem;
+  opacity: 0.85;
+}
+
+.fit-auth-prompt + a {
+  color: LinkText;
+}
 .tab-bar {
   display: flex;
   gap: 0.25rem;

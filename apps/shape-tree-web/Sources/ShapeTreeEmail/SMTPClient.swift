@@ -23,7 +23,7 @@ public enum SMTPClient {
                 NIOSSLClientHandler(context: sslContext, serverHostname: settings.host),
                 position: .first
               )
-            case .startTLS:
+            case .startTLS, .plain:
               ()
             }
 

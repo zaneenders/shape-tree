@@ -1,8 +1,10 @@
 services:
   api:
     build:
-      context: .
-      dockerfile: apps/shape-tree-api/Dockerfile
+      context: apps/shape-tree-api
+      dockerfile: Dockerfile
+      args:
+        BUILD_CONFIGURATION: ${BUILD_CONFIG:-release}
     env_file:
       - apps/shape-tree-api/.env
     environment:
@@ -28,21 +30,28 @@ services:
     env_file:
       - apps/shape-tree-web/.env
     environment:
-      # Override local .env — the runtime image is scratch + prebuilt dist (no frontend/ tree).
       HOSTNAME: 0.0.0.0
       STATIC_ROOT: /app/dist
       SKIP_SHAPE_TREE_WEB_BUILD: "1"
       ADMIN_HOST: 0.0.0.0
       ADMIN_PORT: "42070"
+      SITE_URL: http://127.0.0.1:42069
       OTEL_SERVICE_NAME: shape-tree-web
       OTEL_EXPORTER_OTLP_BASE_ENDPOINT: http://jaeger:4318
       OTEL_SDK_DISABLED: "false"
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: shape_tree
+      PGPASSWORD: shape_tree
+      PGDATABASE: shape_tree
+      PGSSLMODE: disable
     ports:
       - "127.0.0.1:42069:8080"
       - "127.0.0.1:42070:42070"
     restart: unless-stopped
     depends_on:
       - jaeger
+      - postgres
     networks:
       - app
       - observability
