@@ -19,6 +19,8 @@ and a static-ish blog.
 
 ### Setup
 
+I have included a `docker-compose` file as a stand alone example I would encourage you modify it to your needs.
+
 ```bash
 cp apps/shape-tree-api/.env.example apps/shape-tree-api/.env
 cp apps/shape-tree-web/.env.example apps/shape-tree-web/.env
