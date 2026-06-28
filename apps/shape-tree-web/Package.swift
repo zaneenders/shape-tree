@@ -12,6 +12,11 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0"),
     .package(url: "https://github.com/swiftlang/swift-subprocess.git", revision: "aac702b"),
     .package(url: "https://github.com/swiftlang/swift-markdown.git", from: "0.5.0"),
+    .package(url: "https://github.com/apple/swift-metrics.git", from: "2.5.0"),
+    .package(url: "https://github.com/swift-server/swift-prometheus.git", from: "2.0.0"),
+    .package(
+      url: "https://github.com/swift-otel/swift-otel.git", exact: "1.2.1",
+      traits: ["OTLPHTTP"]),
   ],
   targets: [
     .target(
@@ -46,6 +51,10 @@ let package = Package(
         "ShapeTreeMarkdown",
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "HummingbirdCompression", package: "hummingbird-compression"),
+        .product(name: "NIOCore", package: "swift-nio"),
+        .product(name: "Metrics", package: "swift-metrics"),
+        .product(name: "Prometheus", package: "swift-prometheus"),
+        .product(name: "OTel", package: "swift-otel"),
       ]
     ),
   ]

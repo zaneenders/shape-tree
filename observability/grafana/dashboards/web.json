@@ -14,6 +14,12 @@
       "url": "/explore?schemaVersion=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22jaeger%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22queryType%22%3A%22search%22%2C%22service%22%3A%22shape-tree-web%22%7D%5D%7D%7D&orgId=1"
     },
     {
+      "icon": "external link",
+      "title": "Parca profiles",
+      "type": "link",
+      "url": "/explore?schemaVersion=1&panes=%7B%22x%22%3A%7B%22datasource%22%3A%22parca%22%7D%7D&orgId=1"
+    },
+    {
       "icon": "dashboard",
       "title": "Overview",
       "type": "link",

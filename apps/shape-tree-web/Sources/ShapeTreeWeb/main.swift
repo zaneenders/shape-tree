@@ -13,8 +13,10 @@ enum StartupError: Error {
 
 do {
   let packageRoot = PackageConfig.packageRoot(fromFilePath: #filePath)
+  let config = try await PackageConfig.reader(packageRoot: packageRoot)
 
   let settings = try await AppSettings.load(packageRoot: packageRoot)
+  let otel = try OtelSettings.load(from: config)
 
   if !settings.skipShapeTreeWebBuild {
     try await ShapeTreeWebBuilder.run(packageRoot: packageRoot)
@@ -32,7 +34,16 @@ do {
     throw StartupError.missingBootstrap(path: styles)
   }
 
+  let logger = Logger(label: "ShapeTreeWeb")
   let router = Router()
+
+  if !otel.disabled {
+    _ = PrometheusMetrics.registry
+    router.addMiddleware {
+      TracingMiddleware()
+      MetricsMiddleware()
+    }
+  }
 
   router.addMiddleware {
     LogRequestsMiddleware(.info)
@@ -62,12 +73,39 @@ do {
     FileMiddleware(settings.staticRoot)
   }
 
-  let app = Application(
+  var app = Application(
     router: router,
-    configuration: .init(address: .hostname(settings.hostname, port: settings.port))
+    configuration: .init(
+      address: .hostname(settings.hostname, port: settings.port),
+      serverName: otel.serviceName
+    ),
+    logger: logger
   )
 
-  try await app.runService()
+  _ = PrometheusMetrics.registry
+
+  let adminApp = buildAdminApplication(
+    host: settings.adminHost,
+    port: settings.adminPort,
+    serviceName: otel.serviceName,
+    logger: logger
+  )
+  app.addServices(adminApp)
+
+  if !otel.disabled {
+    app.addServices(try OtelTracing.bootstrap(settings: otel, logger: logger))
+  }
+
+  logger.info(
+    """
+    event=server.start \
+    address=\(settings.hostname):\(settings.port) \
+    admin=\(settings.adminHost):\(settings.adminPort) \
+    static_root=\(settings.staticRoot) \
+    otel_disabled=\(otel.disabled)
+    """)
+
+  try await app.run()
 } catch {
   let logger = Logger(label: "ShapeTreeWeb")
   logger.error("Startup failed", metadata: ["error": "\(error)"])

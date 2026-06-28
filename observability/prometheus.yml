@@ -10,4 +10,9 @@ scrape_configs:
         labels:
           service: shape-tree-api
 
-  # shape-tree-web: no metrics endpoint in the new WASM demo server yet.
+  - job_name: shape-tree-web
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["web:42070"]
+        labels:
+          service: shape-tree-web
