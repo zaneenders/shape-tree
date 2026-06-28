@@ -17,14 +17,19 @@ public enum SMTPClient {
           channel.eventLoop.makeCompletedFuture {
             switch settings.tlsMode {
             case .implicitTLS:
-              let sslContext = try NIOSSLContext(
-                configuration: TLSConfiguration.makeClientConfiguration())
+              // TLS wraps the socket from the first byte, so the handler must
+              // be in the pipeline before any SMTP traffic (channelInitializer).
+              let sslContext = try NIOSSLContext(configuration: TLSConfiguration.makeClientConfiguration())
               try channel.pipeline.syncOperations.addHandler(
                 NIOSSLClientHandler(context: sslContext, serverHostname: settings.host),
-                position: .first
-              )
-            case .startTLS, .plain:
-              ()
+                position: .first)
+            case .startTLS: ()
+            // The EHLO + STARTTLS handshake happens in plaintext first;
+            // the handler is added later in SendEmailHandler.channelRead
+            // at the .okForStartTLS case, after the server says "220 ready".
+            case .plain: ()
+            // No TLS at all — local mail catchers (Mailpit). See
+            // validateTLSConfigured(for:) for the boot-time no-op guard.
             }
 
             try channel.pipeline.syncOperations.addHandlers([

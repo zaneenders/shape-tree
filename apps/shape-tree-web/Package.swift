@@ -15,7 +15,7 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-nio-extras.git", from: "1.31.0"),
     .package(url: "https://github.com/apple/swift-nio-imap.git", from: "0.1.0"),
     .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
-    .package(url: "https://github.com/wendylabsinc/swift-postgres-models.git", from: "0.2.0"),
+    .package(url: "https://github.com/wendylabsinc/swift-postgres-models.git", revision: "f480ced"),
     .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0"),
     .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
     .package(url: "https://github.com/swiftlang/swift-subprocess.git", revision: "aac702b"),

@@ -1,8 +1,10 @@
+import Logging
 import NIOCore
 import NIOSSL
 
-private let smtpSSLContext = try! NIOSSLContext(
-  configuration: TLSConfiguration.makeClientConfiguration())
+private let smtpSSLContext = try? NIOSSLContext(configuration: TLSConfiguration.makeClientConfiguration())
+
+private let smtpLogger = Logger(label: "ShapeTreeEmail.SMTP")
 
 final class SendEmailHandler: ChannelInboundHandler {
   typealias InboundIn = SMTPResponse
@@ -89,10 +91,21 @@ final class SendEmailHandler: ChannelInboundHandler {
         self.sendAuthenticationStart(context: context)
       }
     case .okForStartTLS:
+      guard let sslContext = smtpSSLContext else {
+        // Invariant: AuthServices.bootstrapIfConfigured validated the TLS
+        // context at boot, so this should never be nil. If it is, the global
+        // `try?` init failed silently — log loudly, trap in debug builds, and
+        // fail just this email instead of crashing the server.
+        let message = "smtpSSLContext unavailable at send time (boot TLS check missed it)"
+        smtpLogger.error("\(message)")
+        assertionFailure(message)
+        self.currentlyWaitingFor = .error(SMTPClientError.tlsUnavailable(BoringSSLError.unknownError([])))
+        return
+      }
       do {
         try context.channel.pipeline.syncOperations.addHandler(
           try NIOSSLClientHandler(
-            context: smtpSSLContext,
+            context: sslContext,
             serverHostname: self.serverConfiguration.host
           ),
           position: .first

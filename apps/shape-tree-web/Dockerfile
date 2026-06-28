@@ -77,6 +77,11 @@ FROM scratch AS runtime
 
 WORKDIR /app
 
+# CA cert bundle for outbound TLS (SMTP startTLS). scratch has none by default;
+# without it NIOSSLContext can't load a trust store and BoringSSL fails at handshake.
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+ENV SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+
 COPY --from=build /output/ShapeTreeWeb ./ShapeTreeWeb
 COPY --from=build /app/dist ./dist
 
