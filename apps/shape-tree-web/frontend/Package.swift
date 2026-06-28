@@ -76,5 +76,5 @@ let package = Package(
         .plugin(name: "BridgeJS", package: "JavaScriptKit")
       ]
     ),
-  ]
+    ]
 )

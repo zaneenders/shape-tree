@@ -78,13 +78,15 @@ private func runShapeTreeWeb(logger: Logger) async throws {
     ResponseCompressionMiddleware(minimumResponseSizeToCompress: 512)
   }
 
+  let authPages = AuthPages(styles: styles, bootstrapScript: appjs)
+
   AuthRoutes.addRoutes(
     to: router,
     auth: authBundle.services,
     rateLimiter: LoginRateLimiter(),
-    spaLoginPage: { next in AuthPages.login(next: next) },
-    spaVerifyPage: { token, next in AuthPages.verify(token: token, next: next) },
-    spaCheckEmailPage: { AuthPages.checkEmail() }
+    spaLoginPage: { next in authPages.login(next: next) },
+    spaVerifyPage: { token, next in authPages.verify(token: token, next: next) },
+    spaCheckEmailPage: { authPages.checkEmail() }
   )
 
   router.get { _, _ in

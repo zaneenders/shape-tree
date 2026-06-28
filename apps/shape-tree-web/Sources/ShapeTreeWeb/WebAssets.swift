@@ -2,9 +2,18 @@ enum WebAssets {
   static func indexHTML(
     title: String = "WASM Hummingbird Server",
     styles: String,
-    bootstrapScript: String
+    bootstrapScript: String,
+    propsJSON: String? = nil
   ) -> String {
     let escapedTitle = escapeHTML(title)
+    let propsTag =
+      propsJSON.map { json in
+        // Break out of <script type="application/json"> if a token ever contains </script>.
+        let escaped = json.replacingOccurrences(of: "<", with: "\\u003c")
+        return """
+          <script type="application/json" id="entry-page-props">\(escaped)</script>
+          """
+      } ?? ""
     return """
       <!DOCTYPE html>
       <html>
@@ -14,6 +23,7 @@ enum WebAssets {
         <style>
         \(styles)
         </style>
+        \(propsTag)
         <script type="module">
         \(bootstrapScript)
         </script>
