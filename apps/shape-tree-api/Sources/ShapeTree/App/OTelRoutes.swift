@@ -2,28 +2,28 @@ import Hummingbird
 import Logging
 import NIOCore
 
-func buildAdminApplication(
+func buildOTelApplication(
   host: String,
   port: Int,
   serviceName: String,
   logger: Logger
 ) -> some ApplicationProtocol {
-  var adminLogger = logger
-  adminLogger[metadataKey: "server"] = "admin"
-  adminLogger.info(
-    "event=admin.start address=\(host):\(port) service=\(serviceName)")
+  var otelLogger = logger
+  otelLogger[metadataKey: "server"] = "otel"
+  otelLogger.info(
+    "event=otel.start address=\(host):\(port) service=\(serviceName)")
 
   return Application(
-    router: buildAdminRouter(),
+    router: buildOTelRouter(),
     configuration: .init(
       address: .hostname(host, port: port),
-      serverName: "ShapeTreeAdmin"
+      serverName: "ShapeTreeOTel"
     ),
-    logger: adminLogger
+    logger: otelLogger
   )
 }
 
-func buildAdminRouter() -> Router<BasicRequestContext> {
+func buildOTelRouter() -> Router<BasicRequestContext> {
   let router = Router(context: BasicRequestContext.self)
 
   router.get("healthz") { _, _ -> Response in

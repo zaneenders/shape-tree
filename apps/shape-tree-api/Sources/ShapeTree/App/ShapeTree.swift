@@ -18,8 +18,8 @@ enum ShapeTree {
 
     let host = try config.requiredString(forKey: "HOST")
     let port = try config.requiredInt(forKey: "PORT")
-    let adminHost = try config.requiredString(forKey: "ADMIN_HOST")
-    let adminPort = try config.requiredInt(forKey: "ADMIN_PORT")
+    let otelHost = try config.requiredString(forKey: "OTEL_HOST")
+    let otelPort = try config.requiredInt(forKey: "OTEL_PORT")
     let dataPathRaw = try config.requiredString(forKey: "DATA_PATH")
     let ollamaURL = try config.requiredString(forKey: "OLLAMA_URL")
     let ollamaToken = try config.requiredString(forKey: "OLLAMA_TOKEN")
@@ -76,13 +76,13 @@ enum ShapeTree {
 
     _ = PrometheusMetrics.registry
 
-    let adminApp = buildAdminApplication(
-      host: adminHost,
-      port: adminPort,
+    let otelApp = buildOTelApplication(
+      host: otelHost,
+      port: otelPort,
       serviceName: otel.serviceName,
       logger: app.logger
     )
-    app.addServices(adminApp)
+    app.addServices(otelApp)
 
     if !otel.disabled {
       app.addServices(try OtelTracing.bootstrap(settings: otel, logger: app.logger))
@@ -92,7 +92,7 @@ enum ShapeTree {
       """
       event=server.start \
       address=\(host):\(port) \
-      admin=\(adminHost):\(adminPort) \
+      otel=\(otelHost):\(otelPort) \
       data_root=\(layout.dataRoot.path) \
       authorized_keys=\(layout.authorizedKeysDirectory.path) \
       ollama=\(ollamaURL) \

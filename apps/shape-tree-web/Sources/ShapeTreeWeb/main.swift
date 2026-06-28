@@ -127,13 +127,13 @@ private func runShapeTreeWeb(logger: Logger) async throws {
 
   _ = PrometheusMetrics.registry
 
-  let adminApp = buildAdminApplication(
-    host: settings.adminHost,
-    port: settings.adminPort,
+  let otelApp = buildOTelApplication(
+    host: settings.otelHost,
+    port: settings.otelPort,
     serviceName: otel.serviceName,
     logger: logger
   )
-  app.addServices(adminApp)
+  app.addServices(otelApp)
 
   authBundle.addServices(to: &app)
   let startupLogger = app.logger
@@ -149,10 +149,9 @@ private func runShapeTreeWeb(logger: Logger) async throws {
     """
     event=server.start \
     address=\(settings.hostname):\(settings.port) \
-    admin=\(settings.adminHost):\(settings.adminPort) \
+    otel=\(settings.otelHost):\(settings.otelPort) \
     static_root=\(settings.staticRoot) \
     site_url=\(settings.siteURL) \
-    auth_enabled=\(authBundle != nil) \
     otel_disabled=\(otel.disabled)
     """)
 
