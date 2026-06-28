@@ -8,6 +8,9 @@ services:
       dockerfile: Dockerfile
       args:
         BUILD_CONFIGURATION: ${BUILD_CONFIG:-release}
+    env_file:
+      - path: apps/shape-tree-api/.env
+        required: false
     environment:
       # All defaults baked into apps/shape-tree-api/Dockerfile; override via
       # the environment: block here, or by mounting a .env in tower compose.
@@ -31,8 +34,16 @@ services:
       dockerfile: Dockerfile
       args:
         BUILD_CONFIGURATION: ${BUILD_CONFIG:-release}
+    env_file:
+      - path: apps/shape-tree-web/.env
+        required: false
     environment:
-      # Defaults baked into apps/shape-tree-web/Dockerfile; dev-only overrides here.
+      HOSTNAME: 0.0.0.0
+      STATIC_ROOT: /app/dist
+      SKIP_SHAPE_TREE_WEB_BUILD: "1"
+      SITE_URL: http://127.0.0.1:42069
+      OTEL_EXPORTER_OTLP_BASE_ENDPOINT: http://jaeger:4318
+      OTEL_SDK_DISABLED: "false"
       PGHOST: postgres
       PGPORT: "5432"
       PGUSER: shape_tree
@@ -70,4 +81,3 @@ networks:
 
 volumes:
   shape_tree_data:
-
