@@ -22,13 +22,6 @@ and a static-ish blog.
 I have included a `docker-compose` file as a stand alone example I would encourage you modify it to your needs.
 
 ```bash
-cp apps/shape-tree-api/.env.example apps/shape-tree-api/.env
-cp apps/shape-tree-web/.env.example apps/shape-tree-web/.env
-```
-
-Edit the two `.env` files with your real values (see each subproject's README for what each variable does).
-
-```bash
 docker compose up
 # api        -> http://127.0.0.1:42067
 # web        -> http://127.0.0.1:42069
@@ -37,4 +30,6 @@ docker compose up
 # prometheus -> http://127.0.0.1:9090    (metrics)
 # grafana    -> http://127.0.0.1:3000    (admin / admin)
 ```
+
+Defaults are baked into each app's Dockerfile as `ENV` directives — `docker compose up` from a fresh clone works with zero setup. To customize, either set environment variables (in the shell, or via `docker compose run -e`) or override in `docker-compose.yml`'s `environment:` block. See each app's README for the tunables.
 

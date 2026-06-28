@@ -11,15 +11,49 @@ need Postgres in the background:
 docker compose up postgres -d
 ```
 
-(The shipped `.env` already targets `127.0.0.1:5432`, so `swift run ShapeTreeWeb` picks it up
-directly.) For traces, also `docker compose up jaeger -d` — or set `OTEL_SDK_DISABLED=true` to skip.
+`docker compose up` works zero-setup — defaults are baked into `apps/shape-tree-web/Dockerfile`. For
+native `swift run ShapeTreeWeb`, export the environment variables you need (see Configuration below);
+the defaults the Dockerfile ships (`HOSTNAME=0.0.0.0`, `STATIC_ROOT=/app/dist`, `SKIP_SHAPE_TREE_WEB_BUILD=1`)
+target the Docker image, so for native runs set at least `HOSTNAME=127.0.0.1`, `STATIC_ROOT=dist`,
+`SKIP_SHAPE_TREE_WEB_BUILD=0`, and a `SITE_URL` matching the port you'll bind.
+
+For traces, also `docker compose up jaeger -d` — or set `OTEL_SDK_DISABLED=true` to skip.
+
+## Configuration
+
+| Variable | Default (Dockerfile) | Description |
+|---|---|---|
+| `HOSTNAME` | `0.0.0.0` | Bind address. Use `127.0.0.1` for native `swift run`. |
+| `PORT` | `8080` | Listener port. |
+| `STATIC_ROOT` | `/app/dist` | Path to the built static assets (WASM/JS). For native run, use `dist`. |
+| `SKIP_SHAPE_TREE_WEB_BUILD` | `1` | `1` = assets already built (Docker / pre-built); `0` = build on `swift run`. |
+| `OTEL_HOST` | `0.0.0.0` | Admin/metrics bind address. |
+| `OTEL_PORT` | `42070` | Admin/metrics listener port. |
+| `SITE_URL` | _(none — set always)_ | Public URL used in magic-link emails. |
+| `AUTH_PRIVATE_DIRECTORIES` | _(none)_ | Comma-separated content subdirectories protected behind email login. |
+| `CONTENT_PATH` | _(override in tower compose)_ | Path to per-page `.wasm` content (shape-tree-web content host mode). |
+| `INDEX_PATH` | _(none)_ | Slug of the home page (e.g. `Home`). |
+| `PGHOST` / `PGPORT` / `PGUSER` / `PGPASSWORD` / `PGDATABASE` / `PGSSLMODE` | _(none)_ | Postgres connection. For `docker compose`, defaults are set in `docker-compose.yml` (`PGHOST=postgres`, etc.). |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM` / `SMTP_TLS` | _(none)_ | iCloud SMTP relay for login links. Required when sending login links. |
+| `AUTH_TOKEN_TTL_MINUTES` | `15` | Magic-link token lifetime. |
+| `AUTH_SESSION_TTL_HOURS` | `336` | Session lifetime (14 days). |
+| `OTEL_SERVICE_NAME` | `shape-tree-web` | OpenTelemetry service name. |
+| `OTEL_EXPORTER_OTLP_BASE_ENDPOINT` | `http://jaeger:4318` | OTLP exporter base URL. |
+| `OTEL_SDK_DISABLED` | `false` | Set `true` to skip trace export. |
+| `SWIFT_SDK_ID` | `swift-6.3.2-RELEASE_wasm-embedded` | WASM SDK id used by `shape-tree-web-builder` when `SKIP_SHAPE_TREE_WEB_BUILD=0`. |
+
+System environment variables override Dockerfile `ENV` defaults at runtime (in Docker, the
+`docker-compose.yml` `environment:` block and the `env_file:` file both override Dockerfile `ENV`).
 
 ## Testing 
 
 ### Email Integration
 
-After configuing your email in the `.env` you can run the end to end email test with: 
+After configuring your SMTP credentials as environment variables (see the table above), run the end
+to end email test with: 
 
 ```sh
-set -a && source apps/shape-tree-web/.env && set +a && SMTP_INTEGRATION_TEST=true swift test --package-path apps/shape-tree-web --filter LoginFlowIntegrationTests
+set -a \
+  && export SMTP_HOST=... SMTP_PORT=587 SMTP_USERNAME=... SMTP_PASSWORD=... SMTP_FROM=... \
+  && SMTP_INTEGRATION_TEST=true swift test --package-path apps/shape-tree-web --filter LoginFlowIntegrationTests
 ```
