@@ -21,30 +21,17 @@ services:
 
   web:
     build:
-      context: .
-      dockerfile: apps/shape-tree-web/Dockerfile
+      context: apps/shape-tree-web
+      dockerfile: Dockerfile
+      args:
+        BUILD_CONFIGURATION: ${BUILD_CONFIG:-release}
     env_file:
       - apps/shape-tree-web/.env
-    environment:
-      OTEL_EXPORTER_OTLP_BASE_ENDPOINT: http://jaeger:4318
-      PGHOST: postgres
-      PGPORT: 5432
-      PGUSER: shape_tree
-      PGPASSWORD: shape_tree
-      PGDATABASE: shape_tree
-      CONTENT_PATH: /content
-    volumes:
-      - ./examples/st-gen-markdown/content:/content:ro
     ports:
-      - "127.0.0.1:42069:42069"
-      - "127.0.0.1:42070:42070"
+      - "127.0.0.1:42069:8080"
     restart: unless-stopped
-    depends_on:
-      - jaeger
-      - postgres
     networks:
       - app
-      - observability
 
   postgres:
     image: postgres:17

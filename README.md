@@ -6,7 +6,7 @@ and a static-ish blog.
 | App | What it is |
 |---|---|
 | [`apps/shape-tree-api`](apps/shape-tree-api) | Hummingbird server wrapping the [Scribe](https://github.com/zaneenders/scribe) agent. Streams chat completions, tool calls and serves a journal. |
-| [`apps/shape-tree-web`](apps/shape-tree-web) | Wasm host: Hummingbird server + ShapeTreeCore client. Serves page wasm from a content directory. |
+| [`apps/shape-tree-web`](apps/shape-tree-web) | Hummingbird server + WASM demo (Entry, FitViewer, ArticleViewer). |
 | [`apps/ShapeTreeApp`](apps/ShapeTreeApp) | Cross-platform (iOS + macOS) SwiftUI client that talks to the API. |
 
 
@@ -19,7 +19,7 @@ cp apps/shape-tree-api/.env.example apps/shape-tree-api/.env
 cp apps/shape-tree-web/.env.example apps/shape-tree-web/.env
 ```
 
-Edit the two `.env` files with your real values (see each subproject's README for what each variable does). The web app requires SMTP when Postgres auth is configured.
+Edit the two `.env` files with your real values (see each subproject's README for what each variable does).
 
 ```bash
 ./scripts/docker-build.sh up

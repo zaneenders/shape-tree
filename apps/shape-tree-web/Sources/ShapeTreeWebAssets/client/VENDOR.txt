@@ -1,5 +1,0 @@
-# Vendored JavaScriptKit browser glue for ShapeTreeCore.
-# Regenerate with: ./Scripts/build-core.sh --regen-js
-javascriptkit=0.55.0
-swift-wasm-sdk=swift-6.3.2-RELEASE_wasm-embedded
-generated=2026-06-23T05:56:35Z

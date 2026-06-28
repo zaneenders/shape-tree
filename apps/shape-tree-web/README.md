@@ -1,86 +1,38 @@
 # shape-tree-web
 
-Wasm host on [Lorikeet](https://github.com/zaneenders/lorikeet) + [Hummingbird](https://github.com/hummingbird-project/hummingbird). Serves a unified HTML shell, embeds `ShapeTreeCore.wasm` for client routing/nav/auth, and reads page modules from a content directory on disk.
+Swift Hummingbird server + WASM frontend (JavaScriptKit). Part of the [shape-tree](../../) monorepo.
 
-## Run
+## Build & run
 
-```bash
+Requires [bun](https://bun.com/), [Swift with WASM SDK](https://www.swift.org/install/macos/), and [binaryen](https://github.com/WebAssembly/binaryen).
+
+```sh
 cd apps/shape-tree-web
-./Scripts/build-core.sh   # required: produces ShapeTreeCore.wasm (gitignored)
 cp .env.example .env
 swift run ShapeTreeWeb
+# open http://127.0.0.1:8080
 ```
 
-The JavaScriptKit glue under `Sources/ShapeTreeWebAssets/client/` is **vendored** in git — you only need a wasm SDK to rebuild the `.wasm` binary. After editing `apps/wasm-client` Swift:
-
-```bash
-./Scripts/build-core.sh
-```
-
-After bumping JavaScriptKit or the wasm SDK, refresh the vendored JS too:
-
-```bash
-./Scripts/build-core.sh --regen-js
-```
-
-Point `CONTENT_PATH` at a directory of `*.wasm` files (see [examples/st-gen-markdown](../../examples/st-gen-markdown) to build demo content).
-
-## Environment
-
-| Variable | Purpose |
-|----------|---------|
-| `CONTENT_PATH` | Runtime wasm/css tree |
-| `INDEX_PATH` | Home page path within the content tree (default `Home`) |
-| `SITE_TITLE` | Optional site title override |
-| `AUTH_PRIVATE_DIRECTORIES` | Comma-separated dirs hidden from nav until sign-in |
-
-**URLs**
-
-- `/` — home (same HTML shell as content pages)
-- `/content/Articles/new-mac` — shell; Core loads `/content/Articles/new-mac.wasm`
-- `/api/get-nav-content` — auth-aware nav JSON
-
-## Auth (optional)
-
-Set all `PG*` vars (see `.env.example`) to enable passwordless email login. Set `SMTP_*` to send links; without SMTP, links are logged only.
-
-```bash
-swift run ShapeTreeWeb --add-user user@example.com
-```
-
-Optional branded login: add `login.md` to your **site build** source; login UI still lives in ShapeTreeCore.
-
-## WASM client build
-
-```bash
-swift sdk install \
-  https://download.swift.org/swift-6.3.2-release/wasm-sdk/swift-6.3.2-RELEASE/swift-6.3.2-RELEASE_wasm.artifactbundle.tar.gz \
-  --checksum a61f0584c93283589f8b2f42db05c1f9a182b506c2957271402992655591dd7c
-brew install binaryen   # wasm-opt; apt: binaryen
-./Scripts/build-core.sh          # wasm only (default)
-./Scripts/build-core.sh --regen-js   # wasm + refresh vendored client/*.js
-```
-
-`build-client.sh` runs `build-core.sh` plus the example site build for convenience.
-
-## Example site
-
-Demo markdown → wasm pipeline lives in [`examples/st-gen-markdown`](../../examples/st-gen-markdown) — not part of this package.
+`swift run ShapeTreeWeb` builds the WASM frontend via `shape-tree-web-builder` unless `SKIP_SHAPE_TREE_WEB_BUILD=1`.
 
 ## Docker
 
 From the repo root:
 
-```bash
+```sh
 ./scripts/docker-build.sh up
+# web -> http://127.0.0.1:42069
 ```
 
-Builds core wasm + example site content, copies `examples/st-gen-markdown/content` to `/content` in the image.
+The web image builds WASM + server inside Docker (self-contained `Dockerfile`).
 
-## Tests
+## Frontend
 
-```bash
-swift test
+WASM products live in `frontend/` (`Entry`, `FitViewer`, `ArticleViewer`). Bun bundles bootstrap JS into `dist/`.
+
+```sh
+cd frontend
+bun install
+cd ..
+swift run shape-tree-web-builder   # or let ShapeTreeWeb run it at startup
 ```
-
-`LoginFlowIntegrationTests` needs Postgres + SMTP.
