@@ -27,6 +27,9 @@ services:
         BUILD_CONFIGURATION: ${BUILD_CONFIG:-release}
     env_file:
       - apps/shape-tree-web/.env
+    environment:
+      STATIC_ROOT: /app/dist
+      SKIP_SHAPE_TREE_WEB_BUILD: "1"
     ports:
       - "127.0.0.1:42069:8080"
     restart: unless-stopped
