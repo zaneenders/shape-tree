@@ -4,8 +4,8 @@ Swift Hummingbird server + WASM frontend (JavaScriptKit). Part of the [shape-tre
 
 ## Build & run
 
-The server runs without any backing services, but to enable email login + fit-viewer protection you
-need Postgres in the background:
+The server **requires** Postgres + SMTP to start (auth is not optional). To run locally with
+the monorepo's backing services:
 
 ```
 docker compose up postgres -d
@@ -34,7 +34,7 @@ For traces, also `docker compose up jaeger -d` — or set `OTEL_SDK_DISABLED=tru
 | `CONTENT_PATH` | _(override in tower compose)_ | Path to per-page `.wasm` content (shape-tree-web content host mode). |
 | `INDEX_PATH` | _(none)_ | Slug of the home page (e.g. `Home`). |
 | `PGHOST` / `PGPORT` / `PGUSER` / `PGPASSWORD` / `PGDATABASE` / `PGSSLMODE` | _(none)_ | Postgres connection. For `docker compose`, defaults are set in `docker-compose.yml` (`PGHOST=postgres`, etc.). |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM` / `SMTP_TLS` | _(none)_ | iCloud SMTP relay for login links. Required when sending login links. |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM` / `SMTP_TLS` | _(none)_ | SMTP relay for magic-link login emails. **Required for startup.** |
 | `AUTH_TOKEN_TTL_MINUTES` | `15` | Magic-link token lifetime. |
 | `AUTH_SESSION_TTL_HOURS` | `336` | Session lifetime (14 days). |
 | `OTEL_SERVICE_NAME` | `shape-tree-web` | OpenTelemetry service name. |
