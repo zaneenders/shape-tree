@@ -4,7 +4,7 @@
   },
   "editable": true,
   "fiscalYearStartMonth": 0,
-  "graphTooltip": 1,
+  "graphTooltip": "shared_crosshair",
   "id": null,
   "links": [
     {
@@ -120,7 +120,7 @@
       },
       "targets": [
         {
-          "expr": "100 * sum(rate(hb_requests{service=\"shape-tree-api\"}{service=\"shape-tree-api\",http_response_status_code=~\"4..|5..\"}[5m])) / clamp_min(sum(rate(hb_requests{service=\"shape-tree-api\"}[5m])), 1e-9)",
+          "expr": "100 * sum(rate(hb_requests{service=\"shape-tree-api\",http_response_status_code=~\"4..|5..\"}[5m])) / clamp_min(sum(rate(hb_requests{service=\"shape-tree-api\"}[5m])), 1e-9)",
           "legendFormat": "error %",
           "refId": "A"
         }
@@ -330,7 +330,7 @@
       "id": 2,
       "targets": [
         {
-          "expr": "sum by (http_response_status_code) (rate(hb_requests{service=\"shape-tree-api\"}{service=\"shape-tree-api\",http_response_status_code=~\"4..|5..\"}[5m]))",
+          "expr": "sum by (http_response_status_code) (rate(hb_requests{service=\"shape-tree-api\",http_response_status_code=~\"4..|5..\"}[5m]))",
           "legendFormat": "{{http_response_status_code}}",
           "refId": "A"
         }
@@ -567,7 +567,7 @@
           "refId": "rate"
         },
         {
-          "expr": "sum by (http_route) (rate(hb_requests{service=\"shape-tree-api\"}{service=\"shape-tree-api\",http_response_status_code=~\"4..|5..\"}[5m]))",
+          "expr": "sum by (http_route) (rate(hb_requests{service=\"shape-tree-api\",http_response_status_code=~\"4..|5..\"}[5m]))",
           "format": "table",
           "instant": true,
           "legendFormat": "__auto",
