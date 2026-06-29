@@ -14,17 +14,22 @@ import Testing
 @testable import ShapeTreeWebAuth
 
 private func loginFlowSuiteEnabled() -> Bool {
-  guard let runTests = ProcessInfo.processInfo.environment["SMTP_INTEGRATION_TEST"] else {
+  guard ProcessInfo.processInfo.environment["SMTP_INTEGRATION_TEST"]?.lowercased() == "true" else {
     return false
   }
-  return runTests.lowercased() == "true"
+  let required = [
+    "SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM",
+    "IMAP_USERNAME", "IMAP_PASSWORD",
+  ]
+  let env = ProcessInfo.processInfo.environment
+  return required.allSatisfy { !(env[$0] ?? "").isEmpty }
 }
 
 /// Full end-to-end login flow test against a real Postgres + SMTP/IMAP provider.
 /// ```console
 /// SMTP_INTEGRATION_TEST=true swift test --filter LoginFlowIntegrationTests
 /// ```
-/// NOTE: You will need to configer your SMTP settings in the .env file for shape-tree-web
+/// NOTE: You will need to configure your SMTP and IMAP settings in the .env file for shape-tree-web
 @Suite(.serialized, .timeLimit(.minutes(2)), .disabled(if: !loginFlowSuiteEnabled()))
 struct LoginFlowIntegrationTests: ~Copyable {
 
