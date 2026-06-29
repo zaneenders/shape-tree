@@ -1,5 +1,8 @@
 import Configuration
 import Foundation
+import Logging
+
+private let smtpSettingsLogger = Logger(label: "ShapeTreeEmail.SMTPSettings")
 
 public struct SMTPSettings: Sendable {
   public let connection: SMTPConnectionSettings
@@ -22,6 +25,17 @@ public struct SMTPSettings: Sendable {
     if tlsMode != .plain, username.isEmpty || password.isEmpty {
       return nil
     }
+
+    smtpSettingsLogger.info(
+      "SMTP settings loaded",
+      metadata: [
+        "host": "\(host)",
+        "port": "\(port)",
+        "username": "\(username)",
+        "passwordLength": "\(password.count)",
+        "tlsMode": "\(tlsMode)",
+        "fromAddress": "\(fromAddress)",
+      ])
 
     return SMTPSettings(
       connection: SMTPConnectionSettings(
