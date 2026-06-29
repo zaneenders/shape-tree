@@ -33,14 +33,14 @@ struct IncomingEmail: Sendable, Equatable {
 }
 
 enum IMAPClientError: Error, CustomStringConvertible, Sendable {
-  case serverRejected(String)
+  case serverRejected(String, host: String, port: Int)
   case unexpectedResponse(String)
   case protocolError(String)
 
   var description: String {
     switch self {
-    case .serverRejected(let message):
-      return "IMAP server rejected the request: \(message)"
+    case .serverRejected(let message, let host, let port):
+      return "IMAP server \(host):\(port) rejected the request: \(message)"
     case .unexpectedResponse(let message):
       return "Unexpected IMAP response: \(message)"
     case .protocolError(let message):

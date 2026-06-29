@@ -277,7 +277,7 @@ private func percentDecode(_ value: String) -> String {
   return result
 }
 
-private func formURLEncode(_ value: String) -> String {
+func formURLEncode(_ value: String) -> String {
   let hexDigits = Array("0123456789ABCDEF")
   var result = ""
   for byte in value.utf8 {

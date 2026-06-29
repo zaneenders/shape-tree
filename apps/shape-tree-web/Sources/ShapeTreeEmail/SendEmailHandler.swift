@@ -69,7 +69,17 @@ final class SendEmailHandler: ChannelInboundHandler {
     let result = self.unwrapInboundIn(data)
     switch result {
     case .error(let message):
-      self.allDonePromise.fail(SMTPClientError.serverRejected(message))
+      smtpLogger.warning(
+        "SMTP command rejected",
+        metadata: [
+          "host": "\(self.serverConfiguration.host)",
+          "port": "\(self.serverConfiguration.port)",
+          "username": "\(self.serverConfiguration.username)",
+          "reason": "\(message)",
+        ])
+      self.allDonePromise.fail(
+        SMTPClientError.serverRejected(message, host: self.serverConfiguration.host, port: self.serverConfiguration.port)
+      )
       return
     case .ok:
       ()

@@ -332,7 +332,7 @@ struct LoginFlowIntegrationTests: ~Copyable {
   /// Postgres port-forward (the `.env` default `postgres` only resolves inside Docker).
   private static func makeConfig() async throws -> ConfigReader {
     let secretKeys = SecretsSpecifier<String, String>.specific([
-      "PGPASSWORD", "SMTP_PASSWORD",
+      "PGPASSWORD", "SMTP_PASSWORD", "IMAP_PASSWORD",
     ])
     var env = ProcessInfo.processInfo.environment
     env["PGHOST"] = "127.0.0.1"

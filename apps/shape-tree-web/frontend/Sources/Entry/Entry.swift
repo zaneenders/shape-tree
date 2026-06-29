@@ -347,22 +347,6 @@ private func submitLoginForm(
   })
 }
 
-private func formURLEncode(_ value: String) -> String {
-  let hexDigits = Array("0123456789ABCDEF")
-  var result = ""
-  for byte in value.utf8 {
-    switch byte {
-    case 0x30...0x39, 0x41...0x5A, 0x61...0x7A, 0x2D, 0x2E, 0x5F, 0x7E:
-      result.append(Character(UnicodeScalar(byte)))
-    default:
-      result.append("%")
-      result.append(hexDigits[Int(byte >> 4)])
-      result.append(hexDigits[Int(byte & 0x0F)])
-    }
-  }
-  return result
-}
-
 private func submitVerifyForm(
   token: String,
   next: String,

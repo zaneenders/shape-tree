@@ -13,7 +13,7 @@ public enum PackageConfig {
 
   public static func reader(packageRoot: URL) async throws -> ConfigReader {
     let secretKeys = SecretsSpecifier<String, String>.specific([
-      "PGPASSWORD", "SMTP_PASSWORD",
+      "PGPASSWORD", "SMTP_PASSWORD", "IMAP_PASSWORD",
     ])
     let envFile = FilePath(packageRoot.appendingPathComponent(".env").path())
     return ConfigReader(providers: [

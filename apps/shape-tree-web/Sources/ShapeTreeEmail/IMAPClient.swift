@@ -1,7 +1,10 @@
+import Logging
 import NIOCore
 import NIOIMAP
 import NIOPosix
 import NIOSSL
+
+private let imapLogger = Logger(label: "ShapeTreeEmail.IMAP")
 
 enum IMAPClient {
   private static let headerFields = ["FROM", "SUBJECT", "DATE"]
@@ -38,6 +41,14 @@ enum IMAPClient {
     limit: Int,
     group: EventLoopGroup
   ) async throws -> [IncomingEmail] {
+    imapLogger.info(
+      "Connecting to IMAP",
+      metadata: [
+        "host": "\(settings.host)",
+        "port": "\(settings.port)",
+        "username": "\(settings.username)",
+        "mailbox": "\(mailbox)",
+      ])
     let host = settings.host
     let parserOptions = ResponseParser.Options(bufferLimit: 1_048_576)
 
@@ -73,18 +84,21 @@ enum IMAPClient {
 
     _ = try await runChecked(
       on: channel,
-      command: .login(username: settings.username, password: settings.password)
+      command: .login(username: settings.username, password: settings.password),
+      settings: settings
     )
 
     let selectResult = try await runChecked(
       on: channel,
-      command: .select(mailboxName(mailbox))
+      command: .select(mailboxName(mailbox)),
+      settings: settings
     )
 
     let messageCount = messageCount(from: selectResult)
     let searchResult = try await runChecked(
       on: channel,
-      command: .uidSearch(key: .all, returnOptions: [])
+      command: .uidSearch(key: .all, returnOptions: []),
+      settings: settings
     )
     var uids = searchUIDs(from: searchResult)
 
@@ -96,7 +110,8 @@ enum IMAPClient {
       let sequenceSet = MessageIdentifierSetNonEmpty<SequenceNumber>(range: range)
       let fetchResult = try await runChecked(
         on: channel,
-        command: .fetch(.set(sequenceSet), fetchAttributes, [])
+        command: .fetch(.set(sequenceSet), fetchAttributes, []),
+        settings: settings
       )
       let messages = parseFetchedMessages(from: fetchResult)
       _ = try? await run(on: channel, command: .logout)
@@ -117,7 +132,8 @@ enum IMAPClient {
 
     let fetchResult = try await runChecked(
       on: channel,
-      command: .uidFetch(.set(uidSet), fetchAttributes, [])
+      command: .uidFetch(.set(uidSet), fetchAttributes, []),
+      settings: settings
     )
     let messages = parseFetchedMessages(from: fetchResult)
     _ = try? await run(on: channel, command: .logout)
@@ -147,14 +163,24 @@ enum IMAPClient {
 
   private static func runChecked(
     on channel: Channel,
-    command: Command
+    command: Command,
+    settings: IMAPConnectionSettings
   ) async throws -> NIMAPCommandResult {
     let result = try await run(on: channel, command: command)
     switch result.tagged.state {
     case .ok:
       return result
     case .no(let text), .bad(let text):
-      throw IMAPClientError.serverRejected(text.text)
+      let reason = text.text
+      imapLogger.warning(
+        "IMAP command rejected",
+        metadata: [
+          "host": "\(settings.host)",
+          "port": "\(settings.port)",
+          "username": "\(settings.username)",
+          "reason": "\(reason)",
+        ])
+      throw IMAPClientError.serverRejected(reason, host: settings.host, port: settings.port)
     }
   }
 

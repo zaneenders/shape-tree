@@ -1,5 +1,8 @@
 import Configuration
 import Foundation
+import Logging
+
+private let imapSettingsLogger = Logger(label: "ShapeTreeEmail.IMAPSettings")
 
 struct IMAPSettings: Sendable {
   let connection: IMAPConnectionSettings
@@ -14,14 +17,12 @@ struct IMAPSettings: Sendable {
   )
 
   static func load(from config: ConfigReader) -> IMAPSettings? {
-    let username =
-      nonEmpty(config.string(forKey: "IMAP_USERNAME", isSecret: false))
-      ?? nonEmpty(config.string(forKey: "SMTP_USERNAME", isSecret: false))
-    let password =
-      config.string(forKey: "IMAP_PASSWORD", isSecret: true)
-      ?? config.string(forKey: "SMTP_PASSWORD", isSecret: true)
-
-    guard let username, let password, !password.isEmpty else {
+    guard let username = nonEmpty(config.string(forKey: "IMAP_USERNAME", isSecret: false)) else {
+      imapSettingsLogger.info("IMAP_USERNAME not set — IMAP disabled")
+      return nil
+    }
+    guard let password = config.string(forKey: "IMAP_PASSWORD", isSecret: true), !password.isEmpty else {
+      imapSettingsLogger.info("IMAP_PASSWORD not set — IMAP disabled")
       return nil
     }
 
@@ -30,6 +31,15 @@ struct IMAPSettings: Sendable {
     guard (1...65535).contains(port) else {
       return nil
     }
+
+    imapSettingsLogger.info(
+      "IMAP settings loaded",
+      metadata: [
+        "host": "\(host)",
+        "port": "\(port)",
+        "username": "\(username)",
+        "passwordLength": "\(password.count)",
+      ])
 
     return IMAPSettings(
       connection: IMAPConnectionSettings(

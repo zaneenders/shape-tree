@@ -1,12 +1,9 @@
 import JavaScriptEventLoop
 import JavaScriptKit
+import ShapeTreeDOM
 
 public enum FetchError: Error {
   case failed
-}
-
-public func fetchURL(_ url: String) -> JSPromise {
-  JSPromise(JSObject.global.fetch.object!(url).object!)!
 }
 
 public func fetchBytes(_ url: String) async throws(FetchError) -> [UInt8] {
