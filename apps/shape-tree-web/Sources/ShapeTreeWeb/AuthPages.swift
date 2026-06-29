@@ -12,10 +12,6 @@ struct AuthPages: Sendable {
     self.bootstrapScript = bootstrapScript
   }
 
-  func login(next: String?) -> Response {
-    shellHTML(page: "login", next: normalizedNext(next), token: "")
-  }
-
   func checkEmail() -> Response {
     shellHTML(page: "check-email", next: "/", token: "")
   }

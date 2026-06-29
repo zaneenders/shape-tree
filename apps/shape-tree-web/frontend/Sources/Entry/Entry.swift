@@ -10,8 +10,20 @@ import ShapeTreeDOM
   let app = createElement("div", id: "app")
   append(app, to: documentBody())
 
+  let appHeader = createElement("div", className: "app-header")
+  append(appHeader, to: app)
+
   let heading = createElement("h1", innerText: "ShapeTree · Swift WASM Demo")
-  append(heading, to: app)
+  append(heading, to: appHeader)
+
+  let authButton = createElement(
+    "button",
+    className: "auth-button",
+    id: "auth-button",
+    innerText: "Sign in",
+    attributes: ["type": "button"]
+  )
+  append(authButton, to: appHeader)
 
   let tabBar = createElement("nav", className: "tab-bar", attributes: ["role": "tablist"])
   append(tabBar, to: app)
@@ -28,6 +40,20 @@ import ShapeTreeDOM
     ]
   )
   append(demoTab, to: tabBar)
+
+  let fitTab = createElement(
+    "button",
+    className: "tab",
+    id: "fit-tab",
+    innerText: "Fit",
+    attributes: [
+      "role": "tab",
+      "aria-selected": "false",
+      "aria-controls": "fit-panel",
+      "hidden": "true",
+    ]
+  )
+  append(fitTab, to: tabBar)
 
   let articleTab = createElement(
     "button",
@@ -57,15 +83,23 @@ import ShapeTreeDOM
   )
   append(demoPanel, to: tabPanels)
 
-  // The server renders an auth view by embedding `entry-page-props` JSON.
-  // When present, the auth form replaces the default demo content but the
-  // nav shell above (heading + tabs) stays visible through the login flow.
-  if let props = readPageProps(), !props.page.isEmpty {
-    renderAuthView(into: demoPanel, props: props)
-    demoTab.innerText = .string("Sign in")
-  } else {
-    renderDemoContent(into: demoPanel)
-  }
+  let routeOutlet = createElement("div", id: "route-outlet")
+  append(routeOutlet, to: demoPanel)
+
+  let fitPanel = createElement(
+    "div",
+    className: "tab-panel",
+    id: "fit-panel",
+    attributes: [
+      "role": "tabpanel",
+      "aria-labelledby": "fit-tab",
+      "aria-hidden": "true",
+    ]
+  )
+  append(fitPanel, to: tabPanels)
+
+  let fitContainer = createElement("div", id: "fit-container")
+  append(fitContainer, to: fitPanel)
 
   let articlePanel = createElement(
     "div",
@@ -82,15 +116,26 @@ import ShapeTreeDOM
   let articleContainer = createElement("div", id: "article-container")
   append(articleContainer, to: articlePanel)
 
-  wireArticleTab(
-    articleTab: articleTab,
+  let shell = AppShell(
+    routeOutlet: routeOutlet,
     demoTab: demoTab,
-    articlePanel: articlePanel,
-    demoPanel: demoPanel
+    fitTab: fitTab,
+    articleTab: articleTab,
+    authButton: authButton,
+    demoPanel: demoPanel,
+    fitPanel: fitPanel,
+    articlePanel: articlePanel
   )
+  setHidden(fitTab, true)
+  JSObject.global.window.appAuthenticated = .boolean(false)
+  renderInitialView(shell: shell)
+  wireClientRouter(shell: shell)
+
+  wireAppTabs(shell: shell)
+  refreshSessionTabs(shell: shell, openFitIfSignedIn: consumeSignedInQuery())
 }
 
-private func renderDemoContent(into demoPanel: JSValue) {
+func renderDemoContent(into demoPanel: JSValue) {
   let serverSection = createElement("section", id: "server-section")
   append(serverSection, to: demoPanel)
 
@@ -114,20 +159,9 @@ private func renderDemoContent(into demoPanel: JSValue) {
       return JSValue.undefined
     }
   )
-
-  let fitSection = createElement("section", id: "fit-section")
-  append(fitSection, to: demoPanel)
-
-  let fitHeading = createElement("h2", innerText: "FIT Activity Viewer")
-  append(fitHeading, to: fitSection)
-
-  let fitContainer = createElement("div", id: "fit-container")
-  append(fitContainer, to: fitSection)
-
-  wireFitViewerLazyLoad(fitSection: fitSection)
 }
 
-private func readPageProps() -> PageProps? {
+func readPageProps() -> PageProps? {
   let document = JSObject.global.document
   guard let script = document.getElementById("entry-page-props").object else { return nil }
   guard let raw = script.textContent.string, !raw.isEmpty else { return nil }
@@ -135,7 +169,7 @@ private func readPageProps() -> PageProps? {
   return PageProps(unsafelyCopying: parsed)
 }
 
-private func renderAuthView(into container: JSValue, props: PageProps) {
+func renderAuthView(into container: JSValue, props: PageProps, shell: AppShell) {
   let main = createElement("main", className: "auth-page")
   append(main, to: container)
 
@@ -191,7 +225,7 @@ private func renderAuthView(into container: JSValue, props: PageProps) {
     )
     append(p1, to: main)
 
-    append(createLink(href: "/login", text: "Back to sign in"), to: main)
+    append(createSpaLink(shell: shell, route: .login(next: "/"), text: "Back to sign in"), to: main)
 
   case "verify":
     if !props.token.isEmpty {
@@ -230,7 +264,7 @@ private func renderAuthView(into container: JSValue, props: PageProps) {
       )
       append(blurb, to: main)
 
-      append(createLink(href: "/login", text: "Request a new sign-in link"), to: main)
+      append(createSpaLink(shell: shell, route: .login(next: "/"), text: "Request a new sign-in link"), to: main)
     }
 
   default:
@@ -238,8 +272,25 @@ private func renderAuthView(into container: JSValue, props: PageProps) {
   }
 }
 
-private func createLink(href: String, text: String) -> JSValue {
-  createElement("a", innerText: text, attributes: ["href": href])
+private func createSpaLink(shell: AppShell, route: ClientRoute, text: String) -> JSValue {
+  let button = createElement(
+    "button",
+    className: "text-link",
+    innerText: text,
+    attributes: ["type": "button"]
+  )
+  button.onclick = .object(
+    JSClosure { _ -> JSValue in
+      switch route {
+      case .home:
+        navigateToHome(shell: shell)
+      case .login(let next):
+        navigateToLogin(shell: shell, next: next)
+      }
+      return .undefined
+    }
+  )
+  return button
 }
 
 @JS struct PageProps {

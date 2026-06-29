@@ -55,13 +55,12 @@ package enum AuthRoutes {
     to router: Router<C>,
     auth: AuthServices,
     rateLimiter: LoginRateLimiter,
-    spaLoginPage: @Sendable @escaping (String?) -> Response,
+    spaShellPage: @Sendable @escaping () -> Response,
     spaVerifyPage: @Sendable @escaping (String?, String?) -> Response,
     spaCheckEmailPage: @Sendable @escaping () -> Response
   ) where C.Identity == User, C.Session == UUID {
-    router.get("login") { request, _ in
-      let next = request.uri.queryParameters.get("next")
-      return spaLoginPage(next)
+    router.get("login") { _, _ in
+      spaShellPage()
     }
 
     router.get("auth/check-email") { _, _ in

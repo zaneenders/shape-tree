@@ -40,6 +40,14 @@ public func setInnerHTML(_ element: JSValue, _ html: String) {
   element.innerHTML = .string(html)
 }
 
+public func clearElement(_ element: JSValue) {
+  element.innerHTML = .string("")
+}
+
+public func setHidden(_ element: JSValue, _ hidden: Bool) {
+  element.hidden = .boolean(hidden)
+}
+
 public func elementById(_ id: String) -> JSValue? {
   let document = JSObject.global.document
   return document.getElementById(id).object.map { .object($0) }

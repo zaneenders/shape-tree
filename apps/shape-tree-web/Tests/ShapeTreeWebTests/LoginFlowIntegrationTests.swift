@@ -126,7 +126,7 @@ struct LoginFlowIntegrationTests: ~Copyable {
         to: router,
         auth: auth,
         rateLimiter: LoginRateLimiter(),
-        spaLoginPage: { _ in Response(status: .ok, body: .init(byteBuffer: ByteBuffer(string: "login"))) },
+        spaShellPage: { Response(status: .ok, body: .init(byteBuffer: ByteBuffer(string: "shell"))) },
         spaVerifyPage: { _, _ in Response(status: .ok, body: .init(byteBuffer: ByteBuffer(string: "verify"))) },
         spaCheckEmailPage: { Response(status: .ok, body: .init(byteBuffer: ByteBuffer(string: "check-email"))) }
       )

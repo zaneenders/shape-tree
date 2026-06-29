@@ -4,6 +4,7 @@ import HTTPTypes
 import Hummingbird
 import HummingbirdCompression
 import Logging
+import NIOCore
 import ShapeTreeConfig
 import ShapeTreeMarkdown
 import ShapeTreeWebAuth
@@ -80,20 +81,26 @@ private func runShapeTreeWeb(logger: Logger) async throws {
 
   let authPages = AuthPages(styles: styles, bootstrapScript: appjs)
 
+  let shellHTML = WebAssets.indexHTML(styles: styles, bootstrapScript: appjs)
+  let spaShellPage: @Sendable () -> Response = {
+    Response(
+      status: .ok,
+      headers: [.contentType: "text/html; charset=utf-8"],
+      body: .init(byteBuffer: ByteBuffer(string: shellHTML))
+    )
+  }
+
   AuthRoutes.addRoutes(
     to: router,
     auth: authBundle.services,
     rateLimiter: LoginRateLimiter(),
-    spaLoginPage: { next in authPages.login(next: next) },
+    spaShellPage: spaShellPage,
     spaVerifyPage: { token, next in authPages.verify(token: token, next: next) },
     spaCheckEmailPage: { authPages.checkEmail() }
   )
 
   router.get { _, _ in
-    EditedResponse(
-      headers: [.contentType: "text/html; charset=utf-8"],
-      response: WebAssets.indexHTML(styles: styles, bootstrapScript: appjs)
-    )
+    spaShellPage()
   }
 
   router.get("api/message") { _, _ in
@@ -101,9 +108,13 @@ private func runShapeTreeWeb(logger: Logger) async throws {
   }
 
   router.get("api/session") { _, context in
-    SessionInfo(
-      authenticated: context.identity != nil,
-      email: context.identity?.email
+    let authenticated = context.identity != nil
+    return SessionInfo(
+      authenticated: authenticated,
+      email: context.identity?.email,
+      demo: true,
+      fit: authenticated,
+      article: true
     )
   }
 
@@ -168,6 +179,9 @@ private struct Message: ResponseEncodable {
 private struct SessionInfo: ResponseEncodable {
   let authenticated: Bool
   let email: String?
+  let demo: Bool
+  let fit: Bool
+  let article: Bool
 }
 
 extension ArticleDocument: ResponseEncodable {}
