@@ -211,6 +211,7 @@ private func showRoute(_ route: ClientRoute, shell: AppShell, updateHistory: Boo
     refreshSessionTabs(shell: shell)
   }
 }
+
 private func syncViewToLocation(shell: AppShell) {
   let location = JSObject.global.location
   let pathname = location.pathname.string ?? "/"

@@ -75,5 +75,4 @@ private func resetFitViewerState() {
   fitPointGridRows = 0
   fitRouteImage = nil
   fitRouteImageDirty = true
-  pointerInside = false
 }

@@ -1,5 +1,5 @@
 {
-  "name": "wasm-server-frontend",
+  "name": "shape-tree-frontend",
   "private": true,
   "type": "module",
   "dependencies": {

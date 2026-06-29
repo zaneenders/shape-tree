@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "wasm-server-frontend",
+      "name": "shape-tree-frontend",
       "dependencies": {
         "@bjorn3/browser_wasi_shim": "0.3.0",
       },

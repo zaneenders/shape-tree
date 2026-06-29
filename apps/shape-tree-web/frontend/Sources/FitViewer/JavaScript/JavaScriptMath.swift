@@ -8,7 +8,6 @@ func jsPx(_ value: Double) -> String {
 
 func jsNumber(_ value: Double, decimals: Int = 2) -> String {
   if decimals == 0 {
-    // Swift-native fast path — no JS bridge for common hue/percent formatting.
     return String(Int(value.rounded()))
   }
   let scale = jsPow(10, Double(decimals))
@@ -28,26 +27,6 @@ func jsPow(_ base: Double, _ exponent: Double) -> Double {
 
 func jsWindowInnerHeight() -> Double {
   JSObject.global.innerHeight.number ?? 600
-}
-
-func clamp(_ value: Double, min: Double, max: Double) -> Double {
-  jsMax(min, jsMin(max, value))
-}
-
-func jsRandom() -> Double {
-  JSObject.global.Math.object!.random.function!().number ?? 0
-}
-
-func jsSin(_ value: Double) -> Double {
-  JSObject.global.Math.object!.sin.function!(value).number ?? 0
-}
-
-func jsCos(_ value: Double) -> Double {
-  JSObject.global.Math.object!.cos.function!(value).number ?? 0
-}
-
-func jsHypot(_ x: Double, _ y: Double) -> Double {
-  JSObject.global.Math.object!.hypot.function!(x, y).number ?? 0
 }
 
 func jsMax(_ a: Double, _ b: Double) -> Double {

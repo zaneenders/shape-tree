@@ -51,9 +51,6 @@ func wireCanvasEvents(canvas: JSValue) {
   canvas.onpointermove = .object(
     JSClosure { arguments in
       if let point = canvasPoint(from: arguments[0], canvas: canvas) {
-        mouseX = point.x
-        mouseY = point.y
-        pointerInside = true
         fitHoverIndex = nearestFitPointIndex(x: point.x, y: point.y)
       }
       return JSValue.undefined
@@ -62,7 +59,6 @@ func wireCanvasEvents(canvas: JSValue) {
 
   canvas.onpointerleave = .object(
     JSClosure { _ in
-      pointerInside = false
       fitHoverIndex = nil
       return JSValue.undefined
     }
@@ -80,7 +76,6 @@ func startDrawLoop(canvas: JSValue) {
   let context = canvas.getContext("2d")
   drawStep = JSClosure { _ -> JSValue in
     guard drawStep != nil else { return JSValue.undefined }
-    frame += 1
     stepFitPlayback()
     drawFitFrame(context: context)
 

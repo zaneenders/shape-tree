@@ -27,7 +27,7 @@ ARG SWIFT_STATIC_SDK_CHECKSUM
 ARG TARGETARCH
 ARG BUILD_CONFIGURATION
 
-# nodejs: BridgeJS plugin during `swift package js`. bun: app/ → dist/app.js, features/ → dist/*.js.
+# nodejs: BridgeJS plugin during `swift package js`. bun: app/ → dist/*.js.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends binaryen ca-certificates curl nodejs unzip \
   && rm -rf /var/lib/apt/lists/* \

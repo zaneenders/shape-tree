@@ -1,14 +1,6 @@
 import JavaScriptKit
 import ShapeTreeDOM
 
-@JS struct SessionInfo {
-  var authenticated: Bool
-  var email: String?
-  var demo: Bool
-  var fit: Bool
-  var article: Bool
-}
-
 func selectDemoTab(shell: AppShell) {
   setAttribute(shell.demoTab, "aria-selected", "true")
   setAttribute(shell.fitTab, "aria-selected", "false")
