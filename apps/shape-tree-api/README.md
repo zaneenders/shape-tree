@@ -2,29 +2,44 @@
 
 Hummingbird server wrapping ScribeAgent.
 
-## Configuration
+## Local development
 
-All values are **required**. Copy `.env.example` to `.env` and edit:
+The only hard dependency is **Ollama** running on the host. The shipped `.env` targets
+`http://host.docker.internal:11434` (for Docker compose); for a native `swift run` override it:
 
 ```bash
-cp .env.example .env
+OLLAMA_URL=http://127.0.0.1:11434 swift run ShapeTree
 ```
 
-| Variable | Description |
-|---|---|
-| `HOST` | Bind address — **defaults to `127.0.0.1` (loopback only)**. Set to a specific LAN IP only behind TLS. `0.0.0.0` logs a warning at startup. |
-| `PORT` | Listener port. |
-| `DATA_PATH` | Absolute or relative directory for mutable ShapeTree files; relative paths (including `.`) resolve against the server working directory. Journal git state, `journal-subjects.json`, and the ES256 trust store live under `R/.shape-tree/`. |
-| `OLLAMA_URL` | Ollama API base URL. |
-| `OLLAMA_TOKEN` | Ollama bearer token (may be empty for local Ollama). |
-| `AGENT_MODEL` | Ollama model identifier (e.g. `gemma4:e2b`). |
-| `AGENT_SYSTEM_PROMPT` | System prompt passed to the agent. |
-| `AGENT_CONTEXT_WINDOW` | Model context window size in tokens. |
-| `AGENT_CONTEXT_WINDOW_THRESHOLD` | Context utilisation threshold (0–1) that triggers pruning. |
-| `JOURNAL_COMMIT_AUTHOR_NAME` | Fallback git author name for journal commits. |
-| `JOURNAL_COMMIT_AUTHOR_EMAIL` | Fallback git author email for journal commits. |
+Traces are optional — `docker compose up jaeger -d` and set
+`OTEL_EXPORTER_OTLP_BASE_ENDPOINT=http://127.0.0.1:4318`, or `OTEL_SDK_DISABLED=true` to skip. There
+is no database; the journal is a git working tree under `DATA_PATH`, so the runtime image ships
+`git` + `openssh-client`.
 
-System environment variables override `.env` file values.
+## Configuration
+
+`docker compose up` works from a fresh clone — defaults are baked into `apps/shape-tree-api/Dockerfile` as `ENV` directives. Override per-deployment via `docker-compose.yml`'s `environment:` block or via shell env vars (`swift run` / `docker compose run -e`).
+
+| Variable | Default (Dockerfile) | Description |
+|---|---|---|
+| `HOST` | `0.0.0.0` | Bind address. Use `127.0.0.1` for native `swift run` (loopback only). |
+| `PORT` | `42067` | Listener port. |
+| `OTEL_HOST` | `0.0.0.0` | Admin/metrics bind address. |
+| `OTEL_PORT` | `42068` | Admin/metrics listener port. |
+| `DATA_PATH` | `/data` | Absolute or relative directory for mutable ShapeTree files; relative paths (including `.`) resolve against the server working directory. Journal git state, `journal-subjects.json`, and the ES256 trust store live under `R/.shape-tree/`. |
+| `OLLAMA_URL` | `http://ollama:11434` | Ollama API base URL. For native `swift run`, use `http://127.0.0.1:11434` (or `http://host.docker.internal:11434` if Ollama runs on the docker host). |
+| `OLLAMA_TOKEN` | _(empty)_ | Ollama bearer token (may be empty for local Ollama). |
+| `AGENT_MODEL` | `gemma4:26b` | Ollama model identifier. |
+| `AGENT_SYSTEM_PROMPT` | `You are a helpful coding assistant.` | System prompt passed to the agent. |
+| `AGENT_CONTEXT_WINDOW` | `131072` | Model context window size in tokens. |
+| `AGENT_CONTEXT_WINDOW_THRESHOLD` | `0.85` | Context utilisation threshold (0–1) that triggers pruning. |
+| `JOURNAL_COMMIT_AUTHOR_NAME` | `ShapeTree` | Fallback git author name for journal commits. |
+| `JOURNAL_COMMIT_AUTHOR_EMAIL` | `shape-tree@localhost` | Fallback git author email for journal commits. |
+| `OTEL_SERVICE_NAME` | `shape-tree-api` | OpenTelemetry service name. |
+| `OTEL_EXPORTER_OTLP_BASE_ENDPOINT` | `http://jaeger:4318` | OTLP exporter base URL. |
+| `OTEL_SDK_DISABLED` | `false` | Set `true` to skip trace export. |
+
+System environment variables override Dockerfile `ENV` defaults at container start.
 
 ## Authentication: per-device ES256 keys
 

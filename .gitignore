@@ -52,10 +52,6 @@ coverage.lcov
 
 Package.resolved
 
-# Generated example site content (markdown → wasm pipeline)
-examples/st-gen-markdown/content/
-examples/st-canvas-demo/dist/
-
-# Generated wasm binaries (rebuilt by Scripts/build-core.sh and content pipelines)
+# Generated wasm binaries
 *.wasm
 

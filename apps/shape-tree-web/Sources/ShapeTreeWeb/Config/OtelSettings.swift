@@ -8,16 +8,6 @@ struct OtelSettings: Sendable {
   /// Unset == false == OTel enabled (matches the OTel default).
   let disabled: Bool
 
-  init(
-    serviceName: String,
-    otlpBaseEndpoint: String,
-    disabled: Bool
-  ) {
-    self.serviceName = serviceName
-    self.otlpBaseEndpoint = otlpBaseEndpoint
-    self.disabled = disabled
-  }
-
   static func load(from config: ConfigReader) throws -> OtelSettings {
     let serviceName =
       try config.requiredString(forKey: "OTEL_SERVICE_NAME", isSecret: false)

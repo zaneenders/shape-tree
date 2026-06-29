@@ -1,86 +1,75 @@
 # shape-tree-web
 
-Wasm host on [Lorikeet](https://github.com/zaneenders/lorikeet) + [Hummingbird](https://github.com/hummingbird-project/hummingbird). Serves a unified HTML shell, embeds `ShapeTreeCore.wasm` for client routing/nav/auth, and reads page modules from a content directory on disk.
+Swift Hummingbird server + WASM frontend (JavaScriptKit). Part of the [shape-tree](../../) monorepo.
 
-## Run
+## Build & run
 
-```bash
-cd apps/shape-tree-web
-./Scripts/build-core.sh   # required: produces ShapeTreeCore.wasm (gitignored)
-cp .env.example .env
-swift run ShapeTreeWeb
+The server runs without any backing services, but to enable email login + fit-viewer protection you
+need Postgres in the background:
+
+```
+docker compose up postgres -d
 ```
 
-The JavaScriptKit glue under `Sources/ShapeTreeWebAssets/client/` is **vendored** in git — you only need a wasm SDK to rebuild the `.wasm` binary. After editing `apps/wasm-client` Swift:
+`docker compose up` works zero-setup — defaults are baked into `apps/shape-tree-web/Dockerfile`. For
+native `swift run ShapeTreeWeb`, export the environment variables you need (see Configuration below);
+the defaults the Dockerfile ships (`HOSTNAME=0.0.0.0`, `STATIC_ROOT=/app/dist`, `SKIP_SHAPE_TREE_WEB_BUILD=1`)
+target the Docker image, so for native runs set at least `HOSTNAME=127.0.0.1`, `STATIC_ROOT=dist`,
+`SKIP_SHAPE_TREE_WEB_BUILD=0`, and a `SITE_URL` matching the port you'll bind.
 
-```bash
-./Scripts/build-core.sh
+For traces, also `docker compose up jaeger -d` — or set `OTEL_SDK_DISABLED=true` to skip.
+
+## Configuration
+
+| Variable | Default (Dockerfile) | Description |
+|---|---|---|
+| `HOSTNAME` | `0.0.0.0` | Bind address. Use `127.0.0.1` for native `swift run`. |
+| `PORT` | `8080` | Listener port. |
+| `STATIC_ROOT` | `/app/dist` | Path to the built static assets (WASM/JS). For native run, use `dist`. |
+| `SKIP_SHAPE_TREE_WEB_BUILD` | `1` | `1` = assets already built (Docker / pre-built); `0` = build on `swift run`. |
+| `OTEL_HOST` | `0.0.0.0` | Admin/metrics bind address. |
+| `OTEL_PORT` | `42070` | Admin/metrics listener port. |
+| `SITE_URL` | _(none — set always)_ | Public URL used in magic-link emails. |
+| `AUTH_PRIVATE_DIRECTORIES` | _(none)_ | Comma-separated content subdirectories protected behind email login. |
+| `CONTENT_PATH` | _(override in tower compose)_ | Path to per-page `.wasm` content (shape-tree-web content host mode). |
+| `INDEX_PATH` | _(none)_ | Slug of the home page (e.g. `Home`). |
+| `PGHOST` / `PGPORT` / `PGUSER` / `PGPASSWORD` / `PGDATABASE` / `PGSSLMODE` | _(none)_ | Postgres connection. For `docker compose`, defaults are set in `docker-compose.yml` (`PGHOST=postgres`, etc.). |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM` / `SMTP_TLS` | _(none)_ | iCloud SMTP relay for login links. Required when sending login links. |
+| `AUTH_TOKEN_TTL_MINUTES` | `15` | Magic-link token lifetime. |
+| `AUTH_SESSION_TTL_HOURS` | `336` | Session lifetime (14 days). |
+| `OTEL_SERVICE_NAME` | `shape-tree-web` | OpenTelemetry service name. |
+| `OTEL_EXPORTER_OTLP_BASE_ENDPOINT` | `http://jaeger:4318` | OTLP exporter base URL. |
+| `OTEL_SDK_DISABLED` | `false` | Set `true` to skip trace export. |
+| `SWIFT_SDK_ID` | `swift-6.3.2-RELEASE_wasm-embedded` | WASM SDK id used by `shape-tree-web-builder` when `SKIP_SHAPE_TREE_WEB_BUILD=0`. |
+
+System environment variables override Dockerfile `ENV` defaults at runtime (in Docker, the
+`docker-compose.yml` `environment:` block and the `env_file:` file both override Dockerfile `ENV`).
+
+## Provisioning a login user
+
+The Postgres defaults match `docker-compose.yml` (host `postgres`, db/user/pass
+`shape_tree`). Run it natively against the compose-backed Postgres (exposed on
+`127.0.0.1:5432`):
+
+```sh
+PGHOST=127.0.0.1 PGPORT=5432 \
+PGUSER=shape_tree PGPASSWORD=shape_tree PGDATABASE=shape_tree PGSSLMODE=disable \
+  swift run --package-path apps/shape-tree-web shape-tree-add-user <email>
 ```
 
-After bumping JavaScriptKit or the wasm SDK, refresh the vendored JS too:
+This runs any pending migrations, then inserts the user. It skips insertion (and
+logs a notice) if the email already exists. The `PG*` vars are read from the
+environment or a `.env` file in the working directory.
 
-```bash
-./Scripts/build-core.sh --regen-js
+## Testing 
+
+### Email Integration
+
+After configuring your SMTP credentials as environment variables (see the table above), run the end
+to end email test with: 
+
+```sh
+set -a \
+  && export SMTP_HOST=... SMTP_PORT=587 SMTP_USERNAME=... SMTP_PASSWORD=... SMTP_FROM=... \
+  && SMTP_INTEGRATION_TEST=true swift test --package-path apps/shape-tree-web --filter LoginFlowIntegrationTests
 ```
-
-Point `CONTENT_PATH` at a directory of `*.wasm` files (see [examples/st-gen-markdown](../../examples/st-gen-markdown) to build demo content).
-
-## Environment
-
-| Variable | Purpose |
-|----------|---------|
-| `CONTENT_PATH` | Runtime wasm/css tree |
-| `INDEX_PATH` | Home page path within the content tree (default `Home`) |
-| `SITE_TITLE` | Optional site title override |
-| `AUTH_PRIVATE_DIRECTORIES` | Comma-separated dirs hidden from nav until sign-in |
-
-**URLs**
-
-- `/` — home (same HTML shell as content pages)
-- `/content/Articles/new-mac` — shell; Core loads `/content/Articles/new-mac.wasm`
-- `/api/get-nav-content` — auth-aware nav JSON
-
-## Auth (optional)
-
-Set all `PG*` vars (see `.env.example`) to enable passwordless email login. Set `SMTP_*` to send links; without SMTP, links are logged only.
-
-```bash
-swift run ShapeTreeWeb --add-user user@example.com
-```
-
-Optional branded login: add `login.md` to your **site build** source; login UI still lives in ShapeTreeCore.
-
-## WASM client build
-
-```bash
-swift sdk install \
-  https://download.swift.org/swift-6.3.2-release/wasm-sdk/swift-6.3.2-RELEASE/swift-6.3.2-RELEASE_wasm.artifactbundle.tar.gz \
-  --checksum a61f0584c93283589f8b2f42db05c1f9a182b506c2957271402992655591dd7c
-brew install binaryen   # wasm-opt; apt: binaryen
-./Scripts/build-core.sh          # wasm only (default)
-./Scripts/build-core.sh --regen-js   # wasm + refresh vendored client/*.js
-```
-
-`build-client.sh` runs `build-core.sh` plus the example site build for convenience.
-
-## Example site
-
-Demo markdown → wasm pipeline lives in [`examples/st-gen-markdown`](../../examples/st-gen-markdown) — not part of this package.
-
-## Docker
-
-From the repo root:
-
-```bash
-./scripts/docker-build.sh up
-```
-
-Builds core wasm + example site content, copies `examples/st-gen-markdown/content` to `/content` in the image.
-
-## Tests
-
-```bash
-swift test
-```
-
-`LoginFlowIntegrationTests` needs Postgres + SMTP.

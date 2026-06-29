@@ -3,57 +3,66 @@ import Foundation
 import Hummingbird
 import Logging
 import PostgresNIO
-import ShapeTreeWebEmail
+import ShapeTreeEmail
+
+package enum AuthBootError: Error, CustomStringConvertible {
+  case smtpTLSUnavailable(Error)
+  case unableToLoadSettings
+
+  package var description: String {
+    switch self {
+    case .smtpTLSUnavailable(let error):
+      return """
+        SMTP TLS unavailable at boot: \(error). \
+        If running in a scratch/minimal image, install CA certificates \
+        (e.g. /etc/ssl/certs/ca-certificates.crt).
+        """
+    case .unableToLoadSettings:
+      return "Unable to load .env settings for AuthServices"
+    }
+  }
+}
 
 package struct AuthServices: Sendable {
   let database: any AuthDatabase
   let persist: any PersistDriver
   let settings: AuthSettings
-  let smtp: SMTPSettings
+  let config: ConfigReader
   let siteURL: String
   let secureCookies: Bool
 
-  package static func bootstrap(
+  /// Boots when Postgres is configured. SMTP is loaded when a login email is sent.
+  package static func bootstrapIfConfigured(
     from config: ConfigReader,
     siteURL: String,
     logger: Logger
-  ) async throws -> AuthServicesBundle {
-    do {
-      let postgresSettings = try PostgresSettings.load(from: config)
-      let client = PostgresClient(configuration: postgresSettings.configuration)
-      let authSettings = AuthSettings.load(from: config)
-      let smtp = SMTPSettings.load(from: config)
-      guard let smtp else {
-        throw AuthSetupError(
-          "SMTP is required when Postgres auth is configured. Set SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, and SMTP_FROM in .env or the environment."
-        )
-      }
-      let secureCookies = URL(string: siteURL)?.scheme == "https"
-
-      let persist = PostgresPersistDriver(client: client, logger: logger)
-      let database = PostgresAuthDatabase(client: client)
-      return AuthServicesBundle(
-        services: AuthServices(
-          database: database,
-          persist: persist,
-          settings: authSettings,
-          smtp: smtp,
-          siteURL: siteURL,
-          secureCookies: secureCookies
-        ),
-        persistDriver: persist,
-        postgresClient: client
-      )
-    } catch let error as AuthSetupError {
-      throw error
-    } catch {
-      throw AuthSetupError("\(error)")
+  ) async throws -> AuthServicesBundle? {
+    guard let postgresSettings = try? PostgresSettings.load(from: config) else {
+      return nil
     }
-  }
-}
 
-struct AuthSetupError: Error, CustomStringConvertible {
-  let message: String
-  init(_ message: String) { self.message = message }
-  var description: String { message }
+    let client = PostgresClient(configuration: postgresSettings.configuration)
+    let authSettings = AuthSettings.load(from: config)
+    let secureCookies = URL(string: siteURL)?.scheme == "https"
+
+    guard let smtp = SMTPSettings.load(from: config) else {
+      throw AuthBootError.unableToLoadSettings
+    }
+    try smtp.connection.validateTLSConfigured()
+
+    let persist = PostgresPersistDriver(client: client, logger: logger)
+    let database = PostgresAuthDatabase(client: client)
+    return AuthServicesBundle(
+      services: AuthServices(
+        database: database,
+        persist: persist,
+        settings: authSettings,
+        config: config,
+        siteURL: siteURL,
+        secureCookies: secureCookies
+      ),
+      persistDriver: persist,
+      postgresClient: client
+    )
+  }
 }

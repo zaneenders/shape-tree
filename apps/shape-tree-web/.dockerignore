@@ -1,0 +1,23 @@
+# Swift build artifacts (rebuilt inside the image)
+.build
+**/.build
+**/.build-*
+**/.build-wasm
+.swiftpm
+**/.swiftpm
+
+# Local build output (rebuilt inside the image)
+dist
+frontend/node_modules
+
+# Local config (Docker uses ENV)
+.env
+
+# Git and editor noise
+.git
+.gitignore
+.DS_Store
+
+# Not needed to compile
+README.md
+.env.example

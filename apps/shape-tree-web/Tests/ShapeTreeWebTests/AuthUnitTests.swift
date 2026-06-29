@@ -2,7 +2,7 @@ import Foundation
 import Testing
 
 @testable import ShapeTreeWebAuth
-@testable import ShapeTreeWebEmail
+@testable import ShapeTreeEmail
 
 @Suite struct LoginTokenServiceTests {
   @Test func generateProducesBase64URLToken() {
@@ -117,26 +117,15 @@ import Testing
     #expect(AuthEmail.safeNextPath("") == nil)
   }
 
-  @Test func signedInRedirectAppendsQueryParam() {
-    #expect(AuthEmail.signedInRedirect(to: "/") == "/?signed-in=1")
-    #expect(AuthEmail.signedInRedirect(to: "/content/Private/secret") == "/content/Private/secret?signed-in=1")
-    #expect(
-      AuthEmail.signedInRedirect(to: "/content/Private/secret?foo=bar")
-        == "/content/Private/secret?foo=bar&signed-in=1"
-    )
+  @Test func normalizedWasmNextPathAcceptsSafePaths() {
+    #expect(AuthEmail.normalizedWasmNextPath("/") == "/")
+    #expect(AuthEmail.normalizedWasmNextPath("/posts/secret") == "/posts/secret")
   }
 
-  @Test func normalizedContentNextPathAcceptsContentRoutes() {
-    #expect(AuthEmail.normalizedContentNextPath("/content/Private/secret") == "/content/Private/secret")
-    #expect(AuthEmail.normalizedWasmNextPath("/content/Private/secret") == "/content/Private/secret")
-    #expect(AuthEmail.normalizedContentNextPath("/") == "/")
-  }
-
-  @Test func normalizedContentNextPathRejectsNonContentRoutes() {
-    #expect(AuthEmail.normalizedContentNextPath("/posts/secret") == nil)
-    #expect(AuthEmail.normalizedContentNextPath(nil) == nil)
-    #expect(AuthEmail.normalizedContentNextPath("//evil.com") == nil)
-    #expect(AuthEmail.normalizedContentNextPath("/other") == nil)
+  @Test func normalizedWasmNextPathRejectsUnsafePaths() {
+    #expect(AuthEmail.normalizedWasmNextPath(nil) == nil)
+    #expect(AuthEmail.normalizedWasmNextPath("//evil.com") == nil)
+    #expect(AuthEmail.normalizedWasmNextPath("http://evil.com") == nil)
   }
 }
 

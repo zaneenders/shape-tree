@@ -44,24 +44,8 @@ package enum AuthEmail {
     return raw
   }
 
-  /// Accepts content paths; returns the path or `/`, rejecting everything else.
-  package static func normalizedContentNextPath(_ raw: String?) -> String? {
-    guard let raw = safeNextPath(raw) else { return nil }
-    if raw == "/" { return raw }
-    if raw.hasPrefix("/content/") { return raw }
-    return nil
-  }
-
-  /// Backwards-compatible alias while callers migrate.
+  /// Accepts same-origin relative paths for post-login redirects.
   package static func normalizedWasmNextPath(_ raw: String?) -> String? {
-    normalizedContentNextPath(raw)
-  }
-
-  /// Appends `signed-in=1` so the SPA can refresh nav after magic-link verify.
-  package static func signedInRedirect(to path: String) -> String {
-    if path.contains("?") {
-      return "\(path)&signed-in=1"
-    }
-    return "\(path)?signed-in=1"
+    safeNextPath(raw)
   }
 }
