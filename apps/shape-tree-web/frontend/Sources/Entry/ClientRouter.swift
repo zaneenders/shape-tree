@@ -15,6 +15,8 @@ struct AppShell {
 enum ClientRoute: Equatable {
   case home
   case login(next: String)
+  case checkEmail
+  case verify(token: String, next: String)
 
   static func from(pathname: String, search: String) -> ClientRoute? {
     switch pathname {
@@ -23,6 +25,13 @@ enum ClientRoute: Equatable {
     case "/login":
       let next = normalizedNextPath(queryParam("next", in: search)) ?? "/"
       return .login(next: next)
+    case "/auth/check-email":
+      return .checkEmail
+    case "/auth/verify":
+      return .verify(
+        token: queryParam("token", in: search) ?? "",
+        next: normalizedNextPath(queryParam("next", in: search)) ?? "/"
+      )
     default:
       return nil
     }
@@ -34,6 +43,10 @@ enum ClientRoute: Equatable {
       "ShapeTree · Swift WASM Demo"
     case .login:
       "Sign in"
+    case .checkEmail:
+      "Check your email"
+    case .verify(let token, _):
+      token.isEmpty ? "Sign-in link invalid" : "Confirm sign in"
     }
   }
 
@@ -47,6 +60,10 @@ enum ClientRoute: Equatable {
       } else {
         "/login?next=\(next)"
       }
+    case .checkEmail:
+      "/auth/check-email"
+    case .verify(let token, let next):
+      verifyPath(token: token, next: next)
     }
   }
 }
@@ -109,13 +126,6 @@ func renderInitialView(shell: AppShell) {
     return
   }
 
-  if let props = readPageProps(), !props.page.isEmpty {
-    clearElement(shell.routeOutlet)
-    renderAuthView(into: shell.routeOutlet, props: props, shell: shell)
-    selectDemoTab(shell: shell)
-    return
-  }
-
   showRoute(.home, shell: shell, updateHistory: false)
 }
 
@@ -126,6 +136,28 @@ func navigateToHome(shell: AppShell) {
 func navigateToLogin(shell: AppShell, next: String = "/") {
   let safeNext = normalizedNextPath(next) ?? "/"
   showRoute(.login(next: safeNext), shell: shell, updateHistory: true)
+}
+
+func navigateToCheckEmail(shell: AppShell) {
+  showRoute(.checkEmail, shell: shell, updateHistory: true)
+}
+
+func navigateToVerify(shell: AppShell, token: String = "", next: String = "/") {
+  let safeNext = normalizedNextPath(next) ?? "/"
+  showRoute(.verify(token: token, next: safeNext), shell: shell, updateHistory: true)
+}
+
+func navigateAfterSignIn(shell: AppShell, next: String) {
+  let safeNext = normalizedNextPath(next) ?? "/"
+  if safeNext == "/" {
+    navigateToHome(shell: shell)
+    return
+  }
+  if let route = ClientRoute.from(pathname: safeNext, search: "") {
+    showRoute(route, shell: shell, updateHistory: true)
+    return
+  }
+  navigateToHome(shell: shell)
 }
 
 private func showRoute(_ route: ClientRoute, shell: AppShell, updateHistory: Bool) {
@@ -139,6 +171,20 @@ private func showRoute(_ route: ClientRoute, shell: AppShell, updateHistory: Boo
     renderAuthView(
       into: shell.routeOutlet,
       props: PageProps(page: "login", next: next, token: ""),
+      shell: shell
+    )
+    selectDemoTab(shell: shell)
+  case .checkEmail:
+    renderAuthView(
+      into: shell.routeOutlet,
+      props: PageProps(page: "check-email", next: "/", token: ""),
+      shell: shell
+    )
+    selectDemoTab(shell: shell)
+  case .verify(let token, let next):
+    renderAuthView(
+      into: shell.routeOutlet,
+      props: PageProps(page: "verify", next: next, token: token),
       shell: shell
     )
     selectDemoTab(shell: shell)
@@ -177,13 +223,13 @@ private func closestAnchor(from target: JSValue) -> JSObject? {
   return nil
 }
 
-private func queryParam(_ name: String, in search: String) -> String? {
+func queryParam(_ name: String, in search: String) -> String? {
   guard !search.isEmpty else { return nil }
   let query = search.hasPrefix("?") ? String(search.dropFirst()) : search
   for pair in query.split(separator: "&") {
     let parts = pair.split(separator: "=", maxSplits: 1)
     guard parts.count == 2, parts[0] == Substring(name) else { continue }
-    return String(parts[1])
+    return percentDecode(String(parts[1]))
   }
   return nil
 }
@@ -193,4 +239,56 @@ private func normalizedNextPath(_ raw: String?) -> String? {
     return nil
   }
   return raw
+}
+
+private func verifyPath(token: String, next: String) -> String {
+  if token.isEmpty {
+    return "/auth/verify"
+  }
+  var path = "/auth/verify?token=\(formURLEncode(token))"
+  if next != "/" {
+    path += "&next=\(formURLEncode(next))"
+  }
+  return path
+}
+
+private func percentDecode(_ value: String) -> String {
+  var result = ""
+  var index = value.startIndex
+  while index < value.endIndex {
+    let char = value[index]
+    if char == "%", value.distance(from: index, to: value.endIndex) >= 3 {
+      let next = value.index(index, offsetBy: 1)
+      let end = value.index(index, offsetBy: 3)
+      let hex = String(value[next..<end])
+      if let code = UInt8(hex, radix: 16) {
+        result.append(Character(UnicodeScalar(code)))
+        index = end
+        continue
+      }
+    }
+    if char == "+" {
+      result.append(" ")
+    } else {
+      result.append(char)
+    }
+    index = value.index(after: index)
+  }
+  return result
+}
+
+private func formURLEncode(_ value: String) -> String {
+  let hexDigits = Array("0123456789ABCDEF")
+  var result = ""
+  for byte in value.utf8 {
+    switch byte {
+    case 0x30...0x39, 0x41...0x5A, 0x61...0x7A, 0x2D, 0x2E, 0x5F, 0x7E:
+      result.append(Character(UnicodeScalar(byte)))
+    default:
+      result.append("%")
+      result.append(hexDigits[Int(byte >> 4)])
+      result.append(hexDigits[Int(byte & 0x0F)])
+    }
+  }
+  return result
 }

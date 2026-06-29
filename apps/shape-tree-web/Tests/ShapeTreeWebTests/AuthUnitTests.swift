@@ -117,15 +117,6 @@ import Testing
     #expect(AuthEmail.safeNextPath("") == nil)
   }
 
-  @Test func signedInRedirectAppendsQueryParam() {
-    #expect(AuthEmail.signedInRedirect(to: "/") == "/?signed-in=1")
-    #expect(AuthEmail.signedInRedirect(to: "/content/Private/secret") == "/content/Private/secret?signed-in=1")
-    #expect(
-      AuthEmail.signedInRedirect(to: "/content/Private/secret?foo=bar")
-        == "/content/Private/secret?foo=bar&signed-in=1"
-    )
-  }
-
   @Test func normalizedWasmNextPathAcceptsSafePaths() {
     #expect(AuthEmail.normalizedWasmNextPath("/") == "/")
     #expect(AuthEmail.normalizedWasmNextPath("/posts/secret") == "/posts/secret")

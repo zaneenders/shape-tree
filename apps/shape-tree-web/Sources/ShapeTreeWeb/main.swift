@@ -41,12 +41,10 @@ private func runShapeTreeWeb(logger: Logger) async throws {
   let js = "\(settings.staticRoot)/app.js"
   let css = "\(settings.staticRoot)/app.css"
   let appjs = try String(contentsOfFile: js, encoding: .utf8)
-  let styles = try String(contentsOfFile: css, encoding: .utf8)
-
   guard !appjs.isEmpty else {
     throw StartupError.missingBootstrap(path: js)
   }
-  guard !styles.isEmpty else {
+  guard FileManager.default.fileExists(atPath: css) else {
     throw StartupError.missingBootstrap(path: css)
   }
 
@@ -79,9 +77,7 @@ private func runShapeTreeWeb(logger: Logger) async throws {
     ResponseCompressionMiddleware(minimumResponseSizeToCompress: 512)
   }
 
-  let authPages = AuthPages(styles: styles, bootstrapScript: appjs)
-
-  let shellHTML = WebAssets.indexHTML(styles: styles, bootstrapScript: appjs)
+  let shellHTML = WebAssets.indexHTML(bootstrapScript: appjs)
   let spaShellPage: @Sendable () -> Response = {
     Response(
       status: .ok,
@@ -94,9 +90,7 @@ private func runShapeTreeWeb(logger: Logger) async throws {
     to: router,
     auth: authBundle.services,
     rateLimiter: LoginRateLimiter(),
-    spaShellPage: spaShellPage,
-    spaVerifyPage: { token, next in authPages.verify(token: token, next: next) },
-    spaCheckEmailPage: { authPages.checkEmail() }
+    spaShellPage: spaShellPage
   )
 
   router.get { _, _ in

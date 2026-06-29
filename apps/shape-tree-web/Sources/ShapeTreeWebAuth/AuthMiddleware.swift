@@ -48,12 +48,4 @@ package enum AuthEmail {
   package static func normalizedWasmNextPath(_ raw: String?) -> String? {
     safeNextPath(raw)
   }
-
-  /// Appends `signed-in=1` so the SPA can refresh nav after magic-link verify.
-  package static func signedInRedirect(to path: String) -> String {
-    if path.contains("?") {
-      return "\(path)&signed-in=1"
-    }
-    return "\(path)?signed-in=1"
-  }
 }

@@ -1,29 +1,19 @@
 enum WebAssets {
+  static let stylesheetPath = "/app.css"
+
   static func indexHTML(
     title: String = "WASM Hummingbird Server",
-    styles: String,
-    bootstrapScript: String,
-    propsJSON: String? = nil
+    bootstrapScript: String
   ) -> String {
     let escapedTitle = escapeHTML(title)
-    let propsTag =
-      propsJSON.map { json in
-        // Break out of <script type="application/json"> if a token ever contains </script>.
-        let escaped = json.replacingOccurrences(of: "<", with: "\\u003c")
-        return """
-          <script type="application/json" id="entry-page-props">\(escaped)</script>
-          """
-      } ?? ""
     return """
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>\(escapedTitle)</title>
-        <style>
-        \(styles)
-        </style>
-        \(propsTag)
+        <link rel="stylesheet" href="\(stylesheetPath)" />
         <script type="module">
         \(bootstrapScript)
         </script>

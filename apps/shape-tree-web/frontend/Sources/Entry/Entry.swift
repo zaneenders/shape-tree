@@ -132,7 +132,7 @@ import ShapeTreeDOM
   wireClientRouter(shell: shell)
 
   wireAppTabs(shell: shell)
-  refreshSessionTabs(shell: shell, openFitIfSignedIn: consumeSignedInQuery())
+  refreshSessionTabs(shell: shell, openFitIfSignedIn: false)
 }
 
 func renderDemoContent(into demoPanel: JSValue) {
@@ -161,14 +161,6 @@ func renderDemoContent(into demoPanel: JSValue) {
   )
 }
 
-func readPageProps() -> PageProps? {
-  let document = JSObject.global.document
-  guard let script = document.getElementById("entry-page-props").object else { return nil }
-  guard let raw = script.textContent.string, !raw.isEmpty else { return nil }
-  guard let parsed = JSObject.global.JSON.parse(JSValue.string(raw)).object else { return nil }
-  return PageProps(unsafelyCopying: parsed)
-}
-
 func renderAuthView(into container: JSValue, props: PageProps, shell: AppShell) {
   let main = createElement("main", className: "auth-page")
   append(main, to: container)
@@ -184,11 +176,7 @@ func renderAuthView(into container: JSValue, props: PageProps, shell: AppShell) 
     )
     append(blurb, to: main)
 
-    let form = createElement(
-      "form",
-      className: "auth-form",
-      attributes: ["method": "POST", "action": "/auth/login"]
-    )
+    let form = createElement("form", className: "auth-form")
     append(form, to: main)
 
     let emailLabel = createElement("label", innerText: "Email")
@@ -205,13 +193,36 @@ func renderAuthView(into container: JSValue, props: PageProps, shell: AppShell) 
     )
     append(emailInput, to: emailLabel)
 
-    append(
-      createElement("input", attributes: ["type": "hidden", "name": "next", "value": props.next]),
-      to: form
+    let nextInput = createElement(
+      "input",
+      attributes: ["type": "hidden", "name": "next", "value": props.next]
     )
-    append(
-      createElement("button", innerText: "Send sign-in link", attributes: ["type": "submit"]),
-      to: form
+    append(nextInput, to: form)
+
+    let status = createElement("p", className: "status", id: "login-status")
+    append(status, to: form)
+
+    let submitButton = createElement(
+      "button",
+      innerText: "Send sign-in link",
+      attributes: ["type": "submit"]
+    )
+    append(submitButton, to: form)
+
+    form.onsubmit = .object(
+      JSClosure { arguments -> JSValue in
+        if let event = arguments[0].object {
+          _ = event.preventDefault!()
+        }
+        submitLoginForm(
+          emailInput: emailInput,
+          next: props.next,
+          status: status,
+          submitButton: submitButton,
+          shell: shell
+        )
+        return .undefined
+      }
     )
 
   case "check-email":
@@ -235,24 +246,33 @@ func renderAuthView(into container: JSValue, props: PageProps, shell: AppShell) 
       let blurb = createElement("p", innerText: "Click continue to finish signing in.")
       append(blurb, to: main)
 
-      let form = createElement(
-        "form",
-        className: "auth-form",
-        attributes: ["method": "POST", "action": "/auth/verify"]
-      )
+      let form = createElement("form", className: "auth-form")
       append(form, to: main)
 
-      append(
-        createElement("input", attributes: ["type": "hidden", "name": "token", "value": props.token]),
-        to: form
+      let status = createElement("p", className: "status", id: "verify-status")
+      append(status, to: form)
+
+      let submitButton = createElement(
+        "button",
+        innerText: "Continue",
+        attributes: ["type": "submit"]
       )
-      append(
-        createElement("input", attributes: ["type": "hidden", "name": "next", "value": props.next]),
-        to: form
-      )
-      append(
-        createElement("button", innerText: "Continue", attributes: ["type": "submit"]),
-        to: form
+      append(submitButton, to: form)
+
+      form.onsubmit = .object(
+        JSClosure { arguments -> JSValue in
+          if let event = arguments[0].object {
+            _ = event.preventDefault!()
+          }
+          submitVerifyForm(
+            token: props.token,
+            next: props.next,
+            status: status,
+            submitButton: submitButton,
+            shell: shell
+          )
+          return .undefined
+        }
       )
     } else {
       let heading = createElement("h1", innerText: "Sign-in link invalid")
@@ -286,11 +306,110 @@ private func createSpaLink(shell: AppShell, route: ClientRoute, text: String) ->
         navigateToHome(shell: shell)
       case .login(let next):
         navigateToLogin(shell: shell, next: next)
+      case .checkEmail:
+        navigateToCheckEmail(shell: shell)
+      case .verify:
+        navigateToVerify(shell: shell)
       }
       return .undefined
     }
   )
   return button
+}
+
+private func submitLoginForm(
+  emailInput: JSValue,
+  next: String,
+  status: JSValue,
+  submitButton: JSValue,
+  shell: AppShell
+) {
+  guard let email = emailInput.value.string, !email.isEmpty else { return }
+  let body = "email=\(formURLEncode(email))&next=\(formURLEncode(next))"
+
+  setInnerText(status, "Sending…")
+  submitButton.disabled = .boolean(true)
+
+  let promise = postFormURL("/auth/login", body: body)
+  promise.then(success: { response in
+    if response.ok.boolean == true {
+      navigateToCheckEmail(shell: shell)
+    } else {
+      setInnerText(status, "Something went wrong. Try again.")
+      submitButton.disabled = .boolean(false)
+    }
+    return JSValue.undefined
+  })
+  promise.catch(failure: { _ in
+    setInnerText(status, "Something went wrong. Try again.")
+    submitButton.disabled = .boolean(false)
+    return JSValue.undefined
+  })
+}
+
+private func formURLEncode(_ value: String) -> String {
+  let hexDigits = Array("0123456789ABCDEF")
+  var result = ""
+  for byte in value.utf8 {
+    switch byte {
+    case 0x30...0x39, 0x41...0x5A, 0x61...0x7A, 0x2D, 0x2E, 0x5F, 0x7E:
+      result.append(Character(UnicodeScalar(byte)))
+    default:
+      result.append("%")
+      result.append(hexDigits[Int(byte >> 4)])
+      result.append(hexDigits[Int(byte & 0x0F)])
+    }
+  }
+  return result
+}
+
+private func submitVerifyForm(
+  token: String,
+  next: String,
+  status: JSValue,
+  submitButton: JSValue,
+  shell: AppShell
+) {
+  let body = "token=\(formURLEncode(token))&next=\(formURLEncode(next))"
+
+  setInnerText(status, "Signing in…")
+  submitButton.disabled = .boolean(true)
+
+  let promise = postFormURL("/auth/verify", body: body)
+  promise.then(success: { response in
+    let jsonPromise = JSPromise(response.json().object!)!
+    jsonPromise.then(success: { jsonValue in
+      guard let body = jsonValue.object else {
+        setInnerText(status, "Something went wrong. Try again.")
+        submitButton.disabled = .boolean(false)
+        return JSValue.undefined
+      }
+      let result = VerifyResponse(unsafelyCopying: body)
+      if result.ok {
+        refreshSessionTabs(shell: shell, openFitIfSignedIn: true)
+        navigateAfterSignIn(shell: shell, next: result.next ?? "/")
+      } else {
+        navigateToVerify(shell: shell)
+      }
+      return JSValue.undefined
+    })
+    jsonPromise.catch(failure: { _ in
+      setInnerText(status, "Something went wrong. Try again.")
+      submitButton.disabled = .boolean(false)
+      return JSValue.undefined
+    })
+    return JSValue.undefined
+  })
+  promise.catch(failure: { _ in
+    setInnerText(status, "Something went wrong. Try again.")
+    submitButton.disabled = .boolean(false)
+    return JSValue.undefined
+  })
+}
+
+@JS struct VerifyResponse {
+  var ok: Bool
+  var next: String?
 }
 
 @JS struct PageProps {

@@ -126,9 +126,7 @@ struct LoginFlowIntegrationTests: ~Copyable {
         to: router,
         auth: auth,
         rateLimiter: LoginRateLimiter(),
-        spaShellPage: { Response(status: .ok, body: .init(byteBuffer: ByteBuffer(string: "shell"))) },
-        spaVerifyPage: { _, _ in Response(status: .ok, body: .init(byteBuffer: ByteBuffer(string: "verify"))) },
-        spaCheckEmailPage: { Response(status: .ok, body: .init(byteBuffer: ByteBuffer(string: "check-email"))) }
+        spaShellPage: { Response(status: .ok, body: .init(byteBuffer: ByteBuffer(string: "shell"))) }
       )
       FitProtectedRoutes.register(on: router, staticRoot: staticRoot.path)
 
@@ -151,8 +149,9 @@ struct LoginFlowIntegrationTests: ~Copyable {
           headers: [.contentType: "application/x-www-form-urlencoded"],
           body: ByteBuffer(string: loginBody)
         ) { response in
-          #expect(response.status == .seeOther)
-          #expect(response.headers[.location] == "/auth/check-email")
+          #expect(response.status == .ok)
+          #expect(response.headers[.contentType]?.hasPrefix("application/json") == true)
+          #expect(String(buffer: response.body) == #"{"ok":true}"#)
         }
 
         // 3. Poll IMAP for the login email and extract the token.
@@ -197,8 +196,12 @@ struct LoginFlowIntegrationTests: ~Copyable {
           headers: [.contentType: "application/x-www-form-urlencoded"],
           body: ByteBuffer(string: verifyBody)
         ) { response in
-          #expect(response.status == .seeOther)
-          #expect(response.headers[.location] == "/?signed-in=1")
+          #expect(response.status == .ok)
+          #expect(response.headers[.contentType]?.hasPrefix("application/json") == true)
+          let body = String(buffer: response.body)
+          let json = try JSONSerialization.jsonObject(with: Data(body.utf8)) as? [String: Any]
+          #expect(json?["ok"] as? Bool == true)
+          #expect(json?["next"] as? String == nextPath)
           if let setCookie = response.headers[.setCookie] {
             sessionCookie = Self.parseSessionCookie(setCookie)
           }

@@ -214,6 +214,8 @@ func heartRateHue(_ heartRate: UInt8?) -> Double {
 
 /// Build (or rebuild) the offscreen route image. Called when data or size changes.
 func renderFitRouteToImage() {
+  guard canvasWidth >= 1, canvasHeight >= 1 else { return }
+
   // Create offscreen canvas once and reuse.
   let offscreen: JSValue
   if let existing = fitRouteImage {
@@ -351,12 +353,14 @@ func formatSpeed(_ metersPerSecond: Double) -> String {
 }
 
 func drawFitFrame(context: JSValue) {
+  guard canvasWidth >= 1, canvasHeight >= 1 else { return }
+
   context.fillStyle = .string("#070b12")
   _ = context.fillRect(0, 0, canvasWidth, canvasHeight)
 
   // Blit pre-rendered scene: grid + altitude ribbon + route + markers.
   if fitRouteImageDirty { renderFitRouteToImage() }
-  if let img = fitRouteImage {
+  if let img = fitRouteImage, canvasWidth >= 1, canvasHeight >= 1 {
     _ = context.drawImage(img, 0, 0)
   }
 

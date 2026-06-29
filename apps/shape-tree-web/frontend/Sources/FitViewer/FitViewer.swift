@@ -6,7 +6,13 @@ import ShapeTreeDOM
   JavaScriptEventLoop.installGlobalExecutor()
 }
 
+@JS public func teardownFitViewer() {
+  resetFitViewerState()
+}
+
 @JS public func renderFitViewer(into container: JSValue) async {
+  resetFitViewerState()
+
   let shell = mountFeatureShell(
     into: container,
     className: "fit-viewer",
@@ -56,4 +62,19 @@ import ShapeTreeDOM
   } else if bytes != nil {
     setInnerText(shell.status, "Loaded empty FIT file")
   }
+}
+
+private func resetFitViewerState() {
+  stopDrawLoop()
+  fitSummary = nil
+  fitScreenPoints = []
+  fitPlaybackIndex = 0
+  fitHoverIndex = nil
+  fitPointGrid = []
+  fitPointGridStarts = []
+  fitPointGridCols = 0
+  fitPointGridRows = 0
+  fitRouteImage = nil
+  fitRouteImageDirty = true
+  pointerInside = false
 }

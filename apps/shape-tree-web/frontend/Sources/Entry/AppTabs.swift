@@ -107,43 +107,8 @@ func refreshSessionTabs(shell: AppShell, openFitIfSignedIn: Bool = false) {
   })
 }
 
-func consumeSignedInQuery() -> Bool {
-  let location = JSObject.global.location
-  let search = location.search.string ?? ""
-  guard queryParam("signed-in", in: search) == "1" else { return false }
-
-  let pathname = location.pathname.string ?? "/"
-  let cleaned = stripQueryParam("signed-in", from: search)
-  _ = JSObject.global.history.replaceState(JSValue.null, "", pathname + cleaned)
-  return true
-}
-
 private func signedOutSession() -> SessionInfo {
   SessionInfo(authenticated: false, email: nil, demo: true, fit: false, article: true)
-}
-
-private func queryParam(_ name: String, in search: String) -> String? {
-  guard !search.isEmpty else { return nil }
-  let query = search.hasPrefix("?") ? String(search.dropFirst()) : search
-  for pair in query.split(separator: "&") {
-    let parts = pair.split(separator: "=", maxSplits: 1)
-    guard parts.count == 2, parts[0] == Substring(name) else { continue }
-    return String(parts[1])
-  }
-  return nil
-}
-
-private func stripQueryParam(_ name: String, from search: String) -> String {
-  guard !search.isEmpty else { return "" }
-  let hadQuestion = search.hasPrefix("?")
-  let query = hadQuestion ? String(search.dropFirst()) : search
-  let kept = query.split(separator: "&").compactMap { pair -> String? in
-    let parts = pair.split(separator: "=", maxSplits: 1)
-    guard parts.count == 2, parts[0] != Substring(name) else { return nil }
-    return String(pair)
-  }
-  if kept.isEmpty { return "" }
-  return (hadQuestion ? "?" : "") + kept.joined(separator: "&")
 }
 
 private func applySessionTabs(shell: AppShell, session: SessionInfo, openFitIfSignedIn: Bool) {
@@ -167,6 +132,7 @@ private func applySessionTabs(shell: AppShell, session: SessionInfo, openFitIfSi
 func signOut(shell: AppShell) {
   let promise = postURL("/auth/logout")
   promise.then(success: { _ in
+    teardownFitViewerIfLoaded()
     JSObject.global.window.fitViewerLoaded = .boolean(false)
     if let container = elementById("fit-container") {
       clearElement(container)
@@ -200,6 +166,18 @@ private func loadFitViewer() {
       return .undefined
     }
     _ = mountFitViewer(container)
+    return .undefined
+  })
+  promise.catch(failure: { _ in .undefined })
+}
+
+private func teardownFitViewerIfLoaded() {
+  let promise = dynamicImport("/fit-viewer-bootstrap.js")
+  promise.then(success: { moduleValue in
+    guard let teardown = moduleValue.object?.teardownFitViewer.function else {
+      return .undefined
+    }
+    teardown()
     return .undefined
   })
   promise.catch(failure: { _ in .undefined })

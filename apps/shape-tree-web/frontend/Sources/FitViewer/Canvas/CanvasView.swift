@@ -2,7 +2,7 @@ import JavaScriptKit
 
 func resizeCanvas(canvas: JSValue, stage: JSValue) {
   let dpr = JSObject.global.devicePixelRatio.number ?? 1
-  let cssWidth = stage.clientWidth.number ?? 640
+  let cssWidth = jsMax(stage.clientWidth.number ?? 640, 1)
   let maxHeight = jsWindowInnerHeight() * 0.58
   let cssHeight = jsMin(jsMax(cssWidth * 0.58, 260), maxHeight)
 
@@ -71,9 +71,15 @@ func wireCanvasEvents(canvas: JSValue) {
   canvas.tabIndex = .number(0)
 }
 
+func stopDrawLoop() {
+  drawStep = nil
+}
+
 func startDrawLoop(canvas: JSValue) {
+  stopDrawLoop()
   let context = canvas.getContext("2d")
   drawStep = JSClosure { _ -> JSValue in
+    guard drawStep != nil else { return JSValue.undefined }
     frame += 1
     stepFitPlayback()
     drawFitFrame(context: context)

@@ -55,20 +55,18 @@ package enum AuthRoutes {
     to router: Router<C>,
     auth: AuthServices,
     rateLimiter: LoginRateLimiter,
-    spaShellPage: @Sendable @escaping () -> Response,
-    spaVerifyPage: @Sendable @escaping (String?, String?) -> Response,
-    spaCheckEmailPage: @Sendable @escaping () -> Response
+    spaShellPage: @Sendable @escaping () -> Response
   ) where C.Identity == User, C.Session == UUID {
     router.get("login") { _, _ in
       spaShellPage()
     }
 
     router.get("auth/check-email") { _, _ in
-      spaCheckEmailPage()
+      spaShellPage()
     }
 
-    // The login form is a real POST. Regardless of whether the address is known,
-    // redirect to the check-email page so we never leak which emails are registered.
+    // Login is submitted via fetch from the SPA. Always return the same JSON body so we
+    // never leak which emails are registered.
     router.post("auth/login") { request, context async throws -> Response in
       let body = try await request.body.collect(upTo: 16 * 1024)
       let fields = FormParser.parseURLForm(String(buffer: body))
@@ -77,12 +75,12 @@ package enum AuthRoutes {
 
       guard let email = AuthEmail.validatedEmail(fields["email"] ?? "") else {
         context.logger.warning("Rejected malformed login email from \(ip)")
-        return redirect(to: "/auth/check-email")
+        return loginAccepted()
       }
 
       guard await rateLimiter.allow(ip: ip) else {
         context.logger.warning("Login rate limited for \(email) from \(ip)")
-        return redirect(to: "/auth/check-email")
+        return loginAccepted()
       }
 
       let (rawToken, tokenHash) = LoginTokenService.generate()
@@ -113,22 +111,20 @@ package enum AuthRoutes {
         }
       }
 
-      return redirect(to: "/auth/check-email")
+      return loginAccepted()
     }
 
-    router.get("auth/verify") { request, _ async -> Response in
-      let token = request.uri.queryParameters.get("token")
-      let next = AuthEmail.normalizedWasmNextPath(request.uri.queryParameters.get("next"))
-      return spaVerifyPage(token, next)
+    router.get("auth/verify") { _, _ in
+      spaShellPage()
     }
 
-    // The confirm form is a real POST. On failure redirect back to the (tokenless)
-    // verify page, which renders the "link invalid" state in the core wasm.
+    // Verify is submitted via fetch from the SPA. Always return JSON so the client can
+    // finish sign-in without a redirect.
     router.post("auth/verify") { request, context async throws -> Response in
       let body = try await request.body.collect(upTo: 16 * 1024)
       let fields = FormParser.parseURLForm(String(buffer: body))
       guard let rawToken = fields["token"], !rawToken.isEmpty else {
-        return redirect(to: "/auth/verify")
+        return verifyRejected()
       }
 
       let tokenHash = LoginTokenService.hash(rawToken)
@@ -136,13 +132,13 @@ package enum AuthRoutes {
         let userID = try await auth.database.consumeLoginToken(hash: tokenHash, logger: context.logger),
         let user = try await auth.database.user(id: userID, logger: context.logger)
       else {
-        return redirect(to: "/auth/verify")
+        return verifyRejected()
       }
 
       context.sessions.setSession(user.id, expiresIn: auth.settings.sessionTTL)
 
       let next = AuthEmail.normalizedWasmNextPath(fields["next"]) ?? "/"
-      return redirect(to: AuthEmail.signedInRedirect(to: next))
+      return verifyAccepted(next: next)
     }
 
     router.post("auth/logout") { _, context async throws -> Response in
@@ -153,6 +149,32 @@ package enum AuthRoutes {
 
   private static func redirect(to location: String) -> Response {
     Response(status: .seeOther, headers: [.location: location], body: .init())
+  }
+
+  private static func loginAccepted() -> Response {
+    Response(
+      status: .ok,
+      headers: [.contentType: "application/json; charset=utf-8"],
+      body: .init(byteBuffer: ByteBuffer(string: #"{"ok":true}"#))
+    )
+  }
+
+  private static func verifyAccepted(next: String) -> Response {
+    let nextJSON = (try? JSONSerialization.data(withJSONObject: ["ok": true, "next": next]))
+      .flatMap { String(data: $0, encoding: .utf8) } ?? #"{"ok":true,"next":"/"}"#
+    return Response(
+      status: .ok,
+      headers: [.contentType: "application/json; charset=utf-8"],
+      body: .init(byteBuffer: ByteBuffer(string: nextJSON))
+    )
+  }
+
+  private static func verifyRejected() -> Response {
+    Response(
+      status: .ok,
+      headers: [.contentType: "application/json; charset=utf-8"],
+      body: .init(byteBuffer: ByteBuffer(string: #"{"ok":false}"#))
+    )
   }
 
   private static func sendLoginEmail(

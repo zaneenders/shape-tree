@@ -71,7 +71,7 @@ RUN SWIFT_MUSL_SDK="$(cat /.swift-musl-sdk)" \
   && cp ".build/${SWIFT_MUSL_SDK}/${BUILD_CONFIGURATION}/ShapeTreeWeb" /output/ShapeTreeWeb
 
 # -----------------------------------------------------------------------------
-# Runtime: static binary + dist (first paint: inlined HTML/CSS/entry JS + Entry.wasm; lazy: fit-viewer-bootstrap.js + FitViewer.wasm)
+# Runtime: static binary + dist (shell HTML inlines app.js, links /app.css + Entry.wasm; lazy: fit-viewer-bootstrap.js + FitViewer.wasm)
 # -----------------------------------------------------------------------------
 FROM scratch AS runtime
 
