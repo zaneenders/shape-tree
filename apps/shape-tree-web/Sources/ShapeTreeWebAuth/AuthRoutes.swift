@@ -68,6 +68,9 @@ package enum AuthRoutes {
     // Login is submitted via fetch from the SPA. Always return the same JSON body so we
     // never leak which emails are registered.
     router.post("auth/login") { request, context async throws -> Response in
+      // Drop any existing session so the login flow UI matches server state.
+      context.sessions.clearSession()
+
       let body = try await request.body.collect(upTo: 16 * 1024)
       let fields = FormParser.parseURLForm(String(buffer: body))
       let next = AuthEmail.safeNextPath(fields["next"])

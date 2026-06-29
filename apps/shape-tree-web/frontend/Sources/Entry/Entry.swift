@@ -128,6 +128,7 @@ import ShapeTreeDOM
   )
   setHidden(fitTab, true)
   JSObject.global.window.appAuthenticated = .boolean(false)
+  JSObject.global.window.onAuthFlowRoute = .boolean(false)
   renderInitialView(shell: shell)
   wireClientRouter(shell: shell)
 

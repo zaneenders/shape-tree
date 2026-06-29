@@ -18,6 +18,15 @@ enum ClientRoute: Equatable {
   case checkEmail
   case verify(token: String, next: String)
 
+  var isAuthFlow: Bool {
+    switch self {
+    case .home:
+      false
+    case .login, .checkEmail, .verify:
+      true
+    }
+  }
+
   static func from(pathname: String, search: String) -> ClientRoute? {
     switch pathname {
     case "/":
@@ -161,6 +170,8 @@ func navigateAfterSignIn(shell: AppShell, next: String) {
 }
 
 private func showRoute(_ route: ClientRoute, shell: AppShell, updateHistory: Bool) {
+  let wasOnAuthFlow = JSObject.global.window.onAuthFlowRoute.boolean == true
+  JSObject.global.window.onAuthFlowRoute = .boolean(route.isAuthFlow)
   clearElement(shell.routeOutlet)
 
   switch route {
@@ -195,8 +206,11 @@ private func showRoute(_ route: ClientRoute, shell: AppShell, updateHistory: Boo
   if updateHistory {
     _ = JSObject.global.history.pushState(JSValue.null, "", route.path)
   }
-}
 
+  if wasOnAuthFlow && !route.isAuthFlow {
+    refreshSessionTabs(shell: shell)
+  }
+}
 private func syncViewToLocation(shell: AppShell) {
   let location = JSObject.global.location
   let pathname = location.pathname.string ?? "/"

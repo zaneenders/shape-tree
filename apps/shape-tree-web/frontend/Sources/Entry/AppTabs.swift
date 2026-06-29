@@ -112,12 +112,16 @@ private func signedOutSession() -> SessionInfo {
 }
 
 private func applySessionTabs(shell: AppShell, session: SessionInfo, openFitIfSignedIn: Bool) {
-  JSObject.global.window.appAuthenticated = .boolean(session.authenticated)
-  setInnerText(shell.authButton, session.authenticated ? "Sign out" : "Sign in")
+  // During login/check-email/verify, ignore a stale session cookie in the header.
+  let onAuthFlow = JSObject.global.window.onAuthFlowRoute.boolean == true
+  let displaySession = onAuthFlow ? signedOutSession() : session
 
-  setHidden(shell.demoTab, !session.demo)
-  setHidden(shell.fitTab, !session.fit)
-  setHidden(shell.articleTab, !session.article)
+  JSObject.global.window.appAuthenticated = .boolean(displaySession.authenticated)
+  setInnerText(shell.authButton, displaySession.authenticated ? "Sign out" : "Sign in")
+
+  setHidden(shell.demoTab, !displaySession.demo)
+  setHidden(shell.fitTab, !displaySession.fit)
+  setHidden(shell.articleTab, !displaySession.article)
 
   if !session.fit && isPanelVisible(shell.fitPanel) {
     navigateToHome(shell: shell)
