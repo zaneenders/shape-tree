@@ -43,9 +43,4 @@ package enum AuthEmail {
     }
     return raw
   }
-
-  /// Accepts same-origin relative paths for post-login redirects.
-  package static func normalizedWasmNextPath(_ raw: String?) -> String? {
-    safeNextPath(raw)
-  }
 }

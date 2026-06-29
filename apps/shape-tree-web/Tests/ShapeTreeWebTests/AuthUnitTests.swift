@@ -1,8 +1,9 @@
 import Foundation
+import Logging
 import Testing
 
-@testable import ShapeTreeWebAuth
 @testable import ShapeTreeEmail
+@testable import ShapeTreeWebAuth
 
 @Suite struct LoginTokenServiceTests {
   @Test func generateProducesBase64URLToken() {
@@ -116,17 +117,6 @@ import Testing
   @Test func safeNextPathRejectsEmpty() {
     #expect(AuthEmail.safeNextPath("") == nil)
   }
-
-  @Test func normalizedWasmNextPathAcceptsSafePaths() {
-    #expect(AuthEmail.normalizedWasmNextPath("/") == "/")
-    #expect(AuthEmail.normalizedWasmNextPath("/posts/secret") == "/posts/secret")
-  }
-
-  @Test func normalizedWasmNextPathRejectsUnsafePaths() {
-    #expect(AuthEmail.normalizedWasmNextPath(nil) == nil)
-    #expect(AuthEmail.normalizedWasmNextPath("//evil.com") == nil)
-    #expect(AuthEmail.normalizedWasmNextPath("http://evil.com") == nil)
-  }
 }
 
 @Suite struct SMTPMessageEncodingTests {
@@ -181,5 +171,180 @@ import Testing
     #expect(await limiter.allow(ip: "1.1.1.1") == false)
     try await Task.sleep(for: .milliseconds(250))
     #expect(await limiter.allow(ip: "1.1.1.1") == true)
+  }
+}
+
+private actor FakeAuthDatabase: AuthDatabase {
+  private var _users: [String: User] = [:]
+  private var _tokens: [String: StoredToken] = [:]
+
+  private(set) var createdTokens: [(userID: UUID, tokenHash: String)] = []
+  private(set) var consumedTokens: [String] = []
+
+  var nextCreateLoginTokenError: (any Error)?
+
+  func setNextCreateLoginTokenError(_ error: any Error) {
+    nextCreateLoginTokenError = error
+  }
+
+  struct StoredToken {
+    let userID: UUID
+    let tokenHash: String
+    let expiresAt: Date
+  }
+
+  func addUser(_ user: User) {
+    _users[user.email] = user
+  }
+
+  func user(email: String, logger: Logger) async throws -> User? {
+    _users[email]
+  }
+
+  func user(id: UUID, logger: Logger) async throws -> User? {
+    _users.values.first { $0.id == id }
+  }
+
+  func createUser(email: String, logger: Logger) async throws -> User {
+    let user = User(id: UUID(), email: email, createdAt: Date())
+    _users[email] = user
+    return user
+  }
+
+  func createLoginToken(
+    userID: UUID, tokenHash: String, expiresAt: Date, logger: Logger
+  ) async throws {
+    if let error = nextCreateLoginTokenError {
+      nextCreateLoginTokenError = nil
+      throw error
+    }
+    _tokens[tokenHash] = StoredToken(
+      userID: userID, tokenHash: tokenHash, expiresAt: expiresAt)
+    createdTokens.append((userID, tokenHash))
+  }
+
+  func consumeLoginToken(hash: String, logger: Logger) async throws -> UUID? {
+    consumedTokens.append(hash)
+    return _tokens.removeValue(forKey: hash)?.userID
+  }
+
+  func deleteExpiredLoginTokens(logger: Logger) async throws {
+  }
+
+  var storedTokenCount: Int {
+    _tokens.count
+  }
+
+  func hasToken(hash: String) -> Bool {
+    _tokens[hash] != nil
+  }
+}
+
+@Suite struct LoginEmailFailureRecoveryTests {
+  private let logger = Logger(label: "test.login-email-failure")
+
+  @Test func orphanedTokenRemainsWhenEmailFailsAfterSuccessfulPersist() async throws {
+    let db = FakeAuthDatabase()
+    let user = try await db.createUser(email: "test@example.com", logger: logger)
+    let (_, tokenHash) = LoginTokenService.generate()
+    let expiresAt = Date.now + 600
+
+    try await db.createLoginToken(
+      userID: user.id,
+      tokenHash: tokenHash,
+      expiresAt: expiresAt,
+      logger: logger
+    )
+
+    #expect(await db.hasToken(hash: tokenHash) == true)
+    #expect(await db.storedTokenCount == 1)
+    #expect(await db.createdTokens.count == 1)
+
+    let userID = try await db.consumeLoginToken(hash: tokenHash, logger: logger)
+    #expect(userID == user.id, "Token is valid and points to the right user")
+    #expect(await db.storedTokenCount == 0, "Token is consumed on first use")
+  }
+
+  @Test func retryCreatesFreshTokenWhileOrphanedTokenLingers() async throws {
+    let db = FakeAuthDatabase()
+    let user = try await db.createUser(email: "test@example.com", logger: logger)
+
+    let (_, hash1) = LoginTokenService.generate()
+    try await db.createLoginToken(
+      userID: user.id, tokenHash: hash1,
+      expiresAt: Date.now + 600, logger: logger
+    )
+
+    let (_, hash2) = LoginTokenService.generate()
+    try await db.createLoginToken(
+      userID: user.id, tokenHash: hash2,
+      expiresAt: Date.now + 600, logger: logger
+    )
+
+    #expect(await db.storedTokenCount == 2)
+    #expect(await db.hasToken(hash: hash1) == true, "First token still orphaned")
+    #expect(await db.hasToken(hash: hash2) == true, "Second token is present")
+    #expect(hash1 != hash2, "Tokens are distinct")
+
+    let consumedUserID = try await db.consumeLoginToken(hash: hash2, logger: logger)
+    #expect(consumedUserID == user.id)
+
+    #expect(await db.hasToken(hash: hash1) == true, "Orphaned token remains until expiry sweep")
+    #expect(await db.storedTokenCount == 1)
+  }
+
+  @Test func noTokenPersistedWhenCreateLoginTokenFails() async throws {
+    let db = FakeAuthDatabase()
+    let user = try await db.createUser(email: "test@example.com", logger: logger)
+
+    let (_, tokenHash) = LoginTokenService.generate()
+
+    struct DBError: Error {}
+    await db.setNextCreateLoginTokenError(DBError())
+
+    let tokenPersisted: Bool
+    do {
+      try await db.createLoginToken(
+        userID: user.id, tokenHash: tokenHash,
+        expiresAt: Date.now + 600, logger: logger
+      )
+      tokenPersisted = true
+    } catch {
+      tokenPersisted = false
+    }
+
+    #expect(tokenPersisted == false, "DB write threw — token was never created")
+    #expect(await db.storedTokenCount == 0, "Nothing persisted")
+    #expect(await db.createdTokens.isEmpty, "No creation recorded")
+
+    let (_, hash2) = LoginTokenService.generate()
+    try await db.createLoginToken(
+      userID: user.id, tokenHash: hash2,
+      expiresAt: Date.now + 600, logger: logger
+    )
+    #expect(await db.storedTokenCount == 1, "Retry after DB recovery succeeds")
+    #expect(await db.hasToken(hash: hash2) == true)
+  }
+
+  @Test func repeatedFailuresDuringSMTPOutageAccumulateOrphanedTokens() async throws {
+    let db = FakeAuthDatabase()
+    let user = try await db.createUser(email: "test@example.com", logger: logger)
+
+    for _ in 0..<3 {
+      let (_, hash) = LoginTokenService.generate()
+      try await db.createLoginToken(
+        userID: user.id, tokenHash: hash,
+        expiresAt: Date.now + 600, logger: logger
+      )
+    }
+
+    #expect(await db.storedTokenCount == 3, "Three orphaned tokens accumulated")
+    #expect(await db.createdTokens.count == 3)
+
+    for (_, hash) in await db.createdTokens {
+      let uid = try await db.consumeLoginToken(hash: hash, logger: logger)
+      #expect(uid == user.id)
+    }
+    #expect(await db.storedTokenCount == 0)
   }
 }

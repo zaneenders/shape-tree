@@ -31,7 +31,7 @@ package struct AuthServices: Sendable {
   let siteURL: String
   let secureCookies: Bool
 
-  /// Boots when Postgres is configured. SMTP is loaded when a login email is sent.
+  /// Boots when Postgres is configured. SMTP settings are loaded and validated eagerly at boot.
   package static func bootstrapIfConfigured(
     from config: ConfigReader,
     siteURL: String,

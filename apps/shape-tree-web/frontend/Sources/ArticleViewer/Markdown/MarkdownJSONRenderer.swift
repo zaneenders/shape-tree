@@ -1,5 +1,7 @@
 import JavaScriptKit
 
+private let safeURLSchemes: Set<String> = ["http:", "https:", "mailto:"]
+
 func renderMarkdownNode(_ node: JSValue) -> String {
   guard let object = node.object, let kind = object.kind.string else {
     return ""
@@ -23,12 +25,12 @@ func renderMarkdownNode(_ node: JSValue) -> String {
   case "inlineCode":
     return "<code>\(escapeHTML(object.text.string ?? ""))</code>"
   case "link":
-    let destination = object.destination.string ?? ""
+    let destination = sanitizeURL(object.destination.string ?? "")
     let href = escapeAttr(destination)
     let rel = destination.hasPrefix("http") ? " rel=\"noopener noreferrer\"" : ""
     return "<a href=\"\(href)\"\(rel)>\(renderChildren(object))</a>"
   case "image":
-    let source = escapeAttr(object.source.string ?? "")
+    let source = escapeAttr(sanitizeURL(object.source.string ?? ""))
     let alt = escapeAttr(object.text.string ?? "")
     return "<img src=\"\(source)\" alt=\"\(alt)\" loading=\"lazy\">"
   case "paragraph":
@@ -50,7 +52,7 @@ func renderMarkdownNode(_ node: JSValue) -> String {
   case "thematicBreak":
     return "<hr>"
   case "htmlBlock", "inlineHTML":
-    return object.text.string ?? ""
+    return escapeHTML(object.text.string ?? "")
   default:
     return renderChildren(object)
   }
@@ -84,4 +86,14 @@ private func escapeHTML(_ value: String) -> String {
 
 private func escapeAttr(_ value: String) -> String {
   escapeHTML(value)
+}
+
+private func sanitizeURL(_ raw: String) -> String {
+  let lower = raw.lowercased()
+  if !lower.contains(":") || lower.hasPrefix("#") || lower.hasPrefix("/") {
+    return raw
+  }
+  guard let schemeEnd = lower.firstIndex(of: ":") else { return raw }
+  let scheme = String(lower[...schemeEnd])
+  return safeURLSchemes.contains(scheme) ? raw : ""
 }

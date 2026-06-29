@@ -70,7 +70,7 @@ package enum AuthRoutes {
     router.post("auth/login") { request, context async throws -> Response in
       let body = try await request.body.collect(upTo: 16 * 1024)
       let fields = FormParser.parseURLForm(String(buffer: body))
-      let next = AuthEmail.normalizedWasmNextPath(fields["next"])
+      let next = AuthEmail.safeNextPath(fields["next"])
       let ip = context.remoteAddress?.ipAddress ?? "unknown"
 
       guard let email = AuthEmail.validatedEmail(fields["email"] ?? "") else {
@@ -137,7 +137,7 @@ package enum AuthRoutes {
 
       context.sessions.setSession(user.id, expiresIn: auth.settings.sessionTTL)
 
-      let next = AuthEmail.normalizedWasmNextPath(fields["next"]) ?? "/"
+      let next = AuthEmail.safeNextPath(fields["next"]) ?? "/"
       return verifyAccepted(next: next)
     }
 
