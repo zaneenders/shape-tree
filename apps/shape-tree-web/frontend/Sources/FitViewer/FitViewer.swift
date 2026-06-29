@@ -6,11 +6,11 @@ import ShapeTreeDOM
 }
 
 @JS public func teardownFitViewer() {
-  resetFitViewerState()
+  fitViewState.reset()
 }
 
 @JS public func renderFitViewer(into container: JSValue) async {
-  resetFitViewerState()
+  fitViewState.reset()
 
   let shell = mountFeatureShell(
     into: container,
@@ -46,8 +46,7 @@ import ShapeTreeDOM
   if let bytes, !bytes.isEmpty {
     do {
       let summary = try FitActivityParser.parse(bytes: bytes)
-      loadFitActivity(summary)
-      projectFitTrackToCanvas()
+      fitViewState.loadActivity(summary)
 
       var statusText = "Parsed \(summary.points.count) GPS points"
       if let sport = summary.sport {
@@ -61,18 +60,4 @@ import ShapeTreeDOM
   } else if bytes != nil {
     setInnerText(shell.status, "Loaded empty FIT file")
   }
-}
-
-private func resetFitViewerState() {
-  stopDrawLoop()
-  fitSummary = nil
-  fitScreenPoints = []
-  fitPlaybackIndex = 0
-  fitHoverIndex = nil
-  fitPointGrid = []
-  fitPointGridStarts = []
-  fitPointGridCols = 0
-  fitPointGridRows = 0
-  fitRouteImage = nil
-  fitRouteImageDirty = true
 }

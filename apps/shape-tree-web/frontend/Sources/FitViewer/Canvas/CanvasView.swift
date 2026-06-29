@@ -6,8 +6,8 @@ func resizeCanvas(canvas: JSValue, stage: JSValue) {
   let maxHeight = jsWindowInnerHeight() * 0.58
   let cssHeight = jsMin(jsMax(cssWidth * 0.58, 260), maxHeight)
 
-  canvasWidth = cssWidth
-  canvasHeight = cssHeight
+  fitViewState.canvasWidth = cssWidth
+  fitViewState.canvasHeight = cssHeight
 
   canvas.style.width = .string(jsPx(cssWidth))
   canvas.style.height = .string(jsPx(cssHeight))
@@ -17,7 +17,7 @@ func resizeCanvas(canvas: JSValue, stage: JSValue) {
   let context = canvas.getContext("2d")
   _ = context.setTransform(dpr, 0, 0, dpr, 0, 0)
 
-  projectFitTrackToCanvas()
+  fitViewState.projectTrackToCanvas()
 }
 
 func wireResize(canvas: JSValue, stage: JSValue) {
@@ -40,8 +40,8 @@ func canvasPoint(from event: JSValue, canvas: JSValue) -> (x: Double, y: Double)
     let clientX = event.clientX.number ?? 0
     let clientY = event.clientY.number ?? 0
     return (
-      (clientX - left) * canvasWidth / width,
-      (clientY - top) * canvasHeight / height
+      (clientX - left) * fitViewState.canvasWidth / width,
+      (clientY - top) * fitViewState.canvasHeight / height
     )
   }
   return nil
@@ -51,7 +51,7 @@ func wireCanvasEvents(canvas: JSValue) {
   canvas.onpointermove = .object(
     JSClosure { arguments in
       if let point = canvasPoint(from: arguments[0], canvas: canvas) {
-        fitHoverIndex = nearestFitPointIndex(x: point.x, y: point.y)
+        fitViewState.hoverIndex = fitViewState.nearestPointIndex(x: point.x, y: point.y)
       }
       return JSValue.undefined
     }
@@ -59,7 +59,7 @@ func wireCanvasEvents(canvas: JSValue) {
 
   canvas.onpointerleave = .object(
     JSClosure { _ in
-      fitHoverIndex = nil
+      fitViewState.hoverIndex = nil
       return JSValue.undefined
     }
   )
@@ -68,21 +68,21 @@ func wireCanvasEvents(canvas: JSValue) {
 }
 
 func stopDrawLoop() {
-  drawStep = nil
+  fitViewState.drawStep = nil
 }
 
 func startDrawLoop(canvas: JSValue) {
   stopDrawLoop()
   let context = canvas.getContext("2d")
-  drawStep = JSClosure { _ -> JSValue in
-    guard drawStep != nil else { return JSValue.undefined }
-    stepFitPlayback()
-    drawFitFrame(context: context)
+  fitViewState.drawStep = JSClosure { _ -> JSValue in
+    guard fitViewState.drawStep != nil else { return JSValue.undefined }
+    fitViewState.stepPlayback()
+    fitViewState.drawFrame(context: context)
 
-    if let drawStep {
+    if let drawStep = fitViewState.drawStep {
       _ = JSObject.global.requestAnimationFrame!(drawStep)
     }
     return JSValue.undefined
   }
-  _ = drawStep?(JSValue.undefined)
+  _ = fitViewState.drawStep?(JSValue.undefined)
 }
