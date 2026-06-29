@@ -1,9 +1,8 @@
-import JavaScriptEventLoop
 import JavaScriptKit
 import ShapeTreeDOM
 
 @JS public func bootstrap() {
-  JavaScriptEventLoop.installGlobalExecutor()
+  installEventLoop()
 }
 
 @JS public func renderApp() {
@@ -362,7 +361,7 @@ private func submitVerifyForm(
 
   let promise = postFormURL("/auth/verify", body: body)
   promise.then(success: { response in
-    let jsonPromise = JSPromise(response.json().object!)!
+    let jsonPromise = responseJSON(response)
     jsonPromise.then(success: { jsonValue in
       guard let body = jsonValue.object else {
         setInnerText(status, "Something went wrong. Try again.")
@@ -408,7 +407,7 @@ private func fetchServerMessage(status: JSValue) {
 
   let promise = fetchURL("/api/message")
   promise.then(success: { response in
-    let jsonPromise = JSPromise(response.json().object!)!
+    let jsonPromise = responseJSON(response)
     jsonPromise.then(success: { jsonValue in
       if let body = jsonValue.object {
         let decoded = ServerMessage(unsafelyCopying: body)

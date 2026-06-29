@@ -1,6 +1,6 @@
-import JavaScriptEventLoop
 import JavaScriptKit
+import ShapeTreeDOM
 
 @JS public func bootstrap() {
-  JavaScriptEventLoop.installGlobalExecutor()
+  installEventLoop()
 }

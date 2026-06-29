@@ -1,9 +1,5 @@
 import JavaScriptKit
 
-public func fetchURL(_ url: String) -> JSPromise {
-  JSPromise(JSObject.global.fetch.object!(url).object!)!
-}
-
 public func createElement(
   _ tag: String,
   className: String? = nil,

@@ -12,7 +12,10 @@ let package = Package(
   targets: [
     .target(
       name: "ShapeTreeDOM",
-      dependencies: ["JavaScriptKit"],
+      dependencies: [
+        "JavaScriptKit",
+        .product(name: "JavaScriptEventLoop", package: "JavaScriptKit"),
+      ],
       swiftSettings: [
         .enableExperimentalFeature("Extern"),
         .swiftLanguageMode(.v6),

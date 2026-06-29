@@ -85,7 +85,7 @@ func wireAppTabs(shell: AppShell) {
 func refreshSessionTabs(shell: AppShell, openFitIfSignedIn: Bool = false) {
   let promise = fetchURL("/api/session")
   promise.then(success: { response in
-    let jsonPromise = JSPromise(response.json().object!)!
+    let jsonPromise = responseJSON(response)
     jsonPromise.then(success: { jsonValue in
       guard let body = jsonValue.object else {
         applySessionTabs(shell: shell, session: signedOutSession(), openFitIfSignedIn: false)

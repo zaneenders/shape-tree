@@ -1,4 +1,3 @@
-import JavaScriptEventLoop
 import JavaScriptKit
 import ShapeTreeDOM
 
@@ -12,19 +11,11 @@ import ShapeTreeDOM
   let article = createElement("article", className: "article-content")
   append(article, to: shell.wrapper)
 
-  let response: JSValue
-  do {
-    response = try await fetchURL("/api/article").value
-  } catch {
-    setInnerText(shell.status, "Failed to load /api/article")
-    return
-  }
-
   let json: JSValue
   do {
-    json = try await JSPromise(response.json().object!)!.value
+    json = try await fetchResponseJSON("/api/article")
   } catch {
-    setInnerText(shell.status, "Failed to parse article JSON")
+    setInnerText(shell.status, "Failed to load /api/article")
     return
   }
 
