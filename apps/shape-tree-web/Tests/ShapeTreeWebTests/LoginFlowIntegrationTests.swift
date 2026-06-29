@@ -13,37 +13,18 @@ import Testing
 @testable import ShapeTreeWeb
 @testable import ShapeTreeWebAuth
 
-/// Suite-level gate: enabled when `SMTP_INTEGRATION_TEST=true` and SMTP/IMAP
-/// credentials are present (process env or `.env` via swift-configuration in tests).
 private func loginFlowSuiteEnabled() -> Bool {
-  guard ProcessInfo.processInfo.environment["SMTP_INTEGRATION_TEST"]?.lowercased() == "true" else {
+  guard let runTests = ProcessInfo.processInfo.environment["SMTP_INTEGRATION_TEST"] else {
     return false
   }
-  let required = ["SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM"]
-  let env = ProcessInfo.processInfo.environment
-  return required.allSatisfy { !(env[$0] ?? "").isEmpty }
+  return runTests.lowercased() == "true"
 }
 
 /// Full end-to-end login flow test against a real Postgres + SMTP/IMAP provider.
-///
-/// Exercises the magic-link login flow in-process via Hummingbird's `.router` test framework:
-///
-/// 1. Asserts fit-viewer assets redirect to login when unauthenticated.
-/// 2. Triggers a login email via POST /auth/login.
-/// 3. Polls IMAP for the login email and extracts the token from the link.
-/// 4. Verifies GET /auth/verify returns the verify page.
-/// 5. Verifies POST /auth/verify and captures the session cookie.
-/// 6. Asserts fit-viewer assets are reachable when authenticated.
-///
-/// The suite automatically starts the docker-compose `postgres` service in
-/// ``init`` and stops it in ``deinit`` — no manual setup needed. SMTP/IMAP
-/// credentials are read from `.env`.
-///
-/// Set `SMTP_INTEGRATION_TEST=true` to enable the suite (skipped otherwise):
-///
 /// ```console
 /// SMTP_INTEGRATION_TEST=true swift test --filter LoginFlowIntegrationTests
 /// ```
+/// NOTE: You will need to configer your SMTP settings in the .env file for shape-tree-web
 @Suite(.serialized, .timeLimit(.minutes(2)), .disabled(if: !loginFlowSuiteEnabled()))
 struct LoginFlowIntegrationTests: ~Copyable {
 
@@ -59,8 +40,6 @@ struct LoginFlowIntegrationTests: ~Copyable {
       Self.stopPostgres()
     }
   }
-
-  // MARK: - Tests
 
   @Test
   func fullLoginFlowUnlocksFitViewerAfterAuthentication() async throws {
@@ -185,6 +164,18 @@ struct LoginFlowIntegrationTests: ~Copyable {
           method: .get
         ) { response in
           #expect(response.status == .ok)
+          #expect(String(buffer: response.body) == "shell")
+        }
+
+        // 4a. GET /auth/verify without token still returns the shell page
+        //     (the handler ignores query params, so missing/malformed
+        //     tokens must not crash).
+        try await client.execute(
+          uri: "/auth/verify",
+          method: .get
+        ) { response in
+          #expect(response.status == .ok)
+          #expect(String(buffer: response.body) == "shell")
         }
 
         // 5. POST /auth/verify with token.
