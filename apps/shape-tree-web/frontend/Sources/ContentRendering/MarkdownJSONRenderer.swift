@@ -2,7 +2,7 @@ import JavaScriptKit
 
 private let safeURLSchemes: Set<String> = ["http:", "https:", "mailto:"]
 
-func renderMarkdownNode(_ node: JSValue) -> String {
+public func renderMarkdownNode(_ node: JSValue) -> String {
   guard let object = node.object, let kind = object.kind.string else {
     return ""
   }

@@ -40,6 +40,14 @@ let package = Package(
       ]
     ),
     .target(
+      name: "ShapeTreeContent",
+      dependencies: [
+        "ShapeTreeMarkdown",
+        .product(name: "Markdown", package: "swift-markdown"),
+        .product(name: "Configuration", package: "swift-configuration"),
+      ]
+    ),
+    .target(
       name: "ShapeTreeEmail",
       dependencies: [
         .product(name: "NIOCore", package: "swift-nio"),
@@ -91,6 +99,7 @@ let package = Package(
       dependencies: [
         "ShapeTreeWebBuilder",
         "ShapeTreeConfig",
+        "ShapeTreeContent",
         "ShapeTreeMarkdown",
         "ShapeTreeWebAuth",
         .product(name: "Hummingbird", package: "hummingbird"),
@@ -106,9 +115,14 @@ let package = Package(
       dependencies: ["ShapeTreeEmail"]
     ),
     .testTarget(
+      name: "ShapeTreeContentTests",
+      dependencies: ["ShapeTreeContent"]
+    ),
+    .testTarget(
       name: "ShapeTreeWebTests",
       dependencies: [
         "ShapeTreeWeb",
+        "ShapeTreeContent",
         "ShapeTreeWebAuth",
         "ShapeTreeEmail",
         .product(name: "Hummingbird", package: "hummingbird"),

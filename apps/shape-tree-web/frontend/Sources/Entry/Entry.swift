@@ -54,18 +54,33 @@ import ShapeTreeDOM
   )
   append(fitTab, to: tabBar)
 
-  let articleTab = createElement(
+  let articlesTab = createElement(
     "button",
     className: "tab",
-    id: "article-tab",
-    innerText: "Article",
+    id: "articles-tab",
+    innerText: "Articles",
     attributes: [
       "role": "tab",
       "aria-selected": "false",
-      "aria-controls": "article-panel",
+      "aria-controls": "articles-panel",
+      "hidden": "true",
     ]
   )
-  append(articleTab, to: tabBar)
+  append(articlesTab, to: tabBar)
+
+  let favoritesTab = createElement(
+    "button",
+    className: "tab",
+    id: "favorites-tab",
+    innerText: "Favorites",
+    attributes: [
+      "role": "tab",
+      "aria-selected": "false",
+      "aria-controls": "favorites-panel",
+      "hidden": "true",
+    ]
+  )
+  append(favoritesTab, to: tabBar)
 
   let tabPanels = createElement("div", className: "tab-panels")
   append(tabPanels, to: app)
@@ -100,32 +115,51 @@ import ShapeTreeDOM
   let fitContainer = createElement("div", id: "fit-container")
   append(fitContainer, to: fitPanel)
 
-  let articlePanel = createElement(
+  let articlesPanel = createElement(
     "div",
     className: "tab-panel",
-    id: "article-panel",
+    id: "articles-panel",
     attributes: [
       "role": "tabpanel",
-      "aria-labelledby": "article-tab",
+      "aria-labelledby": "articles-tab",
       "aria-hidden": "true",
     ]
   )
-  append(articlePanel, to: tabPanels)
+  append(articlesPanel, to: tabPanels)
 
-  let articleContainer = createElement("div", id: "article-container")
-  append(articleContainer, to: articlePanel)
+  let articlesContainer = createElement("div", id: "articles-container")
+  append(articlesContainer, to: articlesPanel)
+
+  let favoritesPanel = createElement(
+    "div",
+    className: "tab-panel",
+    id: "favorites-panel",
+    attributes: [
+      "role": "tabpanel",
+      "aria-labelledby": "favorites-tab",
+      "aria-hidden": "true",
+    ]
+  )
+  append(favoritesPanel, to: tabPanels)
+
+  let favoritesContainer = createElement("div", id: "favorites-container")
+  append(favoritesContainer, to: favoritesPanel)
 
   let shell = AppShell(
     routeOutlet: routeOutlet,
     demoTab: demoTab,
     fitTab: fitTab,
-    articleTab: articleTab,
+    articlesTab: articlesTab,
+    favoritesTab: favoritesTab,
     authButton: authButton,
     demoPanel: demoPanel,
     fitPanel: fitPanel,
-    articlePanel: articlePanel
+    articlesPanel: articlesPanel,
+    favoritesPanel: favoritesPanel
   )
   setHidden(fitTab, true)
+  setHidden(articlesTab, true)
+  setHidden(favoritesTab, true)
   JSObject.global.window.appAuthenticated = .boolean(false)
   JSObject.global.window.onAuthFlowRoute = .boolean(false)
   renderInitialView(shell: shell)

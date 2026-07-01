@@ -192,9 +192,57 @@ h2 {
   font-size: 0.9rem;
 }
 
-/* --- Article viewer section --- */
-.article-viewer {
+/* --- Content viewers --- */
+.article-viewer,
+.articles-viewer,
+.favorites-viewer {
   margin-top: 0.5rem;
+}
+
+.content-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.content-list-item {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.content-list-date {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.content-list-link {
+  text-align: left;
+  font: inherit;
+  font-size: 1.05rem;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.content-back {
+  margin-bottom: 1rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.content-title {
+  margin: 0 0 0.5rem;
+}
+
+.content-meta {
+  margin: 0 0 1rem;
+  opacity: 0.75;
 }
 
 .article-content {

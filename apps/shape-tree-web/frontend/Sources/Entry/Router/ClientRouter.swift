@@ -5,11 +5,13 @@ struct AppShell {
   let routeOutlet: JSValue
   let demoTab: JSValue
   let fitTab: JSValue
-  let articleTab: JSValue
+  let articlesTab: JSValue
+  let favoritesTab: JSValue
   let authButton: JSValue
   let demoPanel: JSValue
   let fitPanel: JSValue
-  let articlePanel: JSValue
+  let articlesPanel: JSValue
+  let favoritesPanel: JSValue
 }
 
 enum ClientRoute: Equatable {

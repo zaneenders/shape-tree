@@ -51,6 +51,9 @@ services:
       PGPASSWORD: shape_tree
       PGDATABASE: shape_tree
       PGSSLMODE: disable
+      CONTENT_PATH: /content
+    volumes:
+      - ${HOME}/content:/content:ro
     ports:
       - "127.0.0.1:42069:8080"
       - "127.0.0.1:42070:42070"
