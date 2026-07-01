@@ -1,11 +1,20 @@
+include:
+  - ./observability/docker-compose.yml
+
 services:
   api:
     build:
-      context: .
-      dockerfile: apps/shape-tree-api/Dockerfile
+      context: apps/shape-tree-api
+      dockerfile: Dockerfile
+      args:
+        BUILD_CONFIGURATION: ${BUILD_CONFIG:-release}
     env_file:
-      - apps/shape-tree-api/.env
+      - path: apps/shape-tree-api/.env
+        required: false
     environment:
+      # All defaults baked into apps/shape-tree-api/Dockerfile; override via
+      # the environment: block here, or by mounting a .env in tower compose.
+      DATA_PATH: /data
       OTEL_EXPORTER_OTLP_BASE_ENDPOINT: http://jaeger:4318
     volumes:
       - ./apps/shape-tree-api/:/data
@@ -14,39 +23,52 @@ services:
       - "127.0.0.1:42068:42068"
     restart: unless-stopped
     depends_on:
-      - jaeger
+      jaeger:
+        condition: service_started
     networks:
       - app
       - observability
 
   web:
     build:
-      context: .
-      dockerfile: apps/shape-tree-web/Dockerfile
+      context: apps/shape-tree-web
+      dockerfile: Dockerfile
+      args:
+        BUILD_CONFIGURATION: ${BUILD_CONFIG:-release}
     env_file:
-      - apps/shape-tree-web/.env
+      - path: apps/shape-tree-web/.env
+        required: false
     environment:
+      HOSTNAME: 0.0.0.0
+      STATIC_ROOT: /app/dist
+      SKIP_SHAPE_TREE_WEB_BUILD: "1"
+      SITE_URL: http://127.0.0.1:42069
       OTEL_EXPORTER_OTLP_BASE_ENDPOINT: http://jaeger:4318
+      OTEL_SDK_DISABLED: "false"
       PGHOST: postgres
-      PGPORT: 5432
+      PGPORT: "5432"
       PGUSER: shape_tree
       PGPASSWORD: shape_tree
       PGDATABASE: shape_tree
+      PGSSLMODE: disable
+      CONTENT_PATH: /content
     volumes:
-      - ./apps/shape-tree-web/Examples:/Examples:ro
+      - ${HOME}/content:/content:ro
     ports:
-      - "127.0.0.1:42069:42069"
+      - "127.0.0.1:42069:8080"
       - "127.0.0.1:42070:42070"
     restart: unless-stopped
     depends_on:
-      - jaeger
-      - postgres
+      jaeger:
+        condition: service_started
+      postgres:
+        condition: service_healthy
     networks:
       - app
       - observability
 
   postgres:
-    image: postgres:17
+    image: postgres:18
     restart: unless-stopped
     environment:
       POSTGRES_USER: shape_tree
@@ -57,69 +79,16 @@ services:
       - shape_tree_data:/var/lib/postgresql/data
     ports:
       - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shape_tree"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     networks:
       - app
 
-  jaeger:
-    image: jaegertracing/jaeger:2.4.0
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:16686:16686"
-      - "127.0.0.1:4317:4317"
-      - "127.0.0.1:4318:4318"
-    networks:
-      - observability
-
-  parca:
-    image: ghcr.io/ordo-one/swift-parca:latest
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:7070:7070"
-    volumes:
-      - parca-data:/data
-    command:
-      - "--symbolizer-external-addr-2-line-path=/usr/local/bin/addr2line-swift"
-      - "--enable-persistence"
-    networks:
-      - observability
-
-  prometheus:
-    image: prom/prometheus:v3.2.1
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:9090:9090"
-    volumes:
-      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    depends_on:
-      - api
-      - web
-    networks:
-      - observability
-
-  grafana:
-    image: grafana/grafana:11.5.2
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - GRAFANA_PARCA_URL=http://parca:7070
-    volumes:
-      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
-    depends_on:
-      - prometheus
-      - jaeger
-      - parca
-    networks:
-      - observability
+networks:
+  app:
 
 volumes:
   shape_tree_data:
-  parca-data:
-
-networks:
-  app:
-  observability:

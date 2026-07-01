@@ -45,7 +45,7 @@ enum OtelTracing {
   }
 
   /// swift-otel uses the endpoint as-is when set in code (no `/v1/traces` suffix).
-  package static func otlpTracesURL(fromBase baseEndpoint: String) -> String {
+  static func otlpTracesURL(fromBase baseEndpoint: String) -> String {
     if baseEndpoint.contains("/v1/traces") { return baseEndpoint }
     if baseEndpoint.hasSuffix("/") { return "\(baseEndpoint)v1/traces" }
     return "\(baseEndpoint)/v1/traces"

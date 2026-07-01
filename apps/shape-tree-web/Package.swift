@@ -4,25 +4,22 @@ import PackageDescription
 
 let package = Package(
   name: "shape-tree-web",
-  platforms: [
-    .macOS(.v26)
-  ],
-  products: [
-    .executable(name: "ShapeTreeWeb", targets: ["ShapeTreeWeb"])
-  ],
+  platforms: [.macOS(.v26)],
   dependencies: [
-    .package(url: "https://github.com/zaneenders/lorikeet.git", revision: "30702f6"),
-    .package(url: "https://github.com/apple/swift-markdown.git", from: "0.7.0"),
-    .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.24.0"),
+    .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.25.0"),
     .package(url: "https://github.com/hummingbird-project/hummingbird-auth.git", from: "2.0.0"),
+    .package(url: "https://github.com/hummingbird-project/hummingbird-compression.git", from: "2.0.0"),
     .package(url: "https://github.com/vapor/postgres-nio.git", from: "1.21.0"),
-    .package(url: "https://github.com/apple/swift-nio.git", from: "2.100.0"),
+    .package(url: "https://github.com/apple/swift-nio.git", from: "2.101.0"),
     .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.34.0"),
     .package(url: "https://github.com/apple/swift-nio-extras.git", from: "1.31.0"),
     .package(url: "https://github.com/apple/swift-nio-imap.git", from: "0.1.0"),
     .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
-    .package(url: "https://github.com/zaneenders/swift-postgres-models.git", revision: "93c458e"),
+    .package(url: "https://github.com/wendylabsinc/swift-postgres-models.git", revision: "f480ced"),
     .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0"),
+    .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
+    .package(url: "https://github.com/swiftlang/swift-subprocess.git", revision: "aac702b"),
+    .package(url: "https://github.com/swiftlang/swift-markdown.git", from: "0.5.0"),
     .package(url: "https://github.com/apple/swift-metrics.git", from: "2.5.0"),
     .package(url: "https://github.com/swift-server/swift-prometheus.git", from: "2.0.0"),
     .package(
@@ -31,17 +28,27 @@ let package = Package(
   ],
   targets: [
     .target(
-      name: "ShapeTreeWebCore",
+      name: "ShapeTreeConfig",
       dependencies: [
-        .product(name: "Markdown", package: "swift-markdown")
-      ],
-      swiftSettings: [
-        .swiftLanguageMode(.v6),
-        .treatAllWarnings(as: .error),
+        .product(name: "Configuration", package: "swift-configuration")
       ]
     ),
     .target(
-      name: "ShapeTreeWebEmail",
+      name: "ShapeTreeMarkdown",
+      dependencies: [
+        .product(name: "Markdown", package: "swift-markdown")
+      ]
+    ),
+    .target(
+      name: "ShapeTreeContent",
+      dependencies: [
+        "ShapeTreeMarkdown",
+        .product(name: "Markdown", package: "swift-markdown"),
+        .product(name: "Configuration", package: "swift-configuration"),
+      ]
+    ),
+    .target(
+      name: "ShapeTreeEmail",
       dependencies: [
         .product(name: "NIOCore", package: "swift-nio"),
         .product(name: "NIOPosix", package: "swift-nio"),
@@ -50,19 +57,31 @@ let package = Package(
         .product(name: "NIOIMAP", package: "swift-nio-imap"),
         .product(name: "NIOSSL", package: "swift-nio-ssl"),
         .product(name: "Configuration", package: "swift-configuration"),
-      ],
-      swiftSettings: [
-        .swiftLanguageMode(.v6),
-        .treatAllWarnings(as: .error),
+      ]
+    ),
+    .target(
+      name: "ShapeTreeWebBuilder",
+      dependencies: [
+        "ShapeTreeConfig",
+        .product(name: "_NIOFileSystem", package: "swift-nio"),
+        .product(name: "Subprocess", package: "swift-subprocess"),
+      ]
+    ),
+    .executableTarget(
+      name: "shape-tree-web-builder",
+      dependencies: ["ShapeTreeConfig", "ShapeTreeWebBuilder"]
+    ),
+    .executableTarget(
+      name: "shape-tree-add-user",
+      dependencies: [
+        "ShapeTreeWebAuth",
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
       ]
     ),
     .target(
       name: "ShapeTreeWebAuth",
       dependencies: [
-        "ShapeTreeWebCore",
-        "ShapeTreeWebAssets",
-        "ShapeTreeWebEmail",
-        .product(name: "HTML", package: "Lorikeet"),
+        "ShapeTreeEmail",
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "HummingbirdAuth", package: "hummingbird-auth"),
         .product(name: "PostgresNIO", package: "postgres-nio"),
@@ -71,10 +90,6 @@ let package = Package(
         .product(name: "Crypto", package: "swift-crypto"),
         .product(name: "Configuration", package: "swift-configuration"),
       ],
-      swiftSettings: [
-        .swiftLanguageMode(.v6),
-        .treatAllWarnings(as: .error),
-      ],
       plugins: [
         .plugin(name: "PostgresModelsPlugin", package: "swift-postgres-models")
       ]
@@ -82,59 +97,40 @@ let package = Package(
     .executableTarget(
       name: "ShapeTreeWeb",
       dependencies: [
-        "ShapeTreeWebCore",
-        "ShapeTreeWebAssets",
+        "ShapeTreeWebBuilder",
+        "ShapeTreeConfig",
+        "ShapeTreeContent",
+        "ShapeTreeMarkdown",
         "ShapeTreeWebAuth",
-        .product(name: "HTML", package: "Lorikeet"),
-        .product(name: "HTMX", package: "Lorikeet"),
-        .product(name: "HTMXExtras", package: "Lorikeet"),
         .product(name: "Hummingbird", package: "hummingbird"),
+        .product(name: "HummingbirdCompression", package: "hummingbird-compression"),
         .product(name: "NIOCore", package: "swift-nio"),
-        .product(name: "Configuration", package: "swift-configuration"),
         .product(name: "Metrics", package: "swift-metrics"),
         .product(name: "Prometheus", package: "swift-prometheus"),
         .product(name: "OTel", package: "swift-otel"),
-      ],
-      swiftSettings: [
-        .swiftLanguageMode(.v6),
-        .treatAllWarnings(as: .error),
-      ]
-    ),
-    .target(
-      name: "ShapeTreeWebAssets",
-      path: "Sources/ShapeTreeWebAssets",
-      exclude: ["client"],
-      sources: ["Assets.swift", "ClientAssetCatalog.swift", "ClientWasm.swift"],
-      resources: [.copy("ClientWasm.wasm")],
-      plugins: [
-        .plugin(name: "EmbedWebAssets", package: "Lorikeet")
       ]
     ),
     .testTarget(
-      name: "ShapeTreeWebCoreTests",
-      dependencies: ["ShapeTreeWebCore"],
-      swiftSettings: [
-        .swiftLanguageMode(.v6),
-        .treatAllWarnings(as: .error),
-      ]
+      name: "ShapeTreeEmailTests",
+      dependencies: ["ShapeTreeEmail"]
+    ),
+    .testTarget(
+      name: "ShapeTreeContentTests",
+      dependencies: ["ShapeTreeContent"]
     ),
     .testTarget(
       name: "ShapeTreeWebTests",
       dependencies: [
         "ShapeTreeWeb",
-        "ShapeTreeWebCore",
+        "ShapeTreeContent",
         "ShapeTreeWebAuth",
-        "ShapeTreeWebEmail",
+        "ShapeTreeEmail",
         .product(name: "Hummingbird", package: "hummingbird"),
         .product(name: "HummingbirdTesting", package: "hummingbird"),
         .product(name: "HummingbirdAuth", package: "hummingbird-auth"),
         .product(name: "PostgresNIO", package: "postgres-nio"),
         .product(name: "NIOCore", package: "swift-nio"),
         .product(name: "Configuration", package: "swift-configuration"),
-      ],
-      swiftSettings: [
-        .swiftLanguageMode(.v6),
-        .treatAllWarnings(as: .error),
       ]
     ),
   ]

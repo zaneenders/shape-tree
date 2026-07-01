@@ -1,0 +1,20 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "shape-tree-frontend",
+      "dependencies": {
+        "@bjorn3/browser_wasi_shim": "0.3.0",
+      },
+      "devDependencies": {
+        "typescript": "^6.0.3",
+      },
+    },
+  },
+  "packages": {
+    "@bjorn3/browser_wasi_shim": ["@bjorn3/browser_wasi_shim@0.3.0", "", {}, "sha512-FlRBYttPRLcWORzBe6g8nmYTafBkOEFeOqMYM4tAHJzFsQy4+xJA94z85a9BCs8S+Uzfh9LrkpII7DXr2iUVFg=="],
+
+    "typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
+  }
+}

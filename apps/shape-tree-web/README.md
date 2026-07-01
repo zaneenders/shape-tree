@@ -1,76 +1,76 @@
 # shape-tree-web
 
-Markdown blog built on the [Lorikeet](https://github.com/zaneenders/lorikeet) HTML DSL (typed HTML + HTMX), [Hummingbird](https://github.com/hummingbird-project/hummingbird), and a Swift WASM client. Point it at a directory of `.md` files and it serves a readable site with HTMX-powered navigation — no JavaScript build step required.
+Swift Hummingbird server + WASM frontend (JavaScriptKit). Part of the [shape-tree](../../) monorepo.
 
-Build the swift WASM client, then start the server using the bundled `.env.example` (no `.env` needed to try it out):
+## Build & run
 
-```bash
-cd apps/shape-tree-web
-./Scripts/build-client.sh
+The server **requires** Postgres + SMTP to start (auth is not optional). To run locally with
+the monorepo's backing services:
+
+```
+docker compose up postgres -d
 ```
 
-## Setup 
+`docker compose up` works zero-setup — defaults are baked into `apps/shape-tree-web/Dockerfile`. For
+native `swift run ShapeTreeWeb`, export the environment variables you need (see Configuration below);
+the defaults the Dockerfile ships (`HOSTNAME=0.0.0.0`, `STATIC_ROOT=/app/dist`, `SKIP_SHAPE_TREE_WEB_BUILD=1`)
+target the Docker image, so for native runs set at least `HOSTNAME=127.0.0.1`, `STATIC_ROOT=dist`,
+`SKIP_SHAPE_TREE_WEB_BUILD=0`, and a `SITE_URL` matching the port you'll bind.
 
-### Environment
+For traces, also `docker compose up jaeger -d` — or set `OTEL_SDK_DISABLED=true` to skip.
 
-For local development, source `.env.example` directly into your shell:
+## Configuration
 
-Only create a `.env` file when deploying or when you need values that differ from the defaults (e.g. Postgres/SMTP for login):
+| Variable | Default (Dockerfile) | Description |
+|---|---|---|
+| `HOSTNAME` | `0.0.0.0` | Bind address. Use `127.0.0.1` for native `swift run`. |
+| `PORT` | `8080` | Listener port. |
+| `STATIC_ROOT` | `/app/dist` | Path to the built static assets (WASM/JS). For native run, use `dist`. |
+| `SKIP_SHAPE_TREE_WEB_BUILD` | `1` | `1` = assets already built (Docker / pre-built); `0` = build on `swift run`. |
+| `OTEL_HOST` | `0.0.0.0` | Admin/metrics bind address. |
+| `OTEL_PORT` | `42070` | Admin/metrics listener port. |
+| `SITE_URL` | _(none — set always)_ | Public URL used in magic-link emails. |
+| `CONTENT_PATH` | `~/content` | Path to markdown content (`Articles/`, `Favorites/`). |
+| `INDEX_PATH` | `Home` | Slug of the home page markdown file. |
+| `AUTH_PRIVATE_DIRECTORIES` | _(none)_ | Comma-separated content subdirectories protected behind email login. |
+| `INDEX_PATH` | _(none)_ | Slug of the home page (e.g. `Home`). |
+| `PGHOST` / `PGPORT` / `PGUSER` / `PGPASSWORD` / `PGDATABASE` / `PGSSLMODE` | _(none)_ | Postgres connection. For `docker compose`, defaults are set in `docker-compose.yml` (`PGHOST=postgres`, etc.). |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM` / `SMTP_TLS` | _(none)_ | SMTP relay for magic-link login emails. **Required for startup.** |
+| `AUTH_TOKEN_TTL_MINUTES` | `15` | Magic-link token lifetime. |
+| `AUTH_SESSION_TTL_HOURS` | `336` | Session lifetime (14 days). |
+| `OTEL_SERVICE_NAME` | `shape-tree-web` | OpenTelemetry service name. |
+| `OTEL_EXPORTER_OTLP_BASE_ENDPOINT` | `http://jaeger:4318` | OTLP exporter base URL. |
+| `OTEL_SDK_DISABLED` | `false` | Set `true` to skip trace export. |
+| `SWIFT_SDK_ID` | `swift-6.3.2-RELEASE_wasm-embedded` | WASM SDK id used by `shape-tree-web-builder` when `SKIP_SHAPE_TREE_WEB_BUILD=0`. |
 
-```bash
-cp .env.example .env
-# edit .env with your real values
+System environment variables override Dockerfile `ENV` defaults at runtime (in Docker, the
+`docker-compose.yml` `environment:` block and the `env_file:` file both override Dockerfile `ENV`).
+
+## Provisioning a login user
+
+The Postgres defaults match `docker-compose.yml` (host `postgres`, db/user/pass
+`shape_tree`). Run it natively against the compose-backed Postgres (exposed on
+`127.0.0.1:5432`):
+
+```sh
+PGHOST=127.0.0.1 PGPORT=5432 \
+PGUSER=shape_tree PGPASSWORD=shape_tree PGDATABASE=shape_tree PGSSLMODE=disable \
+  swift run --package-path apps/shape-tree-web shape-tree-add-user <email>
 ```
 
-Environment variables (all required):
+This runs any pending migrations, then inserts the user. It skips insertion (and
+logs a notice) if the email already exists. The `PG*` vars are read from the
+environment or a `.env` file in the working directory.
 
-| Variable | Purpose |
-|----------|---------|
-| `HOST` | Bind address |
-| `PORT` | Listener port |
-| `CONTENT_PATH` | Directory of markdown files (scanned recursively) |
+## Testing 
 
-`.env.example` includes sample values for local development (`127.0.0.1`, `42069`, `Examples/content`).
+### Email Integration
 
-### Optional: email login and private directories
+After configuring your SMTP credentials as environment variables (see the table above), run the end
+to end email test with: 
 
-To enable passwordless email login for protected content, set all `PG*` variables and run with the included `postgres` service (see `docker-compose.yml`). SMTP settings are required to actually send login links; without them the server logs each login link but does not send email.
-
-| Variable | Purpose |
-|----------|---------|
-| `SITE_URL` | Public URL used in login links (defaults to `http://HOST:PORT`) |
-| `AUTH_PRIVATE_DIRECTORIES` | Comma-separated content directories to protect (e.g. `Private,Notes/Secret`) |
-| `PGHOST` / `PGPORT` / `PGUSER` / `PGPASSWORD` / `PGDATABASE` | Postgres connection |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM` | SMTP relay for login links |
-
-Add allowed users with:
-
-```bash
-swift run ShapeTreeWeb --add-user user@example.com
+```sh
+set -a \
+  && export SMTP_HOST=... SMTP_PORT=587 SMTP_USERNAME=... SMTP_PASSWORD=... SMTP_FROM=... \
+  && SMTP_INTEGRATION_TEST=true swift test --package-path apps/shape-tree-web --filter LoginFlowIntegrationTests
 ```
-
-Posts inside a private directory are hidden from navigation and require signing in to view.
-
-### Optional: custom login page
-
-By default the `/login` page is a built-in form. To brand it with your own copy, add a `login.md` file to your content directory (the slug defaults to `login`, matched case-insensitively). The file's front matter `title` becomes the heading and its rendered body wraps the login form. Place a `{{login}}` marker anywhere in the body to control where the email field is rendered; if the marker is absent the form is appended to the body. The login post is excluded from the index and navigation, and `/posts/login` redirects to `/login`. When no `login.md` exists, the built-in shell is used.
-
-
-Markdown files support `---` front matter (`title`, `date`, `tags`, `excerpt`). An `index.md` file becomes the home page. Other files are listed as posts sorted by date. Files in subdirectories are grouped in navigation and on the index. Sample content lives in `Examples/content/`.
-
-### Swift WASM
-
-Installed the sdk and binaryen to build the WASM client correctly.
-
-```bash
-swift sdk install \
-  https://download.swift.org/swift-6.3.2-release/wasm-sdk/swift-6.3.2-RELEASE/swift-6.3.2-RELEASE_wasm.artifactbundle.tar.gz \
-  --checksum a61f0584c93283589f8b2f42db05c1f9a182b506c2957271402992655591dd7c
-
-brew install binaryen   # for wasm-opt to reduce binary size
-# Linux (apt):
-# sudo apt install binaryen
-chmod +x Scripts/build-client.sh
-./Scripts/build-client.sh
-```
-

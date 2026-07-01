@@ -11,7 +11,7 @@ package enum AuthCLI {
     }
 
     let secretKeys = SecretsSpecifier<String, String>.specific([
-      "PGPASSWORD", "SMTP_PASSWORD",
+      "PGPASSWORD", "SMTP_PASSWORD", "IMAP_PASSWORD",
     ])
     let config = ConfigReader(providers: [
       EnvironmentVariablesProvider(secretsSpecifier: secretKeys),

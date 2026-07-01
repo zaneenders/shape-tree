@@ -1,0 +1,11 @@
+{
+  "name": "shape-tree-frontend",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@bjorn3/browser_wasi_shim": "0.3.0"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}

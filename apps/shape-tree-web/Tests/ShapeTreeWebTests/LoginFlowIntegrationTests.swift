@@ -7,49 +7,29 @@ import HummingbirdTesting
 import Logging
 import NIOCore
 import PostgresNIO
-import ShapeTreeWebCore
 import Testing
 
+@testable import ShapeTreeEmail
 @testable import ShapeTreeWeb
 @testable import ShapeTreeWebAuth
-@testable import ShapeTreeWebEmail
 
-/// Suite-level gate: enabled when `SMTP_INTEGRATION_TEST=true` and SMTP/IMAP
-/// credentials are available in the environment or `.env`.
 private func loginFlowSuiteEnabled() -> Bool {
-  let values = SMTPSettings.mergedEnvironment()
-  guard values["SMTP_INTEGRATION_TEST"]?.lowercased() == "true" else {
+  guard ProcessInfo.processInfo.environment["SMTP_INTEGRATION_TEST"]?.lowercased() == "true" else {
     return false
   }
-  guard SMTPSettings.loadFromEnvironment() != nil,
-    IMAPSettings.loadFromEnvironment() != nil
-  else { return false }
-  let recipient = values["SMTP_TEST_TO"] ?? values["SMTP_FROM"]
-  return !(recipient ?? "").isEmpty
+  let required = [
+    "SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM",
+    "IMAP_USERNAME", "IMAP_PASSWORD",
+  ]
+  let env = ProcessInfo.processInfo.environment
+  return required.allSatisfy { !(env[$0] ?? "").isEmpty }
 }
 
 /// Full end-to-end login flow test against a real Postgres + SMTP/IMAP provider.
-///
-/// Exercises the entire magic-link login flow in-process via Hummingbird's
-/// `.router` test framework:
-///
-/// 1. Asserts a private post returns 404 (hidden) when unauthenticated.
-/// 2. Asserts the navigation does not show the private directory when unauthenticated.
-/// 3. Triggers a login email via POST /auth/login.
-/// 4. Polls IMAP for the login email and extracts the token from the link.
-/// 5. Verifies the token via POST /auth/verify and captures the session cookie.
-/// 6. Asserts the private post is now visible (200 OK with content).
-/// 7. Asserts the navigation now shows the private directory.
-///
-/// The suite automatically starts the docker-compose `postgres` service in
-/// ``init`` and stops it in ``deinit`` — no manual setup needed. SMTP/IMAP
-/// credentials are read from `.env`.
-///
-/// Set `SMTP_INTEGRATION_TEST=true` to enable the suite (skipped otherwise):
-///
 /// ```console
 /// SMTP_INTEGRATION_TEST=true swift test --filter LoginFlowIntegrationTests
 /// ```
+/// NOTE: You will need to configure your SMTP and IMAP settings in the .env file for shape-tree-web
 @Suite(.serialized, .timeLimit(.minutes(2)), .disabled(if: !loginFlowSuiteEnabled()))
 struct LoginFlowIntegrationTests: ~Copyable {
 
@@ -66,32 +46,39 @@ struct LoginFlowIntegrationTests: ~Copyable {
     }
   }
 
-  // MARK: - Tests
-
   @Test
-  func fullLoginFlowShowsPrivateContentAfterAuthentication() async throws {
-    let values = SMTPSettings.mergedEnvironment()
+  func fullLoginFlowUnlocksFitViewerAfterAuthentication() async throws {
     let logger = Logger(label: "test.login-flow")
 
-    guard let smtpSettings = SMTPSettings.loadFromEnvironment() else {
+    let config = try await Self.makeConfig()
+    guard SMTPSettings.integrationTestEnabled(in: config) else {
+      Issue.record("SMTP/IMAP integration settings missing despite integration gate")
+      return
+    }
+    guard let smtpSettings = SMTPSettings.load(from: config) else {
       Issue.record("SMTP settings missing despite integration gate")
       return
     }
-    guard let imapSettings = IMAPSettings.loadFromEnvironment() else {
+    guard let imapSettings = IMAPSettings.load(from: config) else {
       Issue.record("IMAP settings missing despite integration gate")
       return
     }
 
-    let config = try await Self.makeConfig()
     let postgresSettings = try PostgresSettings.load(from: config)
     let testEmail = smtpSettings.fromAddress
 
     let port = try config.requiredInt(forKey: "PORT")
     let siteURL = "http://test-\(UUID().uuidString.prefix(8)):\(port)"
-    let mailbox = values["IMAP_MAILBOX"] ?? "INBOX"
-    let fetchLimit = max(Int(values["IMAP_FETCH_LIMIT"] ?? "") ?? 20, 1)
-    let timeoutSeconds = max(Int(values["IMAP_ROUND_TRIP_TIMEOUT_SECONDS"] ?? "") ?? 90, 1)
-    let pollSeconds = max(Int(values["IMAP_ROUND_TRIP_POLL_SECONDS"] ?? "") ?? 3, 1)
+    let mailbox = config.string(forKey: "IMAP_MAILBOX", isSecret: false) ?? "INBOX"
+    let fetchLimit = max(config.int(forKey: "IMAP_FETCH_LIMIT") ?? 20, 1)
+    let timeoutSeconds = max(config.int(forKey: "IMAP_ROUND_TRIP_TIMEOUT_SECONDS") ?? 90, 1)
+    let pollSeconds = max(config.int(forKey: "IMAP_ROUND_TRIP_POLL_SECONDS") ?? 3, 1)
+
+    let staticRoot = FileManager.default.temporaryDirectory
+      .appendingPathComponent("login-flow-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: staticRoot, withIntermediateDirectories: true)
+    try Data([0x00, 0x61, 0x73, 0x6D]).write(to: staticRoot.appendingPathComponent("FitViewer.wasm"))
+    defer { try? FileManager.default.removeItem(at: staticRoot) }
 
     let pgClient = PostgresClient(configuration: postgresSettings.configuration)
     try await withThrowingTaskGroup(of: Void.self) { group in
@@ -108,63 +95,38 @@ struct LoginFlowIntegrationTests: ~Copyable {
         database: database, email: testEmail, logger: logger)
       logger.info("Test user: \(user.email) (\(user.id))")
 
-      let contentDir = FileManager.default.temporaryDirectory
-        .appendingPathComponent("login-flow-\(UUID().uuidString)", isDirectory: true)
-      try FileManager.default.createDirectory(
-        at: contentDir, withIntermediateDirectories: true)
-      let contentMarker = UUID().uuidString
-      try Self.createTestContent(at: contentDir, marker: contentMarker)
-      defer { try? FileManager.default.removeItem(at: contentDir) }
-
-      let store = try ContentStore(
-        contentDirectory: contentDir,
-        indexSlug: "Home",
-        privateDirectories: ["Private"]
-      )
-      let initial = store.indexPost ?? store.publishedPosts.first!
-      let secretSlug = "secret"
-
       let auth = AuthServices(
         database: database,
         persist: persist,
         settings: AuthSettings(),
-        smtp: smtpSettings,
+        config: config,
         siteURL: siteURL,
         secureCookies: false
       )
 
       let router = Router(context: AppRequestContext.self)
-      ShapeTreeWeb.configureRouter(
-        router,
-        store: store,
-        initial: initial,
-        indexSlug: "Home",
-        auth: auth
+      AuthRoutes.addSessionMiddleware(to: router, auth: auth)
+      AuthRoutes.addRoutes(
+        to: router,
+        auth: auth,
+        rateLimiter: LoginRateLimiter(),
+        spaShellPage: { Response(status: .ok, body: .init(byteBuffer: ByteBuffer(string: "shell"))) }
       )
+      FitProtectedRoutes.register(on: router, staticRoot: staticRoot.path)
 
       let app = Application(router: router)
 
       try await app.test(.router) { client in
-        let htmxHeader = HTTPField.Name("HX-Request")!
+        let nextPath = "/"
 
-        // 1. Unauthenticated: private post returns 404 (hidden, not redirected).
-        try await client.execute(uri: "/posts/\(secretSlug)", method: .get) { response in
-          #expect(response.status == .notFound)
+        // 1. Unauthenticated: fit viewer redirects to login.
+        try await client.execute(uri: "/FitViewer.wasm", method: .get) { response in
+          #expect(response.status == .seeOther)
+          #expect(response.headers[.location]?.hasPrefix("/login") == true)
         }
 
-        // 2. Unauthenticated: nav omits private content.
-        try await client.execute(
-          uri: "/htmx/content/nav",
-          method: .get,
-          headers: [htmxHeader: "true"]
-        ) { response in
-          #expect(response.status == .ok)
-          let body = String(buffer: response.body)
-          #expect(!body.contains(contentMarker))
-        }
-
-        // 3. Trigger login email.
-        let loginBody = "email=\(testEmail)&next=/posts/\(secretSlug)"
+        // 2. Trigger login email.
+        let loginBody = "email=\(testEmail)&next=\(nextPath)"
         try await client.execute(
           uri: "/auth/login",
           method: .post,
@@ -172,11 +134,11 @@ struct LoginFlowIntegrationTests: ~Copyable {
           body: ByteBuffer(string: loginBody)
         ) { response in
           #expect(response.status == .ok)
-          let body = String(buffer: response.body)
-          #expect(body.contains("Check your email"))
+          #expect(response.headers[.contentType]?.hasPrefix("application/json") == true)
+          #expect(String(buffer: response.body) == #"{"ok":true}"#)
         }
 
-        // 4. Poll IMAP for the login email and extract the token.
+        // 3. Poll IMAP for the login email and extract the token.
         let emailSubject = "Sign in to \(siteURL)"
         let deadline = Date().addingTimeInterval(TimeInterval(timeoutSeconds))
         var rawToken: String?
@@ -201,29 +163,41 @@ struct LoginFlowIntegrationTests: ~Copyable {
           return
         }
 
-        // 5. GET /auth/verify shows the confirm page.
+        // 4. GET /auth/verify returns the verify page.
         try await client.execute(
-          uri: "/auth/verify?token=\(rawToken)&next=/posts/\(secretSlug)",
+          uri: "/auth/verify?token=\(rawToken)&next=\(nextPath)",
           method: .get
         ) { response in
           #expect(response.status == .ok)
-          let body = String(buffer: response.body)
-          #expect(body.contains("Confirm sign in"))
+          #expect(String(buffer: response.body) == "shell")
         }
 
-        // 6. POST /auth/verify with token.
+        // 4a. GET /auth/verify without token still returns the shell page
+        //     (the handler ignores query params, so missing/malformed
+        //     tokens must not crash).
+        try await client.execute(
+          uri: "/auth/verify",
+          method: .get
+        ) { response in
+          #expect(response.status == .ok)
+          #expect(String(buffer: response.body) == "shell")
+        }
+
+        // 5. POST /auth/verify with token.
         var sessionCookie: String?
-        let verifyBody = "token=\(rawToken)&next=/posts/\(secretSlug)"
+        let verifyBody = "token=\(rawToken)&next=\(nextPath)"
         try await client.execute(
           uri: "/auth/verify",
           method: .post,
-          headers: [
-            .contentType: "application/x-www-form-urlencoded"
-          ],
+          headers: [.contentType: "application/x-www-form-urlencoded"],
           body: ByteBuffer(string: verifyBody)
         ) { response in
-          #expect(response.status == .seeOther)
-          #expect(response.headers[.location] == "/posts/\(secretSlug)")
+          #expect(response.status == .ok)
+          #expect(response.headers[.contentType]?.hasPrefix("application/json") == true)
+          let body = String(buffer: response.body)
+          let json = try JSONSerialization.jsonObject(with: Data(body.utf8)) as? [String: Any]
+          #expect(json?["ok"] as? Bool == true)
+          #expect(json?["next"] as? String == nextPath)
           if let setCookie = response.headers[.setCookie] {
             sessionCookie = Self.parseSessionCookie(setCookie)
           }
@@ -234,26 +208,14 @@ struct LoginFlowIntegrationTests: ~Copyable {
           return
         }
 
-        // 7. Authenticated: private post is now visible.
+        // 6. Authenticated: fit viewer wasm is available.
         try await client.execute(
-          uri: "/posts/\(secretSlug)",
+          uri: "/FitViewer.wasm",
           method: .get,
           headers: [.cookie: sessionCookie]
         ) { response in
           #expect(response.status == .ok)
-          let body = String(buffer: response.body)
-          #expect(body.contains(contentMarker))
-        }
-
-        // 8. Authenticated: nav now includes private content.
-        try await client.execute(
-          uri: "/htmx/content/nav",
-          method: .get,
-          headers: [htmxHeader: "true", .cookie: sessionCookie]
-        ) { response in
-          #expect(response.status == .ok)
-          let body = String(buffer: response.body)
-          #expect(body.contains(contentMarker))
+          #expect(response.headers[.contentType] == "application/wasm")
         }
       }
     }
@@ -375,7 +337,7 @@ struct LoginFlowIntegrationTests: ~Copyable {
   /// Postgres port-forward (the `.env` default `postgres` only resolves inside Docker).
   private static func makeConfig() async throws -> ConfigReader {
     let secretKeys = SecretsSpecifier<String, String>.specific([
-      "PGPASSWORD", "SMTP_PASSWORD",
+      "PGPASSWORD", "SMTP_PASSWORD", "IMAP_PASSWORD",
     ])
     var env = ProcessInfo.processInfo.environment
     env["PGHOST"] = "127.0.0.1"
@@ -403,26 +365,6 @@ struct LoginFlowIntegrationTests: ~Copyable {
       return existing
     }
     return try await database.createUser(email: email, logger: logger)
-  }
-
-  private static func createTestContent(at dir: URL, marker: String) throws {
-    let homeMarkdown = "---\ntitle: Test Site\n---\nWelcome to the test site."
-    try homeMarkdown.write(
-      to: dir.appendingPathComponent("Home.md"),
-      atomically: true,
-      encoding: .utf8
-    )
-    let privateDir = dir.appendingPathComponent("Private", isDirectory: true)
-    try FileManager.default.createDirectory(
-      at: privateDir,
-      withIntermediateDirectories: true
-    )
-    let secretMarkdown = "---\ntitle: \(marker)\n---\n\(marker)"
-    try secretMarkdown.write(
-      to: privateDir.appendingPathComponent("secret.md"),
-      atomically: true,
-      encoding: .utf8
-    )
   }
 
   private static func extractToken(from body: String) -> String? {
