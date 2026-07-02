@@ -1,5 +1,6 @@
 import Configuration
 import Foundation
+import SystemPackage
 
 public struct ContentSettings: Sendable {
   public let contentPath: String
@@ -7,16 +8,14 @@ public struct ContentSettings: Sendable {
   public let loginSlug: String
   public let privateDirectories: Set<String>
 
-  public static func load(from config: ConfigReader) -> ContentSettings {
-    let rawPath = config.string(forKey: "CONTENT_PATH", default: "~/content")
+  public static func load(from config: ConfigReader) throws -> ContentSettings {
+    let rawPath = try config.requiredString(forKey: "CONTENT_PATH")
+    let dirs = try config.requiredStringArray(forKey: "AUTH_PRIVATE_DIRECTORIES")
     return ContentSettings(
-      contentPath: expandHomePath(rawPath),
-      indexSlug: config.string(forKey: "INDEX_PATH", default: "Home"),
-      loginSlug: config.string(forKey: "LOGIN_PATH", default: "login"),
-      privateDirectories: parseDirectoryList(
-        config.string(forKey: "AUTH_PRIVATE_DIRECTORIES", default: "")
-      )
-    )
+      contentPath: FilePath(expandingTildeIn: rawPath).string,
+      indexSlug: try config.requiredString(forKey: "INDEX_PATH"),
+      loginSlug: try config.requiredString(forKey: "LOGIN_PATH"),
+      privateDirectories: Set(dirs))
   }
 
   public func makeStore() throws -> ContentStore {
@@ -27,24 +26,4 @@ public struct ContentSettings: Sendable {
       privateDirectories: privateDirectories
     )
   }
-}
-
-public func expandHomePath(_ path: String) -> String {
-  if path == "~" {
-    return FileManager.default.homeDirectoryForCurrentUser.path
-  }
-  if path.hasPrefix("~/") {
-    return (FileManager.default.homeDirectoryForCurrentUser.path as NSString)
-      .appendingPathComponent(String(path.dropFirst(2)))
-  }
-  return path
-}
-
-private func parseDirectoryList(_ value: String) -> Set<String> {
-  Set(
-    value
-      .split(separator: ",")
-      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-      .filter { !$0.isEmpty }
-  )
 }

@@ -51,9 +51,11 @@ services:
       PGPASSWORD: shape_tree
       PGDATABASE: shape_tree
       PGSSLMODE: disable
-      CONTENT_PATH: /content
+      CONTENT_PATH: /example-content
+      INDEX_PATH: Home
+      LOGIN_PATH: login
     volumes:
-      - ${HOME}/content:/content:ro
+      - ./apps/shape-tree-web/example-content:/example-content:ro
     ports:
       - "127.0.0.1:42069:8080"
       - "127.0.0.1:42070:42070"

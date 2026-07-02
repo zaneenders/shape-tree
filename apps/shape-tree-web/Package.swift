@@ -17,6 +17,7 @@ let package = Package(
     .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
     .package(url: "https://github.com/wendylabsinc/swift-postgres-models.git", revision: "f480ced"),
     .package(url: "https://github.com/apple/swift-configuration.git", from: "1.0.0"),
+    .package(url: "https://github.com/apple/swift-system.git", from: "1.4.0"),
     .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.5.0"),
     .package(url: "https://github.com/swiftlang/swift-subprocess.git", revision: "aac702b"),
     .package(url: "https://github.com/swiftlang/swift-markdown.git", from: "0.5.0"),
@@ -45,6 +46,7 @@ let package = Package(
         "ShapeTreeMarkdown",
         .product(name: "Markdown", package: "swift-markdown"),
         .product(name: "Configuration", package: "swift-configuration"),
+        .product(name: "SystemPackage", package: "swift-system"),
       ]
     ),
     .target(

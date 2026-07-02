@@ -33,7 +33,7 @@ private func runShapeTreeWeb(logger: Logger) async throws {
   let config = try await PackageConfig.reader(packageRoot: packageRoot)
 
   let settings = try await AppSettings.load(packageRoot: packageRoot)
-  let contentSettings = ContentSettings.load(from: config)
+  let contentSettings = try ContentSettings.load(from: config)
   let contentStore = try contentSettings.makeStore()
   let otel = try OtelSettings.load(from: config)
 
