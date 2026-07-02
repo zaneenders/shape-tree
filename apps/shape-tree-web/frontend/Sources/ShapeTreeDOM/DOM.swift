@@ -48,6 +48,39 @@ public func setHidden(_ element: JSValue, _ hidden: Bool) {
   element.hidden = .boolean(hidden)
 }
 
+public func locationPathname() -> String {
+  JSObject.global.location.pathname.string ?? "/"
+}
+
+public func replaceHistoryPath(_ path: String) {
+  _ = JSObject.global.history.replaceState(JSValue.null, "", path)
+}
+
+public func pushHistoryPath(_ path: String) {
+  _ = JSObject.global.history.pushState(JSValue.null, "", path)
+}
+
+public func registerTabListResetHandler(for path: String, handler: @escaping () -> Void) {
+  let window = JSObject.global.window
+  var handlers = window.tabListResetHandlers.object ?? JSObject()
+  handlers[path] = .object(
+    JSClosure { _ -> JSValue in
+      handler()
+      return .undefined
+    }
+  )
+  window.tabListResetHandlers = .object(handlers)
+}
+
+public func resetTabContentList(path: String) {
+  guard let handlers = JSObject.global.window.tabListResetHandlers.object,
+    let reset = handlers[path].function
+  else {
+    return
+  }
+  reset()
+}
+
 public func elementById(_ id: String) -> JSValue? {
   let document = JSObject.global.document
   return document.getElementById(id).object.map { .object($0) }

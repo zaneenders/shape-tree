@@ -5,11 +5,13 @@ struct AppShell {
   let routeOutlet: JSValue
   let demoTab: JSValue
   let fitTab: JSValue
-  let articleTab: JSValue
+  let articlesTab: JSValue
+  let favoritesTab: JSValue
   let authButton: JSValue
   let demoPanel: JSValue
   let fitPanel: JSValue
-  let articlePanel: JSValue
+  let articlesPanel: JSValue
+  let favoritesPanel: JSValue
 }
 
 enum ClientRoute: Equatable {
@@ -129,6 +131,13 @@ func renderInitialView(shell: AppShell) {
   let location = JSObject.global.location
   let pathname = location.pathname.string ?? "/"
   let search = location.search.string ?? ""
+
+  if pathname == "/articles" || pathname.hasPrefix("/articles/")
+    || pathname == "/favorites" || pathname.hasPrefix("/favorites/")
+  {
+    openContentTabIfNeeded(shell: shell)
+    return
+  }
 
   if let route = ClientRoute.from(pathname: pathname, search: search) {
     showRoute(route, shell: shell, updateHistory: false)

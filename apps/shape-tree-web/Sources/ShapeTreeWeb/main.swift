@@ -6,6 +6,7 @@ import HummingbirdCompression
 import Logging
 import NIOCore
 import ShapeTreeConfig
+import ShapeTreeContent
 import ShapeTreeMarkdown
 import ShapeTreeWebAuth
 import ShapeTreeWebBuilder
@@ -32,6 +33,8 @@ private func runShapeTreeWeb(logger: Logger) async throws {
   let config = try await PackageConfig.reader(packageRoot: packageRoot)
 
   let settings = try await AppSettings.load(packageRoot: packageRoot)
+  let contentSettings = ContentSettings.load(from: config)
+  let contentStore = try contentSettings.makeStore()
   let otel = try OtelSettings.load(from: config)
 
   if !settings.skipShapeTreeWebBuild {
@@ -108,13 +111,21 @@ private func runShapeTreeWeb(logger: Logger) async throws {
       email: context.identity?.email,
       demo: true,
       fit: authenticated,
-      article: true
+      articles: contentStore.hasArticles,
+      favorites: contentStore.hasFavorites
     )
   }
 
-  let articlePath = "\(settings.staticRoot)/article.md"
-  router.get("api/article") { _, _ in
-    try loadArticleDocument(from: URL(fileURLWithPath: articlePath))
+  ContentRoutes.register(on: router, store: contentStore)
+
+  for section in ContentSection.allCases {
+    let sectionPath = section.rawValue.lowercased()
+    router.get(RouterPath(sectionPath)) { _, _ in
+      spaShellPage()
+    }
+    router.get(RouterPath("\(sectionPath)/:slug")) { _, _ in
+      spaShellPage()
+    }
   }
 
   FitProtectedRoutes.register(on: router, staticRoot: settings.staticRoot)
@@ -158,6 +169,7 @@ private func runShapeTreeWeb(logger: Logger) async throws {
     address=\(settings.hostname):\(settings.port) \
     otel=\(settings.otelHost):\(settings.otelPort) \
     static_root=\(settings.staticRoot) \
+    content_path=\(contentSettings.contentPath) \
     site_url=\(settings.siteURL) \
     otel_disabled=\(otel.disabled)
     """)
@@ -175,7 +187,6 @@ private struct SessionInfo: ResponseEncodable {
   let email: String?
   let demo: Bool
   let fit: Bool
-  let article: Bool
+  let articles: Bool
+  let favorites: Bool
 }
-
-extension ArticleDocument: ResponseEncodable {}

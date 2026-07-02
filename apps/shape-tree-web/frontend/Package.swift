@@ -21,6 +21,18 @@ let package = Package(
         .swiftLanguageMode(.v6),
       ]
     ),
+    .target(
+      name: "ContentRendering",
+      dependencies: [
+        "ShapeTreeDOM",
+        "JavaScriptKit",
+        .product(name: "JavaScriptEventLoop", package: "JavaScriptKit"),
+      ],
+      swiftSettings: [
+        .enableExperimentalFeature("Extern"),
+        .swiftLanguageMode(.v6),
+      ]
+    ),
     .executableTarget(
       name: "Entry",
       dependencies: [
@@ -34,7 +46,7 @@ let package = Package(
         .unsafeFlags(["-Osize"], .when(configuration: .release)),
       ],
       linkerSettings: [
-        .unsafeFlags(["-Xlinker", "-lswiftUnicodeDataTables"])  // Better string suppport
+        .unsafeFlags(["-Xlinker", "-lswiftUnicodeDataTables"])
       ],
       plugins: [
         .plugin(name: "BridgeJS", package: "JavaScriptKit")
@@ -54,15 +66,36 @@ let package = Package(
         .unsafeFlags(["-Osize"], .when(configuration: .release)),
       ],
       linkerSettings: [
-        .unsafeFlags(["-Xlinker", "-lswiftUnicodeDataTables"])  // Better string suppport
+        .unsafeFlags(["-Xlinker", "-lswiftUnicodeDataTables"])
       ],
       plugins: [
         .plugin(name: "BridgeJS", package: "JavaScriptKit")
       ]
     ),
     .executableTarget(
-      name: "ArticleViewer",
+      name: "ArticlesViewer",
       dependencies: [
+        "ContentRendering",
+        "ShapeTreeDOM",
+        "JavaScriptKit",
+        .product(name: "JavaScriptEventLoop", package: "JavaScriptKit"),
+      ],
+      swiftSettings: [
+        .enableExperimentalFeature("Extern"),
+        .swiftLanguageMode(.v6),
+        .unsafeFlags(["-Osize"], .when(configuration: .release)),
+      ],
+      linkerSettings: [
+        .unsafeFlags(["-Xlinker", "-lswiftUnicodeDataTables"])
+      ],
+      plugins: [
+        .plugin(name: "BridgeJS", package: "JavaScriptKit")
+      ]
+    ),
+    .executableTarget(
+      name: "FavoritesViewer",
+      dependencies: [
+        "ContentRendering",
         "ShapeTreeDOM",
         "JavaScriptKit",
         .product(name: "JavaScriptEventLoop", package: "JavaScriptKit"),

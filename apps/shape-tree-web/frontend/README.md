@@ -1,11 +1,12 @@
-# frontend
+# ShapeTree frontend
 
-`app/`
+WASM client modules for the ShapeTree web demo.
 
-Static assets and TypeScript bootstraps. The entry bundle (`app.js`) is inlined into the HTML shell for a fast first TCP load (target: under 14kb).
+## Bootstraps
 
-- `entry-bootstrap.ts` — loads `Entry.wasm`, boots the SPA shell
+- `entry-bootstrap.ts` — boots the SPA shell (`Entry.wasm`)
 - `fit-viewer-bootstrap.ts` — lazy-loads `FitViewer.wasm`
-- `article-viewer-bootstrap.ts` — lazy-loads `ArticleViewer.wasm`
+- `articles-viewer-bootstrap.ts` — lazy-loads `ArticlesViewer.wasm`
+- `favorites-viewer-bootstrap.ts` — lazy-loads `FavoritesViewer.wasm`
 
-Swift UI logic lives in `Sources/` as three WASM executables (`Entry`, `FitViewer`, `ArticleViewer`) sharing the `ShapeTreeDOM` library.
+Swift UI logic lives in `Sources/` as WASM executables (`Entry`, `FitViewer`, `ArticlesViewer`, `FavoritesViewer`) sharing `ShapeTreeDOM` and `ContentRendering`.

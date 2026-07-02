@@ -4,33 +4,48 @@ import ShapeTreeDOM
 func selectDemoTab(shell: AppShell) {
   setAttribute(shell.demoTab, "aria-selected", "true")
   setAttribute(shell.fitTab, "aria-selected", "false")
-  setAttribute(shell.articleTab, "aria-selected", "false")
+  setAttribute(shell.articlesTab, "aria-selected", "false")
+  setAttribute(shell.favoritesTab, "aria-selected", "false")
   setAttribute(shell.demoPanel, "aria-hidden", "false")
   setAttribute(shell.fitPanel, "aria-hidden", "true")
-  setAttribute(shell.articlePanel, "aria-hidden", "true")
+  setAttribute(shell.articlesPanel, "aria-hidden", "true")
+  setAttribute(shell.favoritesPanel, "aria-hidden", "true")
 }
 
 func selectFitTab(shell: AppShell) {
   setAttribute(shell.demoTab, "aria-selected", "false")
   setAttribute(shell.fitTab, "aria-selected", "true")
-  setAttribute(shell.articleTab, "aria-selected", "false")
+  setAttribute(shell.articlesTab, "aria-selected", "false")
+  setAttribute(shell.favoritesTab, "aria-selected", "false")
   setAttribute(shell.demoPanel, "aria-hidden", "true")
   setAttribute(shell.fitPanel, "aria-hidden", "false")
-  setAttribute(shell.articlePanel, "aria-hidden", "true")
+  setAttribute(shell.articlesPanel, "aria-hidden", "true")
+  setAttribute(shell.favoritesPanel, "aria-hidden", "true")
 }
 
-func selectArticleTab(shell: AppShell) {
+func selectArticlesTab(shell: AppShell) {
   setAttribute(shell.demoTab, "aria-selected", "false")
   setAttribute(shell.fitTab, "aria-selected", "false")
-  setAttribute(shell.articleTab, "aria-selected", "true")
+  setAttribute(shell.articlesTab, "aria-selected", "true")
+  setAttribute(shell.favoritesTab, "aria-selected", "false")
   setAttribute(shell.demoPanel, "aria-hidden", "true")
   setAttribute(shell.fitPanel, "aria-hidden", "true")
-  setAttribute(shell.articlePanel, "aria-hidden", "false")
+  setAttribute(shell.articlesPanel, "aria-hidden", "false")
+  setAttribute(shell.favoritesPanel, "aria-hidden", "true")
+}
+
+func selectFavoritesTab(shell: AppShell) {
+  setAttribute(shell.demoTab, "aria-selected", "false")
+  setAttribute(shell.fitTab, "aria-selected", "false")
+  setAttribute(shell.articlesTab, "aria-selected", "false")
+  setAttribute(shell.favoritesTab, "aria-selected", "true")
+  setAttribute(shell.demoPanel, "aria-hidden", "true")
+  setAttribute(shell.fitPanel, "aria-hidden", "true")
+  setAttribute(shell.articlesPanel, "aria-hidden", "true")
+  setAttribute(shell.favoritesPanel, "aria-hidden", "false")
 }
 
 func wireAppTabs(shell: AppShell) {
-  var articleLoaded = false
-
   shell.demoTab.onclick = .object(
     JSClosure { _ -> JSValue in
       navigateToHome(shell: shell)
@@ -49,15 +64,22 @@ func wireAppTabs(shell: AppShell) {
     }
   )
 
-  shell.articleTab.onclick = .object(
+  shell.articlesTab.onclick = .object(
     JSClosure { _ -> JSValue in
-      selectArticleTab(shell: shell)
+      selectArticlesTab(shell: shell)
+      replaceHistoryPath("/articles")
+      loadArticlesViewerOnce()
+      resetTabContentList(path: "/articles")
+      return .undefined
+    }
+  )
 
-      if !articleLoaded {
-        articleLoaded = true
-        loadArticleViewer()
-      }
-
+  shell.favoritesTab.onclick = .object(
+    JSClosure { _ -> JSValue in
+      selectFavoritesTab(shell: shell)
+      replaceHistoryPath("/favorites")
+      loadFavoritesViewerOnce()
+      resetTabContentList(path: "/favorites")
       return .undefined
     }
   )
@@ -100,11 +122,10 @@ func refreshSessionTabs(shell: AppShell, openFitIfSignedIn: Bool = false) {
 }
 
 private func signedOutSession() -> SessionInfo {
-  SessionInfo(authenticated: false, email: nil, demo: true, fit: false, article: true)
+  SessionInfo(authenticated: false, email: nil, demo: true, fit: false, articles: false, favorites: false)
 }
 
 private func applySessionTabs(shell: AppShell, session: SessionInfo, openFitIfSignedIn: Bool) {
-  // During login/check-email/verify, ignore a stale session cookie in the header.
   let onAuthFlow = JSObject.global.window.onAuthFlowRoute.boolean == true
   let displaySession = onAuthFlow ? signedOutSession() : session
 
@@ -113,7 +134,8 @@ private func applySessionTabs(shell: AppShell, session: SessionInfo, openFitIfSi
 
   setHidden(shell.demoTab, !displaySession.demo)
   setHidden(shell.fitTab, !displaySession.fit)
-  setHidden(shell.articleTab, !displaySession.article)
+  setHidden(shell.articlesTab, !displaySession.articles)
+  setHidden(shell.favoritesTab, !displaySession.favorites)
 
   if !session.fit && isPanelVisible(shell.fitPanel) {
     navigateToHome(shell: shell)
@@ -151,6 +173,33 @@ private func loadFitViewerOnce() {
   loadFitViewer()
 }
 
+private func loadArticlesViewerOnce() {
+  let window = JSObject.global.window
+  if window.articlesViewerLoaded.boolean == true { return }
+  window.articlesViewerLoaded = .boolean(true)
+  loadArticlesViewer()
+}
+
+private func loadFavoritesViewerOnce() {
+  let window = JSObject.global.window
+  if window.favoritesViewerLoaded.boolean == true { return }
+  window.favoritesViewerLoaded = .boolean(true)
+  loadFavoritesViewer()
+}
+
+func openContentTabIfNeeded(shell: AppShell) {
+  let pathname = locationPathname()
+  if pathname == "/articles" || pathname.hasPrefix("/articles/") {
+    selectArticlesTab(shell: shell)
+    loadArticlesViewerOnce()
+    return
+  }
+  if pathname == "/favorites" || pathname.hasPrefix("/favorites/") {
+    selectFavoritesTab(shell: shell)
+    loadFavoritesViewerOnce()
+  }
+}
+
 private func loadFitViewer() {
   guard let container = elementById("fit-container") else { return }
 
@@ -179,17 +228,33 @@ private func teardownFitViewerIfLoaded() {
   promise.catch(failure: { _ in .undefined })
 }
 
-private func loadArticleViewer() {
-  guard let container = elementById("article-container") else { return }
+private func loadArticlesViewer() {
+  guard let container = elementById("articles-container") else { return }
 
-  let promise = dynamicImport("/article-viewer-bootstrap.js")
+  let promise = dynamicImport("/articles-viewer-bootstrap.js")
   promise.then(success: { moduleValue in
     guard let module = moduleValue.object,
-      let mountArticleViewer = module.mountArticleViewer.function
+      let mountArticlesViewer = module.mountArticlesViewer.function
     else {
       return .undefined
     }
-    _ = mountArticleViewer(container)
+    _ = mountArticlesViewer(container)
+    return .undefined
+  })
+  promise.catch(failure: { _ in .undefined })
+}
+
+private func loadFavoritesViewer() {
+  guard let container = elementById("favorites-container") else { return }
+
+  let promise = dynamicImport("/favorites-viewer-bootstrap.js")
+  promise.then(success: { moduleValue in
+    guard let module = moduleValue.object,
+      let mountFavoritesViewer = module.mountFavoritesViewer.function
+    else {
+      return .undefined
+    }
+    _ = mountFavoritesViewer(container)
     return .undefined
   })
   promise.catch(failure: { _ in .undefined })

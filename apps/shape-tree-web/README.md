@@ -30,8 +30,9 @@ For traces, also `docker compose up jaeger -d` — or set `OTEL_SDK_DISABLED=tru
 | `OTEL_HOST` | `0.0.0.0` | Admin/metrics bind address. |
 | `OTEL_PORT` | `42070` | Admin/metrics listener port. |
 | `SITE_URL` | _(none — set always)_ | Public URL used in magic-link emails. |
+| `CONTENT_PATH` | `~/content` | Path to markdown content (`Articles/`, `Favorites/`). |
+| `INDEX_PATH` | `Home` | Slug of the home page markdown file. |
 | `AUTH_PRIVATE_DIRECTORIES` | _(none)_ | Comma-separated content subdirectories protected behind email login. |
-| `CONTENT_PATH` | _(override in tower compose)_ | Path to per-page `.wasm` content (shape-tree-web content host mode). |
 | `INDEX_PATH` | _(none)_ | Slug of the home page (e.g. `Home`). |
 | `PGHOST` / `PGPORT` / `PGUSER` / `PGPASSWORD` / `PGDATABASE` / `PGSSLMODE` | _(none)_ | Postgres connection. For `docker compose`, defaults are set in `docker-compose.yml` (`PGHOST=postgres`, etc.). |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM` / `SMTP_TLS` | _(none)_ | SMTP relay for magic-link login emails. **Required for startup.** |

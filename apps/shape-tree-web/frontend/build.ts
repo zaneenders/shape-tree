@@ -1,4 +1,4 @@
-import { copyFileSync, readFileSync, rmSync } from "node:fs";
+import { copyFileSync, readFileSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 
@@ -10,16 +10,14 @@ const wasmOutputsDir = resolve(
   ".build/plugins/PackageToJS/outputs",
 );
 
+const wasmProducts = ["Entry", "FitViewer", "ArticlesViewer", "FavoritesViewer"] as const;
+
 await mkdir(distDir, { recursive: true });
 
 copyFileSync(sampleFitSource, resolve(distDir, "sample.fit"));
 console.log("copied app/sample.fit → dist/sample.fit");
 
-const articleSource = resolve(import.meta.dir, "app/article.md");
-copyFileSync(articleSource, resolve(distDir, "article.md"));
-console.log("copied app/article.md → dist/article.md");
-
-for (const product of ["Entry", "FitViewer", "ArticleViewer"] as const) {
+for (const product of wasmProducts) {
   copyFileSync(
     resolve(wasmOutputsDir, product, `${product}.wasm`),
     resolve(distDir, `${product}.wasm`),
@@ -56,8 +54,12 @@ async function buildBootstrap(
 await buildBootstrap("app/entry-bootstrap.ts", "app.js");
 await buildBootstrap("app/fit-viewer-bootstrap.ts", "fit-viewer-bootstrap.js");
 await buildBootstrap(
-  "app/article-viewer-bootstrap.ts",
-  "article-viewer-bootstrap.js",
+  "app/articles-viewer-bootstrap.ts",
+  "articles-viewer-bootstrap.js",
+);
+await buildBootstrap(
+  "app/favorites-viewer-bootstrap.ts",
+  "favorites-viewer-bootstrap.js",
 );
 
 const styles = readFileSync(resolve(import.meta.dir, "app/app.css"), "utf8");

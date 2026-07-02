@@ -21,5 +21,6 @@ import JavaScriptKit
   var email: String?
   var demo: Bool
   var fit: Bool
-  var article: Bool
+  var articles: Bool
+  var favorites: Bool
 }
