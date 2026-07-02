@@ -9,11 +9,15 @@ import ShapeTreeDOM
   let app = createElement("div", id: "app")
   append(app, to: documentBody())
 
-  let appHeader = createElement("div", className: "app-header")
+  let appHeader = createElement("header", className: "app-header")
   append(appHeader, to: app)
 
-  let heading = createElement("h1", innerText: "ShapeTree · Swift WASM Demo")
-  append(heading, to: appHeader)
+  let brand = createElement("div", className: "app-brand")
+  append(brand, to: appHeader)
+
+  let heading = createElement("h1", innerText: "ShapeTree")
+  append(heading, to: brand)
+
 
   let authButton = createElement(
     "button",

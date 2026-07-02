@@ -2,7 +2,7 @@ enum WebAssets {
   static let stylesheetPath = "/app.css"
 
   static func indexHTML(
-    title: String = "WASM Hummingbird Server",
+    title: String = "ShapeTree",
     bootstrapScript: String
   ) -> String {
     let escapedTitle = escapeHTML(title)
